@@ -1,0 +1,31 @@
+# Prompt Factory — configuração global.
+# Lido por src/prompt_factory/config.py (tomllib, com cache).
+# Alterar thresholds aqui é a forma suportada de "replayar" estágios da pipeline.
+
+[general]
+seed = 42
+# Cache do HuggingFace fora do C: (datasets grandes + torch). O cli.py faz
+# os.environ.setdefault("HF_HOME", <este valor>) antes de qualquer import pesado.
+hf_home = "G:/hf-cache"
+
+[dedup]
+# s06 (dedup próximo): só é near-dup quando os DOIS critérios batem.
+near_cosine = 0.985
+near_jaccard = 0.65
+
+[labeling]
+batch_size = 80        # 77 itens novos + 3 de calibração ocultos
+gold_per_batch = 3
+seed_total = 12000     # 6k pt + 6k EN, estratificado por fonte x tamanho
+
+[classifier]
+conf_accept = 0.50     # >= aceita o rótulo
+conf_review = 0.35     # entre review e accept: aceita mas marca needs_review
+
+[embed]
+model = "intfloat/multilingual-e5-small"
+dim = 384
+
+[app]
+host = "127.0.0.1"
+port = 8765

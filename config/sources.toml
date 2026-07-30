@@ -1,0 +1,147 @@
+# Prompt Factory — registro de fontes.
+#
+# Uma seção por fonte. Toda fonte carrega sua licença ATÉ A LINHA no banco final
+# (colunas license / commercial_ok / redistributable / attribution), porque o
+# corpus mistura licenças e o export precisa filtrar por política.
+#
+# Chaves obrigatórias (contrato lido por src/prompt_factory/ingest/base.py):
+#   enabled          — se False, o ingester nem roda
+#   hf_id            — repo do dataset no HuggingFace Hub
+#   license          — identificador SPDX quando existe; senão nome da licença
+#   commercial_ok    — permite uso comercial do prompt derivado
+#   redistributable  — permite redistribuir o texto (export exclui False por padrão)
+#   attribution      — crédito por extenso, copiado tal e qual para cada linha
+#   expected_min/max — guarda de sanidade do M2/M3: contagem fora do intervalo = falha
+
+# ---------------------------------------------------------------------------
+# Português
+# ---------------------------------------------------------------------------
+
+[wildchat_pt]
+enabled = true
+hf_id = "allenai/WildChat-4.8M"
+lang = "pt"
+license = "odc-by-1.0"
+commercial_ok = true
+redistributable = true
+attribution = "Zhao, Wenting; Ren, Xiang; Hessel, Jack; Cardie, Claire; Choi, Yejin; Deng, Yuntian. \"WildChat: 1M ChatGPT Interaction Logs in the Wild\", ICLR 2024. Dataset allenai/WildChat-4.8M, Allen Institute for AI, licenciado sob Open Data Commons Attribution License (ODC-BY) v1.0."
+expected_min = 30000
+expected_max = 45000
+notes = "Fonte principal de pt. Streaming com pushdown de filters/columns; checkpoints ds.state_dict() a cada 50k linhas lidas."
+
+[aya]
+enabled = true
+hf_id = "CohereLabs/aya_dataset"
+lang = "pt"
+license = "apache-2.0"
+commercial_ok = true
+redistributable = true
+attribution = "Singh, Shivalika; Vargus, Freddie; D'souza, Daniel; et al. \"Aya Dataset: An Open-Access Collection for Multilingual Instruction Tuning\", Cohere For AI, 2024. Dataset CohereLabs/aya_dataset, licenciado sob Apache License 2.0."
+expected_min = 8000
+expected_max = 9500
+notes = "8.997 prompts pt escritos à mão por anotadores humanos — melhor razão qualidade/licença do corpus."
+
+[oasst]
+enabled = true
+hf_id = "OpenAssistant/oasst1"
+hf_ids = ["OpenAssistant/oasst1", "OpenAssistant/oasst2"]
+lang = "pt"
+license = "apache-2.0"
+commercial_ok = true
+redistributable = true
+attribution = "Köpf, Andreas; Kilcher, Yannic; von Rütte, Dimitri; et al. \"OpenAssistant Conversations — Democratizing Large Language Model Alignment\", NeurIPS 2023 Datasets and Benchmarks Track. Datasets OpenAssistant/oasst1 e OpenAssistant/oasst2, LAION-AI / OpenAssistant, licenciados sob Apache License 2.0."
+expected_min = 2000
+expected_max = 4500
+notes = "Extrair só raízes com role=prompter e lang=pt. oasst1 e oasst2 se sobrepõem: unir por message_id antes de contar."
+
+[arena140k]
+enabled = true
+hf_id = "lmarena-ai/arena-human-preference-140k"
+lang = "pt"
+license = "cc-by-4.0"
+commercial_ok = true
+redistributable = true
+attribution = "LMArena (anteriormente LMSYS Chatbot Arena). \"Arena Human Preference 140k\". Dataset lmarena-ai/arena-human-preference-140k; os prompts são licenciados sob Creative Commons Attribution 4.0 International (CC-BY-4.0)."
+expected_min = 1400
+expected_max = 2200
+notes = "1.684 prompts pt. Só o primeiro turno do usuário."
+
+# ---------------------------------------------------------------------------
+# Inglês (amostra estratificada)
+# ---------------------------------------------------------------------------
+
+[wildchat_en]
+enabled = true
+hf_id = "allenai/WildChat-4.8M"
+lang = "en"
+license = "odc-by-1.0"
+commercial_ok = true
+redistributable = true
+attribution = "Zhao, Wenting; Ren, Xiang; Hessel, Jack; Cardie, Claire; Choi, Yejin; Deng, Yuntian. \"WildChat: 1M ChatGPT Interaction Logs in the Wild\", ICLR 2024. Dataset allenai/WildChat-4.8M, Allen Institute for AI, licenciado sob Open Data Commons Attribution License (ODC-BY) v1.0."
+expected_min = 100000
+expected_max = 100000
+notes = "Hash-gate determinístico sha256(conversation_hash) < 8% no streaming (pool ~200k) e depois downsample estratificado EXATO para 100.000 com default_rng(42) sobre modelo x faixa-de-tamanho x ano."
+
+[no_robots]
+enabled = true
+hf_id = "HuggingFaceH4/no_robots"
+lang = "en"
+license = "cc-by-nc-4.0"
+commercial_ok = false
+redistributable = true
+attribution = "Rajani, Nazneen; Tunstall, Lewis; Beeching, Edward; Habib, Nathan; Sanseviero, Omar; von Werra, Leandro; Wolf, Thomas. \"No Robots\", Hugging Face H4, 2023. Dataset HuggingFaceH4/no_robots, licenciado sob Creative Commons Attribution-NonCommercial 4.0 International (CC-BY-NC-4.0)."
+expected_min = 9000
+expected_max = 10500
+notes = "NÃO comercial: contabilizado à parte no export. As categorias nativas (Generation, Open QA, Closed QA, Brainstorm, Chat, Rewrite, Summarize, Coding, Classify, Extract) viram rótulos grátis de task_type via labeling/mappings/."
+
+[dolly]
+enabled = true
+hf_id = "databricks/databricks-dolly-15k"
+lang = "en"
+license = "cc-by-sa-3.0"
+commercial_ok = true
+redistributable = true
+attribution = "Conover, Mike; Hayes, Matt; Mathur, Ankit; et al. \"Free Dolly: Introducing the World's First Truly Open Instruction-Tuned LLM\", Databricks, 2023. Dataset databricks/databricks-dolly-15k, licenciado sob Creative Commons Attribution-ShareAlike 3.0 Unported (CC-BY-SA-3.0)."
+expected_min = 14000
+expected_max = 15500
+notes = "Categorias nativas (open_qa, closed_qa, brainstorming, classification, creative_writing, general_qa, information_extraction, summarization) também mapeiam para task_type."
+
+[hh_rlhf]
+enabled = true
+hf_id = "Anthropic/hh-rlhf"
+lang = "en"
+license = "mit"
+commercial_ok = true
+redistributable = true
+attribution = "Bai, Yuntao; Jones, Andy; Ndousse, Kamal; et al. \"Training a Helpful and Harmless Assistant with Reinforcement Learning from Human Feedback\", Anthropic, 2022. Dataset Anthropic/hh-rlhf, licenciado sob MIT License."
+expected_min = 12000
+expected_max = 18000
+notes = "APENAS os splits helpful-* (base / online / rejection-sampled). Os dados de red-team NUNCA são ingeridos."
+
+[prism]
+enabled = true
+hf_id = "HannahRoseKirk/prism-alignment"
+lang = "en"
+license = "cc-by-4.0"
+commercial_ok = true
+redistributable = true
+attribution = "Kirk, Hannah Rose; Whitefield, Alexander; Röttger, Paul; et al. \"The PRISM Alignment Dataset: What Participatory, Representative and Individualised Human Feedback Reveals About the Subjective and Multicultural Alignment of Large Language Models\", NeurIPS 2024 Datasets and Benchmarks Track. Dataset HannahRoseKirk/prism-alignment, licenciado sob Creative Commons Attribution 4.0 International (CC-BY-4.0)."
+expected_min = 7000
+expected_max = 9000
+notes = "Demografia rica dos participantes; primeiro turno das conversations."
+
+# ---------------------------------------------------------------------------
+# Opcional — DESLIGADA por padrão
+# ---------------------------------------------------------------------------
+
+[lmsys]
+enabled = false
+hf_id = "lmsys/lmsys-chat-1m"
+lang = "pt"
+license = "lmsys-1m"
+commercial_ok = false
+redistributable = false
+attribution = "Zheng, Lianmin; Chiang, Wei-Lin; Sheng, Ying; et al. \"LMSYS-Chat-1M: A Large-Scale Real-World LLM Conversation Dataset\", ICLR 2024. Dataset lmsys/lmsys-chat-1m, sob o LMSYS-Chat-1M Dataset License Agreement (uso não comercial, redistribuição proibida)."
+expected_min = 20000
+expected_max = 60000
+notes = "DESLIGADA. É o maior pool de pt existente (pt é o 2º idioma do dataset), mas é gated, a licença proíbe redistribuição e os nomes vêm anonimizados como NAME_1. Ligar só para uso local; o export nunca inclui redistributable=false."

@@ -1,0 +1,60 @@
+[project]
+name = "prompt-factory"
+version = "0.1.0"
+description = "Banco de prompts reais (pt-BR + EN): pipeline de extração/classificação e interface de curadoria"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "datasets>=4.8,<5",
+    "pyarrow>=17",
+    "pandas>=2.2",
+    "numpy>=1.26,<3",
+    "torch>=2.4",
+    "sentence-transformers>=3.3",
+    "scikit-learn>=1.5",
+    "joblib>=1.4",
+    "fast-langdetect>=0.3",
+    "lingua-language-detector>=2.1",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "huggingface-hub>=0.34",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+setfit = ["setfit>=1.1"]
+onnx = ["optimum[onnxruntime]>=1.21"]
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+
+[project.scripts]
+pf = "prompt_factory.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+# Esta máquina tem o TLS interceptado por proxy/antivírus: a raiz que reassina o
+# tráfego só existe no armazenamento de certificados do Windows, então o bundle
+# embutido do uv rejeita o PyPI com "invalid peer certificate: UnknownIssuer".
+# system-certs faz o uv usar o trust store do SO (= flag `--system-certs`).
+# Em uv < 0.12 a chave se chamava `native-tls`.
+# Verificação de certificado continua LIGADA — nunca troque isto por
+# --allow-insecure-host, que desliga a verificação de fato.
+system-certs = true
+# Cache do uv fica no C: e o .venv no G: — filesystems diferentes, hardlink não
+# funciona. Copiar de vez elimina o warning "Failed to hardlink files".
+link-mode = "copy"
+
+[tool.ruff]
+# Sem esta seção o ruff sobe a árvore de diretórios e herda a configuração de
+# FORA do repositório (acontece nesta máquina): o lint passa a depender de onde
+# o projeto está clonado. Fixar aqui torna `ruff check .` reprodutível.
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "RUF"]
+ignore = ["E501"]  # comprimento de linha fica a cargo do `ruff format`

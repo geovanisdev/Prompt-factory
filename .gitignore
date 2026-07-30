@@ -1,0 +1,32 @@
+# --- dados (nunca commitar parquet / sqlite / npy / exports) ---
+# Tudo dentro de data/ é ignorado, EXCETO os .gitkeep que preservam a estrutura.
+data/**
+!data/**/
+!data/**/.gitkeep
+
+# lotes de rotulagem gerados pela pipeline (o README e os .gitkeep ficam)
+labeling/batches/**
+!labeling/batches/**/
+!labeling/batches/**/.gitkeep
+
+# cache de modelos/datasets do HuggingFace, caso alguém aponte HF_HOME pra cá
+hf-cache/
+
+# --- python / uv ---
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# NÃO ignorar uv.lock — ele É commitado (build reprodutível).
+
+# --- diversos ---
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db
