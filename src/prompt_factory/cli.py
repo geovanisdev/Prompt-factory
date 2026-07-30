@@ -28,7 +28,11 @@ _Option = tuple[tuple[str, ...], dict[str, object]]
 
 _MAX_ROWS: _Option = (
     ("--max-rows",),
-    {"type": int, "metavar": "N", "help": "processa no máximo N linhas (smoke test)"},
+    {
+        "type": int,
+        "metavar": "N",
+        "help": "processa no máximo N linhas (smoke test; no wildchat conta linhas VARRIDAS, não mantidas)",
+    },
 )
 _FORCE: _Option = (
     ("--force",),
@@ -76,12 +80,16 @@ def _db_check(args: argparse.Namespace) -> int:
 
 
 def _ingest(args: argparse.Namespace) -> int:
-    """``pf ingest [fonte...]`` (M2) — baixa fontes e grava ``data/raw/<fonte>.parquet``.
+    """``pf ingest [fonte...]`` (M2/M3) — baixa fontes e grava ``data/raw/<fonte>.parquet``.
 
     Sequencial e fail-fast: a primeira fonte que explodir aborta a rodada, com o
     traceback inteiro. As fontes já gravadas ficam válidas (cada parquet é
     escrito atomicamente), então basta re-rodar o mesmo comando — os downloads
-    do HuggingFace retomam do cache.
+    do HuggingFace retomam do cache e o WildChat retoma do checkpoint.
+
+    Dois contratos de ingester (ver ``ingest/__init__.py``): ``run_ingest`` para
+    quem controla a própria escrita (WildChat, streaming com checkpoint) e
+    ``iter_rows`` + ``write_raw`` para as fontes pequenas do M2.
 
     ``datasets``/``pyarrow`` entram só aqui dentro: ``pf --help`` não paga por eles.
     """
@@ -97,18 +105,29 @@ def _ingest(args: argparse.Namespace) -> int:
         return 2
 
     if args.resume:
-        print("[pf] --resume não tem efeito no M2 (checkpoint só existe no streaming do M3)")
+        # Retomar já é o padrão: a flag existe só para quem espera digitá-la.
+        print("[pf] --resume é o comportamento PADRÃO (existindo checkpoint válido, o passe continua)")
     if args.force:
-        print("[pf] --force não tem efeito no M2 (raw é regenerável: a ingestão sempre reescreve)")
+        print("[pf] --force não tem efeito: raw é regenerável, a ingestão sempre reescreve")
+    if args.downsample and fontes != ["wildchat_en"]:
+        print("[pf] --downsample só vale para `pf ingest wildchat-en`", file=sys.stderr)
+        return 2
 
     print(f"[pf] ingerindo {len(fontes)} fonte(s): {', '.join(fontes)}")
     for nome in fontes:
         try:
-            write_raw(
-                nome,
-                REGISTRY[nome].iter_rows(get_source_cfg(nome), args.max_rows),
-                args.max_rows,
-            )
+            modulo = REGISTRY[nome]
+            runner = getattr(modulo, "run_ingest", None)
+            if runner is not None:
+                codigo = int(runner(nome, get_source_cfg(nome), args))
+                if codigo != 0:
+                    return codigo
+            else:
+                write_raw(
+                    nome,
+                    modulo.iter_rows(get_source_cfg(nome), args.max_rows),
+                    args.max_rows,
+                )
         except Exception as exc:  # o traceback inteiro vai para o stderr logo abaixo
             import traceback
 
@@ -142,10 +161,21 @@ COMMANDS: tuple[_Cmd, ...] = (
                 {
                     "nargs": "*",
                     "metavar": "FONTE",
-                    "help": "seções de config/sources.toml, ou 'all' (padrão: todas as default_on)",
+                    "help": "seções de config/sources.toml (hífen vale por _), ou 'all' (padrão: todas as default_on)",
                 },
             ),
-            (("--resume",), {"action": "store_true", "help": "retoma do último checkpoint de streaming (M3)"}),
+            (
+                ("--resume",),
+                {"action": "store_true", "help": "alias explícito do padrão: retomar do checkpoint (wildchat)"},
+            ),
+            (
+                ("--restart",),
+                {"action": "store_true", "help": "apaga checkpoint e part-files e refaz o passe do zero (wildchat)"},
+            ),
+            (
+                ("--downsample",),
+                {"action": "store_true", "help": "só wildchat-en: pool -> 100.000 estratificadas, sem rede"},
+            ),
             _MAX_ROWS,
             _FORCE,
         ],

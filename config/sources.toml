@@ -24,7 +24,7 @@
 
 [wildchat_pt]
 enabled = true
-default_on = false
+default_on = true
 hf_id = "allenai/WildChat-4.8M"
 lang = "pt"
 license = "odc-by-1.0"
@@ -33,7 +33,7 @@ redistributable = true
 attribution = "Zhao, Wenting; Ren, Xiang; Hessel, Jack; Cardie, Claire; Choi, Yejin; Deng, Yuntian. \"WildChat: 1M ChatGPT Interaction Logs in the Wild\", ICLR 2024. Dataset allenai/WildChat-4.8M, Allen Institute for AI, licenciado sob Open Data Commons Attribution License (ODC-BY) v1.0."
 expected_min = 30000
 expected_max = 45000
-notes = "Fonte principal de pt. Streaming com pushdown de filters/columns; checkpoints ds.state_dict() a cada 50k linhas lidas. default_on vira true no M3, quando o ingester de streaming existir."
+notes = "Fonte principal de pt. Streaming com pushdown de `columns=` (filters= NÃO poupa banda aqui e quebraria a cadência do checkpoint: ver docstring de ingest/wildchat.py); idioma filtrado no cliente com `language == \"Portuguese\"`, por extenso. Checkpoint ds.state_dict() a cada 50k linhas VARRIDAS, part-files em data/raw/_parts/. O split train tem 3.199.860 linhas; a faixa 30k-45k é extrapolação de janela parcial (1,199% de pt) — fora dela é drift de mix, não bug: inspecione a amostra antes de mexer nestes números."
 
 [aya]
 enabled = true
@@ -81,7 +81,7 @@ notes = "1.684 prompts pt. Só o primeiro turno do usuário."
 
 [wildchat_en]
 enabled = true
-default_on = false
+default_on = true
 hf_id = "allenai/WildChat-4.8M"
 lang = "en"
 license = "odc-by-1.0"
@@ -90,7 +90,7 @@ redistributable = true
 attribution = "Zhao, Wenting; Ren, Xiang; Hessel, Jack; Cardie, Claire; Choi, Yejin; Deng, Yuntian. \"WildChat: 1M ChatGPT Interaction Logs in the Wild\", ICLR 2024. Dataset allenai/WildChat-4.8M, Allen Institute for AI, licenciado sob Open Data Commons Attribution License (ODC-BY) v1.0."
 expected_min = 100000
 expected_max = 100000
-notes = "Hash-gate determinístico sha256(conversation_hash) < 8% no streaming (pool ~200k) e depois downsample estratificado EXATO para 100.000 com default_rng(42) sobre modelo x faixa-de-tamanho x ano. default_on vira true no M3."
+notes = "Dois estágios. 1) `pf ingest wildchat-en` varre o split e guarda o POOL em data/raw/wildchat_en_pool.parquet: language == \"English\" + hash-gate determinístico int(sha256(conversation_hash).hexdigest()[:8],16) < 0.11*2**32 (11%, não 8%: 0,11 x ~1,79M linhas EN ~= 197k, com folga para os pisos do estrato). 2) `pf ingest wildchat-en --downsample` (sem rede) corta para EXATAMENTE 100.000 com default_rng(42) sobre família-do-modelo x faixa-de-tamanho x ano; o expected_min/max abaixo vale para ESTE arquivo final, não para o pool (a faixa do pool, 130k-300k, é só WARN e mora em ingest/wildchat.py)."
 
 [no_robots]
 enabled = true
@@ -159,4 +159,4 @@ redistributable = false
 attribution = "Zheng, Lianmin; Chiang, Wei-Lin; Sheng, Ying; et al. \"LMSYS-Chat-1M: A Large-Scale Real-World LLM Conversation Dataset\", ICLR 2024. Dataset lmsys/lmsys-chat-1m, sob o LMSYS-Chat-1M Dataset License Agreement (uso não comercial, redistribuição proibida)."
 expected_min = 20000
 expected_max = 60000
-notes = "DESLIGADA. É o maior pool de pt existente (pt é o 2º idioma do dataset), mas é gated, a licença proíbe redistribuição e os nomes vêm anonimizados como NAME_1. Ligar só para uso local; o export nunca inclui redistributable=false."
+notes = "DESLIGADA. É o maior pool de pt existente (pt é o 2º idioma do dataset), mas é gated, a licença proíbe redistribuição e os nomes vêm anonimizados como NAME_1. Ligar só para uso local; o export nunca inclui redistributable=false. `pf ingest lmsys` já existe: com enabled=false ele faz ZERO rede, imprime o passo a passo para habilitar e sai com código 2 (ingest/lmsys_chat_1m.py)."

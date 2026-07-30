@@ -139,7 +139,9 @@ def test_to_iso_aceita_datetime_str_e_none() -> None:
 
 def test_resolve_names_vazio_expande_para_as_default_on() -> None:
     padrao = resolve_names([])
-    assert set(padrao) == set(REGISTRY)
+    # lmsys está no REGISTRY mas é enabled=false: nunca entra no padrão.
+    assert set(padrao) == set(REGISTRY) - {"lmsys"}
+    assert padrao[-2:] == ["wildchat_pt", "wildchat_en"]  # os caros por último
     assert resolve_names(None) == padrao
     assert resolve_names(["all"]) == padrao
 
@@ -148,9 +150,14 @@ def test_resolve_names_preserva_ordem_e_remove_repetidas() -> None:
     assert resolve_names(["dolly", "aya", "dolly"]) == ["dolly", "aya"]
 
 
+def test_resolve_names_aceita_hifen_no_lugar_do_underscore() -> None:
+    # A linha de comando escreve `wildchat-pt`; o TOML e o parquet usam `_`.
+    assert resolve_names(["wildchat-pt", "wildchat-en"]) == ["wildchat_pt", "wildchat_en"]
+
+
 def test_resolve_names_recusa_fonte_desconhecida() -> None:
     with pytest.raises(ValueError, match="fonte desconhecida"):
-        resolve_names(["wildchat_pt"])  # existe no TOML, mas o ingester é do M3
+        resolve_names(["wildchat"])  # sem o sufixo de modo não existe fonte
 
 
 # ---------------------------------------------------------------------------
