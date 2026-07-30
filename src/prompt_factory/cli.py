@@ -1,7 +1,8 @@
 """Entrypoint `pf` — CLI única do Prompt Factory (argparse, só stdlib).
 
-Cada subcomando corresponde a um estágio da pipeline. No M0 todos são stubs:
-imprimem em que marco chegam e saem com código 2. `pf --help` e
+Cada subcomando corresponde a um estágio da pipeline e vai saindo do stub no
+marco indicado em `_Cmd.milestone` (implementado: `db-check`, M1). Enquanto é
+stub, o comando imprime em que marco chega e sai com código 2. `pf --help` e
 `pf <cmd> --help` funcionam e saem 0 — é isso que a DoD do M0 exige.
 
 O `main()` faz o *bootstrap* de ambiente ANTES de qualquer import pesado:
@@ -62,6 +63,17 @@ class _Cmd:
         self.handler = handler
 
 
+def _db_check(args: argparse.Namespace) -> int:
+    """``pf db-check`` (M1) — autoteste do SQLite num banco temporário.
+
+    Import lazy de propósito: ``pf --help`` não precisa carregar o DDL nem o
+    módulo ``sqlite3``.
+    """
+    from .db import run_db_check
+
+    return run_db_check(bench=args.bench, query=args.query)
+
+
 COMMANDS: tuple[_Cmd, ...] = (
     _Cmd(
         "ingest",
@@ -98,7 +110,12 @@ COMMANDS: tuple[_Cmd, ...] = (
         "db-check",
         "M1",
         "sanidade do SQLite: DDL, WAL e busca FTS sem acento ('coracao' acha 'coração')",
-        [(("--query",), {"metavar": "Q", "help": "termo de teste do FTS5"})],
+        [
+            (("--query",), {"metavar": "Q", "help": "termo de teste do FTS5"}),
+            (("--bench",), {"action": "store_true", "help": "mede tempos (chega no M8, com o banco carregado)"}),
+        ],
+        implemented=True,
+        handler=_db_check,
     ),
     _Cmd(
         "make-seed",

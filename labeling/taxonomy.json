@@ -1,0 +1,310 @@
+{
+  "version": "1.0",
+  "task_type": {
+    "geracao-criativa": {
+      "nome": "Geração criativa",
+      "definicao": "Pedido de criação de conteúdo ficcional ou artístico original: histórias, poemas, letras de música, piadas, diálogos, cenários. Desempate: texto com finalidade prática ou profissional é redacao-pratica; se o usuário pede que o assistente encarne um personagem e interaja, é roleplay-persona.",
+      "exemplos": [
+        "Escreve um conto de terror ambientado numa cidadezinha do interior de Minas",
+        "Write a short poem about the ocean at night, in the style of Emily Dickinson",
+        "Cria uma letra de funk sobre acordar cedo na segunda-feira"
+      ]
+    },
+    "redacao-pratica": {
+      "nome": "Redação prática",
+      "definicao": "Criação de texto utilitário do zero: e-mails, mensagens, posts, currículos, descrições de produto, discursos, cartas. Desempate: se o objetivo é arte ou entretenimento, é geracao-criativa; se o usuário fornece um texto próprio para melhorar, é reescrita-edicao.",
+      "exemplos": [
+        "Escreve um e-mail educado pro meu chefe pedindo aumento depois de 2 anos sem reajuste",
+        "Write a LinkedIn post announcing that I just started as a data analyst at a fintech",
+        "Preciso de uma legenda de Instagram pra divulgar a promoção da minha confeitaria"
+      ]
+    },
+    "reescrita-edicao": {
+      "nome": "Reescrita e edição",
+      "definicao": "O usuário fornece um texto e pede para corrigir, melhorar, encurtar, expandir, mudar o tom ou reformatar, preservando o conteúdo. Desempate: sem texto-fonte do usuário é redacao-pratica ou geracao-criativa; mudar de idioma é traducao; condensar fielmente é resumo.",
+      "exemplos": [
+        "Corrige a gramática mantendo o jeito informal: 'nois vai amanha no mercado compra as coisa'",
+        "Make this message sound more professional: hey boss, im sick, cant come in today",
+        "Reescreve esse parágrafo do meu TCC num tom mais acadêmico: [texto]"
+      ]
+    },
+    "resumo": {
+      "nome": "Resumo",
+      "definicao": "Condensar um texto fornecido ou material identificado (artigo, livro, vídeo) preservando as ideias principais. Desempate: mudar tom ou estilo mantendo o conteúdo integral é reescrita-edicao; pergunta pontual sobre o material é qa-contexto; explicar um conceito sem material de apoio é qa-aberta.",
+      "exemplos": [
+        "Resume esse artigo em 3 bullet points: [texto]",
+        "Summarize the plot of Pride and Prejudice in two sentences",
+        "Me faz um resumo do texto abaixo pra eu falar em 1 minuto na reunião: [texto]"
+      ]
+    },
+    "traducao": {
+      "nome": "Tradução",
+      "definicao": "Converter texto de um idioma para outro, incluindo pedidos pontuais de 'como se diz X em Y'. Desempate: dúvida sobre gramática ou uso da língua sem texto para converter é qa-aberta (domínio linguagem-idiomas); adaptar tom no mesmo idioma é reescrita-edicao.",
+      "exemplos": [
+        "Traduz pro inglês: 'que saudade de você, volta logo'",
+        "Translate this paragraph into Brazilian Portuguese, keeping the informal tone: [text]",
+        "Como se diz 'estágio' em inglês num contexto de trabalho?"
+      ]
+    },
+    "qa-aberta": {
+      "nome": "Pergunta aberta",
+      "definicao": "Pergunta factual ou explicativa respondível com o conhecimento do modelo, sem material de apoio fornecido pelo usuário. Desempate: se há texto ou dados anexados sobre os quais se pergunta, é qa-contexto; recomendação ou julgamento aplicado à situação do usuário é conselho-opiniao; exigindo cálculo ou dedução formal, é matematica-raciocinio.",
+      "exemplos": [
+        "Por que o céu é azul?",
+        "What is the difference between RAM and storage?",
+        "Quem foi Zumbi dos Palmares?"
+      ]
+    },
+    "qa-contexto": {
+      "nome": "Pergunta sobre contexto fornecido",
+      "definicao": "O usuário fornece um documento, trecho ou dados e pergunta algo que se responde a partir desse material. Desempate: sem material anexado é qa-aberta; pedir condensação do material é resumo; pedir saída estruturada (campos, rótulos, JSON) é classificacao-extracao.",
+      "exemplos": [
+        "Com base no contrato abaixo, qual a multa se eu cancelar antes do prazo? [texto]",
+        "According to this abstract, what was the sample size of the study? [text]",
+        "Olha esse e-mail que recebi do 'banco' e me diz se parece golpe: [e-mail]"
+      ]
+    },
+    "brainstorm": {
+      "nome": "Brainstorm e ideação",
+      "definicao": "Gerar ideias, nomes, alternativas ou possibilidades em aberto, tipicamente em lista, sem compromisso com um texto final único. Desempate: pedir um texto pronto é redacao-pratica ou geracao-criativa; pedir etapas ordenadas para atingir um objetivo é planejamento.",
+      "exemplos": [
+        "Me dá 10 ideias de nome pra uma cafeteria com tema de livros",
+        "Brainstorm birthday party ideas for a 10-year-old who loves dinosaurs",
+        "Ideias de conteúdo pra um TikTok de escritório de advocacia"
+      ]
+    },
+    "classificacao-extracao": {
+      "nome": "Classificação e extração",
+      "definicao": "Rotular, categorizar, ranquear ou extrair informação estruturada (entidades, campos, tabelas, JSON) de material fornecido, com formato de saída definido. Desempate: resposta em prosa livre sobre o material é qa-contexto; pedir um programa que faça a extração é codigo.",
+      "exemplos": [
+        "Extrai nome, e-mail e telefone deste texto e devolve em JSON: [texto]",
+        "Classify each of these reviews as positive, negative or neutral: [lista]",
+        "Ordena esses 8 títulos do mais clickbait pro menos clickbait: [lista]"
+      ]
+    },
+    "codigo": {
+      "nome": "Código e programação",
+      "definicao": "Escrever, corrigir, explicar, revisar, converter ou otimizar código; dúvidas de programação, SQL, regex, scripts, erros e ferramentas de desenvolvimento. Desempate: pergunta conceitual sobre tecnologia sem código envolvido é qa-aberta (domínio tecnologia); problema puramente matemático sem programação é matematica-raciocinio.",
+      "exemplos": [
+        "Escreve uma função em Python que valida CPF",
+        "Why does this JavaScript throw 'undefined is not a function'? [code]",
+        "Converte essa query com subquery pra usar JOIN: [sql]"
+      ]
+    },
+    "matematica-raciocinio": {
+      "nome": "Matemática e raciocínio",
+      "definicao": "Cálculos, problemas matemáticos, lógica, enigmas, probabilidade, conversões de unidade e deduções passo a passo. Desempate: se pede código para calcular, é codigo; pergunta factual sem cálculo é qa-aberta.",
+      "exemplos": [
+        "Quanto é 15% de 340?",
+        "A train leaves at 3pm at 80 km/h and another at 4pm at 100 km/h. When does the second catch up? Show the steps",
+        "Resolve e explica: 2x² - 8x + 6 = 0"
+      ]
+    },
+    "conselho-opiniao": {
+      "nome": "Conselho e opinião",
+      "definicao": "Pedido de orientação, recomendação ou julgamento subjetivo aplicado à situação pessoal do usuário. Desempate: pergunta factual neutra é qa-aberta; pedir um plano estruturado em etapas é planejamento; desabafo sem pedido concreto é conversa-social.",
+      "exemplos": [
+        "Vale a pena aceitar uma proposta ganhando 20% menos mas 100% home office?",
+        "What should I reply to a girl who left me on read for two days?",
+        "Meu chefe me expôs na reunião na frente de todo mundo, como eu reajo sem me queimar?"
+      ]
+    },
+    "planejamento": {
+      "nome": "Planejamento",
+      "definicao": "Montar planos, cronogramas, roteiros, rotinas, treinos, dietas, currículos de estudo ou itinerários com etapas e sequência organizadas. Desempate: ideias soltas sem sequência são brainstorm; orientação pontual sem estrutura de etapas é conselho-opiniao.",
+      "exemplos": [
+        "Monta um cronograma de 3 meses pro ENEM estudando 2h por dia útil",
+        "Plan a 5-day trip to Rome on a 1000 euro budget, day by day",
+        "Cria um treino de academia pra iniciante, 3x por semana, foco em hipertrofia"
+      ]
+    },
+    "roleplay-persona": {
+      "nome": "Roleplay e persona",
+      "definicao": "O usuário pede que o assistente assuma um personagem, papel ou persona e interaja a partir dele (personagens de ficção, simulações de entrevista, 'aja como', personas de jailbreak). Desempate: pedir uma história sobre personagens, sem interação em papéis, é geracao-criativa.",
+      "exemplos": [
+        "Você é o Monkey D. Luffy e responde como ele até eu mandar parar",
+        "Act as a job interviewer for a junior developer position and ask me one question at a time",
+        "Finge que é um atendente de telemarketing tentando me vender um plano de internet"
+      ]
+    },
+    "conversa-social": {
+      "nome": "Conversa social",
+      "definicao": "Cumprimentos, small talk, testes do tipo 'oi, você funciona?', agradecimentos, desabafos sem pedido concreto e curiosidade sobre o próprio assistente. Desempate: havendo tarefa ou pergunta concreta, classifica-se pela tarefa; desabafo pedindo orientação é conselho-opiniao.",
+      "exemplos": [
+        "oi, tudo bem?",
+        "hey, what can you do?",
+        "vc é o chatgpt? quem te criou?"
+      ]
+    },
+    "outro": {
+      "nome": "Outro",
+      "definicao": "Prompts que não se encaixam em nenhuma classe: intenção indiscernível, instrução vazia, ou várias tarefas combinadas sem uma dominante. Desempate: usar somente quando nenhuma outra classe cobre a maior parte da intenção; se existe tarefa dominante identificável, usar a classe dela.",
+      "exemplos": [
+        "asdkjhs teste 123",
+        "Pega esse texto, resume, traduz pro inglês e transforma em poema e em post de blog: [texto]",
+        "https://exemplo.com/artigo (link colado sem nenhuma instrução)"
+      ]
+    }
+  },
+  "domain": {
+    "tecnologia": {
+      "nome": "Tecnologia",
+      "definicao": "Computação, software, hardware, internet, IA, eletrônicos, celulares, redes e ferramentas digitais. Desempate: desenvolvimento e programação de jogos ficam em tecnologia; jogar, builds e o universo dos jogos ficam em jogos.",
+      "exemplos": [
+        "Como formato um pendrive no Windows 11?",
+        "Explain how HTTPS keeps my data safe",
+        "Meu Wi-Fi cai toda hora, o que pode ser?"
+      ]
+    },
+    "educacao": {
+      "nome": "Educação",
+      "definicao": "O processo de estudar e ensinar: escola, faculdade, provas, vestibular e ENEM, lição de casa, TCC, planos de aula, métodos de estudo. Desempate: pergunta de conteúdo sem enquadramento escolar vai para o domínio do assunto (ex.: fotossíntese em ciencia); com enquadramento escolar explícito, fica em educacao.",
+      "exemplos": [
+        "Me ajuda a montar um plano de aula sobre frações pro 5º ano",
+        "How do I structure a 5-paragraph essay for my history class?",
+        "Tô estudando pro ENEM, me explica o que mais cai em biologia"
+      ]
+    },
+    "trabalho-negocios": {
+      "nome": "Trabalho e negócios",
+      "definicao": "Carreira, RH, empreendedorismo, marketing, vendas, gestão, comunicação corporativa e currículos. Desempate: finanças pessoais e investimentos ficam em financas; tarefa técnica de programação no trabalho fica em tecnologia.",
+      "exemplos": [
+        "Melhora esse resumo do meu currículo de vendedor: [texto]",
+        "Write a cold email offering my web design services to small restaurants",
+        "Como precificar meu serviço de social media pra pequenos clientes?"
+      ]
+    },
+    "saude": {
+      "nome": "Saúde",
+      "definicao": "Medicina, sintomas, medicamentos, nutrição, exercício físico pela saúde ou estética, sono, saúde mental e bem-estar. Desempate: receita de comida sem foco nutricional fica em culinaria; regras, técnica e universo de modalidades esportivas ficam em esportes.",
+      "exemplos": [
+        "Tô com dor de garganta há 3 dias e sem febre, devo me preocupar?",
+        "Is it safe to take ibuprofen and paracetamol together?",
+        "Monta uma dieta simples de 1800 kcal pra emagrecer"
+      ]
+    },
+    "direito": {
+      "nome": "Direito",
+      "definicao": "Leis, contratos, processos, direitos (consumidor, trabalhista, família), documentos e procedimentos jurídicos. Desempate: debate sobre leis como tema social ou político fica em politica-sociedade; procedimento prático de imposto de renda fica em financas.",
+      "exemplos": [
+        "Fui demitido sem justa causa, o que tenho direito de receber?",
+        "Draft a simple NDA for a freelance design project",
+        "O condomínio pode me multar por barulho depois das 22h?"
+      ]
+    },
+    "ciencia": {
+      "nome": "Ciência",
+      "definicao": "Física, química, biologia, astronomia, geociências, matemática como disciplina e pesquisa científica. Desempate: tecnologia aplicada e computação ficam em tecnologia; conteúdo com enquadramento escolar explícito (prova, lição) fica em educacao.",
+      "exemplos": [
+        "Por que o céu é azul?",
+        "Explain CRISPR gene editing in simple terms",
+        "Qual a diferença entre massa e peso?"
+      ]
+    },
+    "artes-entretenimento": {
+      "nome": "Artes e entretenimento",
+      "definicao": "Filmes, séries, música, livros, celebridades, TV, cultura pop e artes em geral, incluindo pedidos criativos ancorados nesse universo (fanfic, 'no estilo de'). Desempate: pedido criativo de tema genérico e cotidiano fica em geral; videogames ficam em jogos.",
+      "exemplos": [
+        "Me indica séries parecidas com Dark",
+        "Who would win in a fight: Batman or Iron Man? Argue both sides",
+        "Escreve uma fanfic curta do Harry Potter estudando numa Hogwarts brasileira"
+      ]
+    },
+    "financas": {
+      "nome": "Finanças",
+      "definicao": "Dinheiro pessoal: investimentos, orçamento, dívidas, bancos, impostos na prática, criptomoedas e aposentadoria. Desempate: gestão e estratégia de empresas ficam em trabalho-negocios; disputa legal sobre dinheiro fica em direito.",
+      "exemplos": [
+        "Vale mais a pena Tesouro Direto ou CDB pra guardar 10 mil por 2 anos?",
+        "How do I build a monthly budget on a $3,000 salary?",
+        "Como declarar imposto de renda sendo MEI?"
+      ]
+    },
+    "viagens": {
+      "nome": "Viagens",
+      "definicao": "Destinos, roteiros, passagens, hospedagem, vistos de turismo, câmbio de viagem e dicas de turismo. Desempate: mudança definitiva de país e questões migratórias legais ficam em direito.",
+      "exemplos": [
+        "Roteiro de 4 dias em Buenos Aires gastando pouco",
+        "Do Brazilian citizens need a visa to visit Japan?",
+        "Qual a melhor época pra conhecer Fernando de Noronha?"
+      ]
+    },
+    "culinaria": {
+      "nome": "Culinária",
+      "definicao": "Receitas, técnicas de cozinha, ingredientes, substituições, bebidas e harmonização. Desempate: dieta e valor nutricional com foco em saúde ficam em saude; montar um negócio de comida fica em trabalho-negocios.",
+      "exemplos": [
+        "Receita de pão de queijo que não fica borrachudo",
+        "What can I cook with rice, eggs and canned tuna?",
+        "Como fazer a caipirinha perfeita?"
+      ]
+    },
+    "esportes": {
+      "nome": "Esportes",
+      "definicao": "Modalidades esportivas, campeonatos, clubes, atletas, regras, técnica e história do esporte. Desempate: exercício físico pela saúde ou estética fica em saude; e-sports e jogos eletrônicos ficam em jogos.",
+      "exemplos": [
+        "Quantas Libertadores o Flamengo tem?",
+        "Explain the offside rule in soccer like I'm five",
+        "Quem foi melhor: Pelé ou Maradona?"
+      ]
+    },
+    "politica-sociedade": {
+      "nome": "Política e sociedade",
+      "definicao": "Política, eleições, governo, história, religião, filosofia, notícias e questões sociais. Desempate: aplicação da lei a um caso concreto do usuário fica em direito; história da ciência fica em ciencia.",
+      "exemplos": [
+        "Explica a diferença entre presidencialismo e parlamentarismo",
+        "What were the main causes of World War I?",
+        "Qual a diferença entre socialismo e comunismo?"
+      ]
+    },
+    "relacionamentos-pessoal": {
+      "nome": "Relacionamentos e vida pessoal",
+      "definicao": "Amor, amizade, família, convivência, conflitos interpessoais, autoconhecimento e etiqueta social, incluindo mensagens pessoais a escrever. Desempate: sofrimento psíquico como condição clínica (depressão, ansiedade, luto patológico) fica em saude.",
+      "exemplos": [
+        "Como pedir desculpas pra minha melhor amiga depois de uma briga feia?",
+        "Write a sweet good morning text for my girlfriend",
+        "Minha sogra opina em tudo na criação do meu filho, como impor limites sem briga?"
+      ]
+    },
+    "jogos": {
+      "nome": "Jogos",
+      "definicao": "Videogames, jogos de tabuleiro, RPG de mesa, xadrez, e-sports, gacha, builds, lore e dicas de gameplay. Desempate: desenvolvimento e programação de jogos ficam em tecnologia; esportes físicos ficam em esportes.",
+      "exemplos": [
+        "Qual a melhor build pra Yasuo no patch atual?",
+        "Suggest a one-shot D&D plot for four beginner players",
+        "Como jogar de zagueiro no FIFA sem tomar drible fácil?"
+      ]
+    },
+    "linguagem-idiomas": {
+      "nome": "Linguagem e idiomas",
+      "definicao": "A língua em si: gramática, vocabulário, significado de palavras, aprendizado de idiomas, etimologia e linguística. Desempate: tradução de um texto sobre assunto claro leva o domínio do assunto; quando o interesse é a língua (regra, uso, significado), fica aqui.",
+      "exemplos": [
+        "Qual a diferença entre 'mas' e 'mais'?",
+        "When should I use present perfect instead of simple past?",
+        "O que significa 'saudade' e por que dizem que não tem tradução?"
+      ]
+    },
+    "geral": {
+      "nome": "Geral",
+      "definicao": "Assuntos cotidianos, mistos ou indeterminados que não pertencem claramente a nenhum outro domínio; inclui small talk, testes do assistente e pedidos criativos de tema genérico. Desempate: usar somente quando nenhum domínio específico cobre o assunto principal.",
+      "exemplos": [
+        "oi, tudo bem?",
+        "Write a short poem about rain",
+        "Me conta uma curiosidade aleatória"
+      ]
+    }
+  },
+  "flags": {
+    "quality": {
+      "tipo": "int",
+      "descricao": "Qualidade do prompt como item do banco: mede forma e clareza, não o valor do assunto.",
+      "valores": {
+        "1": "Ruim: ininteligível, spam, truncado, só lixo de teclado, ou intenção indiscernível.",
+        "2": "Usável: intenção compreensível, mas vago, mal redigido ou sem contexto que uma boa resposta exigiria.",
+        "3": "Bom: intenção clara, autocontido e bem formulado (não precisa ser sofisticado nem longo)."
+      }
+    },
+    "nsfw": {
+      "tipo": "bool",
+      "definicao": "true quando o prompt pede ou contém conteúdo sexual explícito, roleplay erótico ou violência gráfica gratuita; false para saúde sexual, contexto clínico/educacional, palavrões casuais e violência mencionada em contexto informativo. Na dúvida, false — exceto qualquer sexualização de menores, que é sempre true."
+    }
+  }
+}
