@@ -1,9 +1,10 @@
 """Entrypoint `pf` — CLI única do Prompt Factory (argparse, só stdlib).
 
 Cada subcomando corresponde a um estágio da pipeline e vai saindo do stub no
-marco indicado em `_Cmd.milestone` (implementado: `db-check`, M1). Enquanto é
-stub, o comando imprime em que marco chega e sai com código 2. `pf --help` e
-`pf <cmd> --help` funcionam e saem 0 — é isso que a DoD do M0 exige.
+marco indicado em `_Cmd.milestone` (implementados: `db-check` no M1; `ingest` e
+`report raw` no M2). Enquanto é stub, o comando imprime em que marco chega e sai
+com código 2. `pf --help` e `pf <cmd> --help` funcionam e saem 0 — é isso que a
+DoD do M0 exige.
 
 O `main()` faz o *bootstrap* de ambiente ANTES de qualquer import pesado:
 UTF-8 forçado (Windows) e ``HF_HOME`` vindo do ``config/settings.toml``, para
@@ -74,17 +75,82 @@ def _db_check(args: argparse.Namespace) -> int:
     return run_db_check(bench=args.bench, query=args.query)
 
 
+def _ingest(args: argparse.Namespace) -> int:
+    """``pf ingest [fonte...]`` (M2) — baixa fontes e grava ``data/raw/<fonte>.parquet``.
+
+    Sequencial e fail-fast: a primeira fonte que explodir aborta a rodada, com o
+    traceback inteiro. As fontes já gravadas ficam válidas (cada parquet é
+    escrito atomicamente), então basta re-rodar o mesmo comando — os downloads
+    do HuggingFace retomam do cache.
+
+    ``datasets``/``pyarrow`` entram só aqui dentro: ``pf --help`` não paga por eles.
+    """
+    from . import paths
+    from .ingest import REGISTRY, resolve_names
+    from .ingest.base import get_source_cfg, write_raw
+
+    paths.ensure_dirs()
+    try:
+        fontes = resolve_names(args.source)
+    except ValueError as exc:
+        print(f"[pf] {exc}", file=sys.stderr)
+        return 2
+
+    if args.resume:
+        print("[pf] --resume não tem efeito no M2 (checkpoint só existe no streaming do M3)")
+    if args.force:
+        print("[pf] --force não tem efeito no M2 (raw é regenerável: a ingestão sempre reescreve)")
+
+    print(f"[pf] ingerindo {len(fontes)} fonte(s): {', '.join(fontes)}")
+    for nome in fontes:
+        try:
+            write_raw(
+                nome,
+                REGISTRY[nome].iter_rows(get_source_cfg(nome), args.max_rows),
+                args.max_rows,
+            )
+        except Exception as exc:  # o traceback inteiro vai para o stderr logo abaixo
+            import traceback
+
+            traceback.print_exc()
+            print(f"[{nome}] FALHOU: {exc}", file=sys.stderr)
+            return 1
+    return 0
+
+
+def _report(args: argparse.Namespace) -> int:
+    """``pf report raw`` (M2) — tabela de conferência dos parquets de ``data/raw/``."""
+    if args.target == "raw":
+        from .report import report_raw
+
+        return report_raw(sources=args.sources, head=args.head)
+    if args.target is None:
+        print("[pf] 'report' precisa de um alvo: use `pf report raw` (os estágios chegam no M4)")
+        return 2
+    print(f"[pf] 'report {args.target}' ainda não implementado (chega no M4)")
+    return 2
+
+
 COMMANDS: tuple[_Cmd, ...] = (
     _Cmd(
         "ingest",
         "M2",
-        "baixa uma fonte do HuggingFace e grava data/raw/<fonte>.parquet",
+        "baixa fontes do HuggingFace e grava data/raw/<fonte>.parquet",
         [
-            (("source",), {"nargs": "?", "help": "nome da seção em config/sources.toml (padrão: todas as habilitadas)"}),
-            (("--resume",), {"action": "store_true", "help": "retoma do último checkpoint de streaming"}),
+            (
+                ("source",),
+                {
+                    "nargs": "*",
+                    "metavar": "FONTE",
+                    "help": "seções de config/sources.toml, ou 'all' (padrão: todas as default_on)",
+                },
+            ),
+            (("--resume",), {"action": "store_true", "help": "retoma do último checkpoint de streaming (M3)"}),
             _MAX_ROWS,
             _FORCE,
         ],
+        implemented=True,
+        handler=_ingest,
     ),
     _Cmd(
         "run",
@@ -98,13 +164,16 @@ COMMANDS: tuple[_Cmd, ...] = (
     ),
     _Cmd(
         "report",
-        "M4",
+        "M2",
         "resumo legível de um parquet/estágio (NUNCA abra parquet com cat)",
         [
-            (("target",), {"nargs": "?", "help": "caminho do parquet ou nome do estágio"}),
-            (("--head",), {"type": int, "default": 5, "metavar": "N", "help": "mostra N linhas de exemplo"}),
-            (("--by",), {"metavar": "COL", "help": "contagens agrupadas por coluna"}),
+            (("target",), {"nargs": "?", "help": "'raw' (M2) ou caminho do parquet / nome do estágio (M4)"}),
+            (("--head",), {"type": int, "default": 2, "metavar": "N", "help": "mostra N linhas de exemplo por fonte"}),
+            (("--sources",), {"nargs": "+", "metavar": "FONTE", "help": "restringe o `report raw` a estas fontes"}),
+            (("--by",), {"metavar": "COL", "help": "contagens agrupadas por coluna (M4)"}),
         ],
+        implemented=True,
+        handler=_report,
     ),
     _Cmd(
         "db-check",
@@ -186,7 +255,7 @@ COMMANDS: tuple[_Cmd, ...] = (
 
 
 def _bootstrap_env() -> None:
-    """UTF-8 e HF_HOME antes de tudo. Idempotente e à prova de falha."""
+    """UTF-8, HF_HOME e CA bundle antes de tudo. Idempotente e à prova de falha."""
     os.environ.setdefault("PYTHONUTF8", "1")
     try:
         from .config import hf_home
@@ -196,6 +265,14 @@ def _bootstrap_env() -> None:
         # settings.toml ausente, ilegível ou malformado (TOMLDecodeError é
         # ValueError) não pode derrubar um `pf --help`. Avisa e segue.
         print(f"[pf] aviso: HF_HOME não configurado ({exc})", file=sys.stderr)
+    try:
+        # TLS interceptado nesta máquina: o requests (huggingface_hub) precisa
+        # do armazenamento de certificados do Windows. Ver certs.py.
+        from .certs import ensure_ca_bundle
+
+        ensure_ca_bundle()
+    except Exception as exc:  # pragma: no cover - bootstrap nunca derruba a CLI
+        print(f"[pf] aviso: CA bundle do sistema não gerado ({exc})", file=sys.stderr)
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is None:

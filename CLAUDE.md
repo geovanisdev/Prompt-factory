@@ -18,12 +18,20 @@ Plano completo (fontes, decisões de engenharia, marcos M0–M10): `C:\Users\gig
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve         # interface local em http://127.0.0.1:8765
 ```
 
-Subcomandos e em que marco cada um sai do stub: `ingest` (M2/M3), `run` s01–s06 (M4), `report` (M4), `db-check` (M1), `make-seed` (M5), `labels` (M5), `merge-labels` (M5), `train` (M7), `apply` (M7), `load-db` (M8), `export` (M9), `serve` (M9). Enquanto é stub, o comando imprime o aviso e sai com **código 2** — isso é esperado, não é bug.
+Subcomandos e em que marco cada um sai do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e demais alvos do `report` (M4), `db-check` (M1), `make-seed` (M5), `labels` (M5), `merge-labels` (M5), `train` (M7), `apply` (M7), `load-db` (M8), `export` (M9), `serve` (M9). Enquanto é stub, o comando imprime o aviso e sai com **código 2** — isso é esperado, não é bug.
+
+```powershell
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf ingest                    # todas as fontes default_on
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf ingest aya --max-rows 200 # smoke de uma fonte
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf report raw                # confere data/raw/*.parquet
+```
 
 ## Pegadinhas (leia antes de mexer)
 
 - **`uv` fora do PATH.** Foi instalado agora em `C:\Users\gigio\.local\bin\uv.exe` e a sessão atual não o enxerga. Sempre `& "$env:USERPROFILE\.local\bin\uv.exe" ...` até abrir um terminal novo.
 - **TLS interceptado nesta máquina.** `uv sync` puro falha com `invalid peer certificate: UnknownIssuer` ao buscar o PyPI: há um middlebox (antivírus/proxy) reassinando o tráfego, e a raiz dele só existe no armazenamento de certificados do Windows, não no bundle embutido do uv. A correção é `system-certs = true` em `[tool.uv]` no `pyproject.toml` (já commitado) — equivale a `uv sync --system-certs` e faz o uv confiar no trust store do SO. (Em uv < 0.12 a chave chamava `native-tls`; usá-la no uv 0.12 gera warning de depreciação em *todo* comando.) **Não** use `--allow-insecure-host`: isso desliga a verificação de verdade.
+- **TLS interceptado atinge o Python também.** O `system-certs` resolveu o `uv`, mas `requests`/`huggingface_hub` apontam para o bundle do `certifi`, que não conhece a raiz do middlebox: todo download do Hub morria em `CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`. O `cli._bootstrap_env()` chama `certs.ensure_ca_bundle()`, que gera `data/system-ca.pem` (certifi + raízes de servidor do store do Windows, via `ssl.enum_certificates`) e exporta `REQUESTS_CA_BUNDLE` + `SSL_CERT_FILE`. **A verificação continua ligada** — nunca troque isso por `verify=False` nem por `HF_HUB_DISABLE_SSL_VERIFICATION`. O bundle é regenerado sozinho a cada 7 dias e pode ser apagado. Script solto (fora do `pf`) não passa pelo bootstrap: exporte `REQUESTS_CA_BUNDLE` na mão antes de rodar.
+- **`HF_HOME` do ambiente vence o `settings.toml`.** O bootstrap usa `os.environ.setdefault`, e esta máquina já tem `HF_HOME=F:\hf_cache` no ambiente do usuário — é para lá que o cache vai, não para o `G:/hf-cache` do `settings.toml`. Confira com `echo $env:HF_HOME` antes de culpar o disco errado.
 - **Nunca commitar `data/`.** Parquet, `.sqlite`, `.npy` e exports são artefatos regeneráveis e grandes. O `.gitignore` deixa passar só os `.gitkeep`. O `uv.lock`, ao contrário, **é** commitado.
 - **Nunca ler parquet com `cat`/`Get-Content`/`Read`.** É binário: enche o contexto de lixo e não responde nada. Use `pf report <arquivo>`.
 - **PowerShell corrompe encoding em redirecionamento.** `>` e `Out-File` gravam UTF-16/BOM e quebram acentuação e JSONL. **Toda escrita de dados sai de dentro do Python** (pyarrow, `open(..., encoding="utf-8")`, `csv` com `utf-8-sig` só no export CSV). Redirecionar em PowerShell serve, no máximo, para log descartável.
@@ -41,4 +49,8 @@ Subcomandos e em que marco cada um sai do stub: `ingest` (M2/M3), `run` s01–s0
 
 ## Arquivos críticos
 
-`src/prompt_factory/schema.py` (contrato canônico das colunas) · `db.py` (DDL/FTS/conexão) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `config/sources.toml` (licença e atribuição por fonte) · `.claude/skills/rotular-prompts/SKILL.md`.
+`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `db.py` (DDL/FTS/conexão) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `config/sources.toml` (licença e atribuição por fonte) · `.claude/skills/rotular-prompts/SKILL.md`.
+
+## Camada raw (M2/M3)
+
+`data/raw/<fonte>.parquet` tem **12 colunas** (`ingest/base.RAW_SCHEMA`), não as 27 de `schema.py`: é camada de auditoria, com `text_raw` EXATO da fonte e **nenhuma** normalização — a cadeia canônica (`norm_display` → `hash_norm` → `uid`) começa no s01. Sem nulos: string ausente é `""`, bool ausente é `False`. Cada ingester é um `iter_rows(cfg, max_rows)` puro; quem grava (e quem carimba a licença vinda do `sources.toml`) é o `write_raw`, sempre com `.tmp` + `os.replace`. Reingerir é seguro: raw é regenerável e a escrita é atômica.
