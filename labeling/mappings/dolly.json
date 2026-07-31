@@ -1,0 +1,18 @@
+{
+  "source": "dolly",
+  "axis": "task_type",
+  "taxonomy_version": "1.0",
+  "weight": 0.5,
+  "_note": "As 8 categorias nativas de databricks/databricks-dolly-15k, medidas em data/raw/dolly.parquet (15.011 linhas). 'open_qa' e 'general_qa' viram ambas qa-aberta: a distinção da fonte é de proveniência (uma leva contexto da Wikipédia, a outra não), não de tarefa — para a taxonomia v1.0 as duas são pergunta respondida com o conhecimento do modelo. 'closed_qa' vira qa-contexto porque a fonte garante um trecho de apoio anexado. 'information_extraction' e 'classification' colapsam em classificacao-extracao, o mesmo eixo único da taxonomia.",
+  "_unmapped_note": "Nenhuma categoria sem correspondência limpa nesta fonte — as 8 mapeiam. Cuidado ao acrescentar: só entra aqui categoria cuja definição na fonte caiba INTEIRA num task_type; havendo bifurcação (o caso de 'Generation' no no_robots), o valor correto é null.",
+  "map": {
+    "creative_writing": "geracao-criativa",
+    "open_qa": "qa-aberta",
+    "general_qa": "qa-aberta",
+    "closed_qa": "qa-contexto",
+    "information_extraction": "classificacao-extracao",
+    "classification": "classificacao-extracao",
+    "summarization": "resumo",
+    "brainstorming": "brainstorm"
+  }
+}

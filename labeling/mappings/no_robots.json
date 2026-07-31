@@ -1,0 +1,20 @@
+{
+  "source": "no_robots",
+  "axis": "task_type",
+  "taxonomy_version": "1.0",
+  "weight": 0.5,
+  "_note": "As 10 categorias nativas de HuggingFaceH4/no_robots, medidas em data/raw/no_robots.parquet (9.999 linhas). 'Classify' e 'Extract' colapsam no mesmo task_type porque a taxonomia v1.0 trata rotular e extrair como um eixo único (classificacao-extracao). 'Chat' é conversa-social — na fonte a categoria é small talk e diálogo leve, NÃO 'aja como um personagem', que seria roleplay-persona.",
+  "_unmapped_note": "'Generation' (4.560 linhas, 46% da fonte) fica NULL de propósito: a fonte usa uma categoria só para 'gerar texto', e a taxonomia v1.0 divide isso em geracao-criativa (ficção/arte) e redacao-pratica (e-mail, post, currículo). Não existe correspondência limpa, e chutar um dos dois lados injetaria ~4,5 mil rótulos sistematicamente errados justamente nas duas classes que mais se confundem — com peso 0.5 e sem nenhum humano no caminho para desfazer. As outras 5.439 linhas entram de graça e corretas; estas 4.560 esperam o classificador do M7 ou uma v1.1 da taxonomia com uma classe guarda-chuva.",
+  "map": {
+    "Generation": null,
+    "Open QA": "qa-aberta",
+    "Closed QA": "qa-contexto",
+    "Brainstorm": "brainstorm",
+    "Chat": "conversa-social",
+    "Rewrite": "reescrita-edicao",
+    "Summarize": "resumo",
+    "Coding": "codigo",
+    "Classify": "classificacao-extracao",
+    "Extract": "classificacao-extracao"
+  }
+}

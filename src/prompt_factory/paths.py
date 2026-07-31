@@ -36,7 +36,9 @@ EXPORTS: Path = DATA / "exports"  # JSONL/CSV + manifests
 LABELING: Path = ROOT / "labeling"
 TAXONOMY_JSON: Path = LABELING / "taxonomy.json"
 LABEL_MANIFEST: Path = LABELING / "manifest.json"
-BATCHES: Path = LABELING / "batches"
+BATCHES: Path = LABELING / "batches"      # lotes entregues aos agentes (gitignorado)
+LABELS: Path = LABELING / "labels"        # respostas validadas, 1 jsonl por lote
+SEED: Path = LABELING / "seed"            # s07: seed.parquet + strata.txt
 MAPPINGS: Path = LABELING / "mappings"
 
 SCRIPTS: Path = ROOT / "scripts"
@@ -44,7 +46,7 @@ TESTS: Path = ROOT / "tests"
 
 #: Diretórios que ``ensure_dirs()`` garante existirem.
 DATA_DIRS: tuple[Path, ...] = (RAW, INTERIM, FINAL, EMB, MODELS, DB, EXPORTS)
-LABELING_DIRS: tuple[Path, ...] = (BATCHES, MAPPINGS)
+LABELING_DIRS: tuple[Path, ...] = (BATCHES, LABELS, SEED, MAPPINGS)
 
 
 def ensure_dirs(*extra: Path) -> None:
@@ -65,12 +67,14 @@ __all__ = [
     "INTERIM",
     "LABELING",
     "LABELING_DIRS",
+    "LABELS",
     "LABEL_MANIFEST",
     "MAPPINGS",
     "MODELS",
     "RAW",
     "ROOT",
     "SCRIPTS",
+    "SEED",
     "SETTINGS_TOML",
     "SOURCES_TOML",
     "TAXONOMY_JSON",

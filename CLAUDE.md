@@ -18,7 +18,7 @@ Plano completo (fontes, decisões de engenharia, marcos M0–M10): `C:\Users\gig
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve         # interface local em http://127.0.0.1:8765
 ```
 
-Subcomandos e em que marco cada um sai do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1), `make-seed` (M5), `labels` (M5), `merge-labels` (M5), `train` (M7), `apply` (M7), `load-db` (M8), `export` (M9), `serve` (M9). Enquanto é stub, o comando imprime o aviso e sai com **código 2** — isso é esperado, não é bug.
+Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1), `make-seed`/`labels`/`merge-labels` (M5). Ainda stub: `train` (M7), `apply` (M7), `load-db` (M8), `export` (M9), `serve` (M9) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
 
 ```powershell
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf run                 # s01..s06 (= `all`)
@@ -28,6 +28,16 @@ Subcomandos e em que marco cada um sai do stub: `ingest` (M2 fontes pequenas / M
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf report dedup-sample # 50 pares + data/final/dedup_sample_50.txt
 pwsh -File scripts/smoke_test.ps1                                    # pipeline inteira em miniatura, em tmp
 pwsh -File scripts/run_pipeline.ps1                                  # pipeline real + os dois relatorios
+```
+
+```powershell
+# Campanha de rotulagem (M5). Detalhes em labeling/README.md e na skill.
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf make-seed                 # s07: semente + 155 lotes + manifest
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf labels status             # painel da campanha
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf labels next -n 4 --out-dir tmp   # reivindica 4 lotes
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf labels submit --batch batch_0007 --file r.jsonl --model haiku
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf labels gold --file pregold.jsonl # importa a calibração revisada
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf merge-labels              # s08: final/seed_labels.parquet
 ```
 
 ```powershell
@@ -65,7 +75,7 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 
 ## Arquivos críticos
 
-`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `stages/__init__.py` (`StageConfig` + `STAGES`, único ponto de contato do `cli.py` com a pipeline) · `db.py` (DDL/FTS/conexão) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `config/sources.toml` (licença e atribuição por fonte — **a ordem das seções é o desempate do dedup**) · `.claude/skills/rotular-prompts/SKILL.md`.
+`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `stages/__init__.py` (`StageConfig` + `STAGES`/`CADEIA`, único ponto de contato do `cli.py` com a pipeline) · `labeling_io.py` (manifest atômico, máquina de estados dos lotes e validação estrita) · `db.py` (DDL/FTS/conexão) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `labeling/mappings/*.json` (categoria nativa → task_type) · `config/sources.toml` (licença e atribuição por fonte — **a ordem das seções é o desempate do dedup**) · `.claude/skills/rotular-prompts/SKILL.md`.
 
 ## Preparo do universo (M4)
 
@@ -92,6 +102,33 @@ Pegadinhas deste bloco:
 - **`fast-langdetect` trunca em 80 caracteres por padrão** (`LangDetectConfig(max_input_length=80)`). O wrapper passa `None` e fatia em `[langid] max_input_chars`. Se o download do modelo `full` falhar, ele cai sozinho para o `lite` embutido no wheel e avisa alto.
 - **`lingua` 2.2.0 não tem GALEGO**; o árbitro usa CATALÃO no lugar.
 - **Aceitar os limiares do near-dup é decisão humana.** `pf report dedup-sample` grava `data/final/dedup_sample_50.txt` justamente para isso.
+
+## Campanha de rotulagem (M5)
+
+`pf make-seed` (s07) sorteia **12.000** itens do universo (6k pt + 6k en), estratificados por **fonte × faixa de n_chars**, e já fatia a semente em lotes: `labeling/seed/seed.parquet` + `strata.txt`, `labeling/batches/batch_NNNN.json` e o `labeling/manifest.json`. `pf labels` opera a campanha; `pf merge-labels` (s08) funde tudo em `data/final/seed_labels.parquet`. O protocolo dos agentes está em `.claude/skills/rotular-prompts/SKILL.md`.
+
+| estágio | entrada → saída | o que decide |
+| --- | --- | --- |
+| s07 | `final/universe.parquet` → `labeling/seed/*` + `batches/*` + `manifest.json` | cotas por fonte, faixas de tamanho, ouro e lotes |
+| s08 | `labeling/labels/*.jsonl` + `manifest.gold` + `native_category` → `final/seed_labels.parquet` | precedência manual > agent > native |
+
+Pegadinhas deste bloco:
+
+- **`quality` vai de 1 a 3, não a 1–5.** É o que `labeling/taxonomy.json` define e o que `schema.QUALITY_VALUES` valida (1 ruim, 2 usável, 3 bom). A validação recusa qualquer outro valor.
+- **`bool` é subclasse de `int` em Python**, então `"quality": true` passaria por `isinstance(q, int)` e viraria 1 em silêncio. `labeling_io` testa `isinstance(q, bool)` ANTES do teste de inteiro — nunca inverta essa ordem.
+- **O s07 e o s08 estão em `STAGES`, mas fora do `pf run all`** (`stages.CADEIA` é quem define o `all`). Entre os dois existe uma campanha de horas com revisão humana: se o `all` os incluísse, um `pf run` de rotina regeraria a semente e apagaria o manifest de uma campanha viva. Por isso `pf make-seed` também **recusa** rodar sobre uma campanha com trabalho feito, a menos que venha `--force`.
+- **Refazer a semente invalida os rótulos**, não só o arquivo: uids novos = lotes novos = rótulos apontando para itens que não estão mais em lote nenhum.
+- **A calibração sai de DENTRO dos 12.000**, não ao lado: 100 itens viram o `batch_0000`, o humano revisa, e os 11.900 restantes viram 155 lotes de 77 novos + 3 ouros escondidos. Com as cotas reais isso dá exatamente **155 lotes** (154×77 + 42).
+- **Os 3 ouros de cada lote não têm marca nenhuma no arquivo** entregue ao agente (só `uid`/`lang`/`text`, como todo item); quem sabe quais são é o `manifest.gold_uids`. Marcá-los mediria o cuidado do agente com 3 itens, não a qualidade do lote.
+- **Agreement é medido em `task_type` e `domain` dos 3 ouros = 6 comparações**, granularidade 1/6. `[labeling] agreement_min = 0.80` portanto exige **5 acertos em 6**. `quality` e `nsfw` ficam fora de propósito: a fronteira deles é legitimamente borrada entre anotadores.
+- **`None` e `0.0` de agreement são coisas diferentes.** Sem ouro importado o agreement é `None` ("não medido"); confundir com 0.0 reprovaria a campanha inteira antes da calibração. Lote devolvido pelo portão guarda a nota que o reprovou, mas **sai da média** (o trabalho dele foi descartado).
+- **Falha de validação NÃO muda o estado.** O lote segue `claimed`, a CLI lista todos os erros e imprime uma linha parseável `RETRY_UIDS: uid1,uid2,...` — é ela que dirige o retry.
+- **O parser de resposta é tolerante na FORMA e estrito no CONTEÚDO**: cerca de código, prosa em volta, BOM, CRLF e eco do input são descartados com aviso; uid faltando/inventado/repetido e valor fora do enum são erro.
+- **`oasst` tem 286 linhas e cota 600**: a redistribuição de déficit é caminho normal, não exceção. Medido com as cotas reais: wildchat_pt 3.809 (+209), aya 1.270 (+70), arena140k 635 (+35), oasst 286 — e cada cessão aparece no `strata.txt`.
+- **`Generation` do no_robots está mapeada para `null`** (4.560 linhas, 46% da fonte): a fonte usa uma categoria só para "gerar texto" e a taxonomia divide isso em `geracao-criativa` e `redacao-pratica`. Chutar um dos lados injetaria milhares de rótulos errados justamente nas duas classes que mais se confundem.
+- **Rótulo de agente sobre item de calibração é descartado no s08** — cada ouro reaparece em ~4,7 lotes e serve para medir, não para rotular.
+- **`labeling/labels/`, `labeling/seed/` e `labeling/batches/` são gitignorados**; versionados são `taxonomy.json`, `mappings/*.json` e o `manifest.json`.
+- **A saída de ferramenta do harness trunca em ~30k caracteres**, e um lote de 80 itens chega a ~120k. Por isso `pf labels next` tem `--out`/`--out-dir`: o fluxo real é sempre por arquivo.
 
 ## Camada raw (M2/M3)
 

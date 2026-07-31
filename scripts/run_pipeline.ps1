@@ -15,8 +15,14 @@
     Os estagios sao retomaveis e idempotentes: rodar de novo nao duplica nada.
     O s05 retoma do sidecar (data/emb/progress.json) se for interrompido.
 
-    Marcos seguintes (ainda stubs): pf make-seed (M5), pf merge-labels (M5),
-    pf train / pf apply (M7), pf load-db --swap (M8), pf export (M9).
+    Depois desta cadeia vem a campanha de rotulagem (M5), que NAO entra no
+    `pf run all` de proposito -- tem revisao humana no meio:
+        pf make-seed           -- s07 semente 12k + 155 lotes + manifest
+        pf labels ...          -- campanha (ver .claude/skills/rotular-prompts)
+        pf merge-labels        -- s08 -> data/final/seed_labels.parquet
+
+    Ainda stubs: pf train / pf apply (M7), pf load-db --swap (M8),
+    pf export (M9), pf serve (M9).
 
 .PARAMETER Ingest
     Roda `pf ingest` antes (todas as fontes default_on). Sem isso o script

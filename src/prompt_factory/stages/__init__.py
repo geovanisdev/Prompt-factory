@@ -52,6 +52,13 @@ UNIVERSE = "final/universe.parquet"
 MAPA_PROXIMO = "final/dedup_near_map.parquet"
 UNIVERSE_EMB = "emb/universe.f16.npy"
 UNIVERSE_UIDS = "emb/universe_uids.txt"
+SEED_LABELS = "final/seed_labels.parquet"
+
+#: Saídas do s07 — relativas a ``cfg.labeling_dir``, não a ``cfg.data_dir``: a
+#: semente é insumo da campanha de rotulagem (versionável em espírito, revisável
+#: à mão), não mais um estágio intermediário do funil de dados.
+SEED_PARQUET = "seed/seed.parquet"
+SEED_STRATA = "seed/strata.txt"
 
 #: Linhas por bloco na leitura dos parquets (compromisso memória x chamadas).
 BATCH_LEITURA = 16_384
@@ -63,13 +70,27 @@ class StageConfig:
 
     ``max_rows`` é aplicado **só pelo s01**, e por fonte: os estágios seguintes
     processam tudo o que receberem, senão o funil deixaria de fechar.
+
+    ``labeling_dir`` é o par de ``data_dir`` para o s07/s08: redirecionado, a
+    campanha inteira (semente, lotes, manifest, rótulos) roda dentro de um
+    ``tmp_path`` sem encostar em ``labeling/`` de verdade.
     """
 
     data_dir: Path = paths.DATA
     max_rows: int | None = None
+    labeling_dir: Path = paths.LABELING
+    #: Só o s07 lê: reescrever a semente APAGA uma campanha em andamento, e isso
+    #: nunca pode acontecer por descuido de quem repetiu um comando.
+    force: bool = False
+    #: Só o s08 lê (``pf merge-labels --strict``): falha em vez de avisar quando
+    #: um lote está done sem arquivo de rótulos.
+    strict: bool = False
 
     def caminho(self, relativo: str) -> Path:
         return self.data_dir / relativo
+
+    def caminho_labeling(self, relativo: str) -> Path:
+        return self.labeling_dir / relativo
 
     @property
     def raw(self) -> Path:
@@ -239,7 +260,8 @@ def _despacho(modulo: str) -> Callable[[StageConfig], int]:
     return executar
 
 
-#: Nome curto → função do estágio. O M5 acrescenta s07/s08 aqui.
+#: Nome curto → função do estágio. Único ponto de contato do ``cli.py`` com a
+#: pipeline: todos seguem ``run(cfg) -> int``.
 STAGES: dict[str, Callable[[StageConfig], int]] = {
     "s01": _despacho("s01_normalize"),
     "s02": _despacho("s02_lang"),
@@ -247,7 +269,18 @@ STAGES: dict[str, Callable[[StageConfig], int]] = {
     "s04": _despacho("s04_dedup_exact"),
     "s05": _despacho("s05_embed"),
     "s06": _despacho("s06_dedup_near"),
+    "s07": _despacho("s07_seed_sample"),
+    "s08": _despacho("s08_merge_labels"),
 }
+
+#: O que ``pf run`` (e ``pf run all``) encadeia.
+#:
+#: O s07 e o s08 estão registrados em ``STAGES``, mas **fora da cadeia**: entre
+#: os dois existe uma campanha de rotulagem de horas, com revisão humana da
+#: calibração no meio. Se ``all`` os incluísse, um ``pf run`` de rotina
+#: regeraria a semente e apagaria o manifest de uma campanha em andamento — sem
+#: perguntar nada. Cada um tem comando próprio: `pf make-seed` e `pf merge-labels`.
+CADEIA: tuple[str, ...] = ("s01", "s02", "s03", "s04", "s05", "s06")
 
 #: Descrição de uma linha para o `pf run --help` e mensagens de erro.
 DESCRICOES: dict[str, str] = {
@@ -257,11 +290,14 @@ DESCRICOES: dict[str, str] = {
     "s04": "dedup exato por hash_norm -> interim/dedup1.parquet",
     "s05": "embeddings e5-small -> emb/embeddings.f16.npy",
     "s06": "dedup próximo (cosseno + jaccard) -> final/universe.parquet",
+    "s07": "amostra-semente estratificada + lotes de rotulagem (fora da cadeia)",
+    "s08": "funde rótulos de agente + nativos -> final/seed_labels.parquet (fora da cadeia)",
 }
 
 
 __all__ = [
     "BATCH_LEITURA",
+    "CADEIA",
     "DEDUP1",
     "DESCRICOES",
     "EMBEDDINGS",
@@ -272,6 +308,9 @@ __all__ = [
     "MAPA_PROXIMO",
     "NORMALIZED",
     "SCRUBBED",
+    "SEED_LABELS",
+    "SEED_PARQUET",
+    "SEED_STRATA",
     "STAGES",
     "UNIVERSE",
     "UNIVERSE_EMB",

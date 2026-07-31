@@ -39,10 +39,63 @@ near_len_ratio = 2.0
 block_rows = 2048
 col_chunk = 32768
 
+[seed]
+# s07 (`pf make-seed`). A amostra-semente é o ÚNICO insumo do classificador do
+# M7: mexer em qualquer chave daqui não invalida um arquivo, invalida a campanha
+# de rotulagem inteira. Por isso o sorteio é 100% determinístico a partir de
+# `rng_seed` — mesmo universo + mesmas chaves = mesmos 12.000 uids.
+rng_seed = 42
+size = 12000           # total da semente; os 100 da calibração saem de DENTRO dele
+pt_share = 0.5         # 6.000 pt + 6.000 en
+# Fronteiras de n_chars que, junto com a fonte, definem os estratos: curto
+# (< 120), médio (120–600) e longo (> 600). São 2 fronteiras = 3 faixas.
+bucket_edges = [120, 600]
+# Piso proporcional por faixa antes do rateio: sem ele o arredondamento apaga a
+# faixa rara de uma fonte (prompts longos do aya, por exemplo) e o classificador
+# nunca vê aquele formato.
+bucket_floor = 0.10
+
+# Quantas linhas cada fonte cede por idioma. A ORDEM das chaves é a ordem
+# canônica de iteração do sorteio (determinismo) e o critério de desempate da
+# redistribuição — mesma lógica da ordem das seções em sources.toml.
+# Fonte com menos linhas que a cota trava no que tem e o déficit é redistribuído
+# proporcionalmente entre as outras (o `strata.txt` registra quem cedeu quanto):
+# `oasst` tem 286 linhas no universo e é o caso real que exercita esse caminho.
+[seed.allocation.pt]
+wildchat_pt = 3600
+aya = 1200
+oasst = 600
+arena140k = 600
+
+[seed.allocation.en]
+wildchat_en = 3000
+no_robots = 600
+dolly = 600
+hh_rlhf = 900
+prism = 900
+
 [labeling]
 batch_size = 80        # 77 itens novos + 3 de calibração ocultos
 gold_per_batch = 3
-seed_total = 12000     # 6k pt + 6k EN, estratificado por fonte x tamanho
+calibration_size = 100 # batch_0000: revisado à mão pelo humano, vira o ouro
+# Corte do texto entregue ao agente. Prompt de 1 milhão de caracteres existe no
+# corpus e estouraria a janela do lote inteiro; 1.500 caracteres decidem a
+# classe com folga e o item cortado termina com " …[TRUNCADO]".
+truncate_chars = 1500
+# Portão por lote: concordância com o ouro nos 3 itens de calibração, medindo
+# task_type E domain (6 comparações). A granularidade é 1/6, então 0.80 exige
+# 5 acertos em 6 — abaixo disso o lote volta para `pending`.
+agreement_min = 0.80
+# Um claim que passa disso sem submissão é órfão (sessão morreu, cota acabou) e
+# volta sozinho para `pending` na próxima varredura.
+claim_ttl_hours = 2
+# Tentativas antes da quarentena: lote que falha `max_attempts` vezes vira
+# `failed` e sai do ciclo, em vez de envenenar a campanha para sempre.
+max_attempts = 3
+# s08: discordância entre a categoria nativa da fonte e o rótulo do agente, nos
+# itens que têm as duas origens. Acima disto o mapeamento sai marcado como
+# suspeito no relatório — nada é removido automaticamente.
+mapping_warn = 0.30
 
 [classifier]
 conf_accept = 0.50     # >= aceita o rótulo

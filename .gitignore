@@ -4,10 +4,19 @@ data/**
 !data/**/
 !data/**/.gitkeep
 
-# lotes de rotulagem gerados pela pipeline (o README e os .gitkeep ficam)
+# Artefatos gerados da campanha de rotulagem. VERSIONADOS ficam só a taxonomia,
+# os mapeamentos e o manifest.json (o livro-caixa, que é o estado da campanha).
+# Os lotes carregam o texto dos prompts e a semente é um parquet: nem um nem
+# outro entra no git.
 labeling/batches/**
 !labeling/batches/**/
 !labeling/batches/**/.gitkeep
+labeling/labels/**
+!labeling/labels/**/
+!labeling/labels/**/.gitkeep
+labeling/seed/**
+!labeling/seed/**/
+!labeling/seed/**/.gitkeep
 
 # cache de modelos/datasets do HuggingFace, caso alguém aponte HF_HOME pra cá
 hf-cache/
