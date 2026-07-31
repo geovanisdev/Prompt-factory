@@ -8,6 +8,7 @@ usada em outra.
 
 from __future__ import annotations
 
+import json
 import math
 import sqlite3
 from functools import lru_cache
@@ -17,7 +18,14 @@ from fastapi import APIRouter, HTTPException, Query
 
 from .. import schema
 from . import presenters, queries
-from .deps import Conexao, id_por_uid, linha_por_uid, marcar_atualizado, rotulagem_pendente
+from .deps import (
+    Cache,
+    Conexao,
+    id_por_uid,
+    linha_por_uid,
+    marcar_atualizado,
+    rotulagem_pendente,
+)
 from .models import ConsultaPrompts, Filtros, PatchPrompt
 
 router = APIRouter(tags=["prompts"])
@@ -168,7 +176,7 @@ _CAMPOS_ROTULO = ("task_type", "domain", "quality", "nsfw")
 
 
 @router.patch("/api/prompts/{uid}", summary="Edita o texto e/ou os rótulos de um item")
-def editar(uid: str, corpo: PatchPrompt, conn: Conexao) -> dict[str, Any]:
+def editar(uid: str, corpo: PatchPrompt, conn: Conexao, cache: Cache) -> dict[str, Any]:
     """Edição manual. Devolve a linha inteira, para o cliente reconciliar.
 
     **A preservação do original é feita pelo próprio UPDATE**, não por um SELECT
@@ -228,6 +236,11 @@ def editar(uid: str, corpo: PatchPrompt, conn: Conexao) -> dict[str, Any]:
     )
     if cur.rowcount == 0:  # pragma: no cover - a linha existia dois passos atrás
         raise HTTPException(status_code=404, detail=f"prompt {uid!r} sumiu durante a edição")
+    # DEPOIS do UPDATE e ANTES de responder. Invalidar antes deixaria a janela em
+    # que uma requisição concorrente recalcula sobre a linha VELHA e guarda o
+    # resultado como se fosse o novo — o cache voltaria a mentir e ninguém mais
+    # o derrubaria.
+    cache.invalidar()
     # O trigger prompts_fts_au reindexa sozinho — mas SÓ quando `text` aparece
     # no SET (ele é AFTER UPDATE OF text). Corrigir um rótulo não mexe no FTS,
     # que é exatamente o que se quer num índice de 189 mil textos.
@@ -240,7 +253,7 @@ def editar(uid: str, corpo: PatchPrompt, conn: Conexao) -> dict[str, Any]:
 
 
 @router.post("/api/prompts/{uid}/revert", summary="Desfaz a edição de texto")
-def reverter(uid: str, conn: Conexao) -> dict[str, Any]:
+def reverter(uid: str, conn: Conexao, cache: Cache) -> dict[str, Any]:
     """Volta ao texto original e zera ``text_original``.
 
     O ``AND edited = 1`` no WHERE é a guarda: reverter um item nunca editado
@@ -258,6 +271,7 @@ def reverter(uid: str, conn: Conexao) -> dict[str, Any]:
         raise HTTPException(
             status_code=400, detail=f"prompt {uid!r} não foi editado — não há o que reverter"
         )
+    cache.invalidar()
     return _detalhe(conn, uid)
 
 
@@ -289,8 +303,61 @@ def _faixa_do_bucket(rotulo: str) -> dict[str, int]:
     }[rotulo]
 
 
+def _normalizar(nome: str, bruto: dict[Any, int]) -> dict[Any, int]:
+    """Tipos do SQLite → tipos do JSON, sem mexer nas contagens.
+
+    ``nsfw``/``needs_review``/``edited``/``pii_found`` são 0/1 no banco e bool no
+    contrato; ``quality`` é int. ``None`` (não rotulado) passa intacto — é uma
+    opção legítima da barra lateral, não ausência de dado.
+    """
+    saida: dict[Any, int] = {}
+    for valor, n in bruto.items():
+        if valor is not None and nome in _FACETAS_BOOL:
+            valor = bool(valor)
+        elif valor is not None and nome == "quality":
+            valor = int(valor)
+        saida[valor] = saida.get(valor, 0) + n
+    return saida
+
+
+def _contagens_das_facetas(
+    conn: sqlite3.Connection, filtros: Filtros, *, hits_prontos: bool = False
+) -> dict[str, dict[Any, int]]:
+    """``{faceta: {valor: contagem}}`` de todas as dimensões.
+
+    Aqui mora a economia do primeiro paint: em vez de doze ``GROUP BY``
+    independentes (1.341 ms medidos no banco real), as dimensões que compartilham
+    o mesmo WHERE saem de **uma** varredura da distribuição conjunta e são
+    marginalizadas em Python (37 ms). Sobram consulta própria só para o
+    ``n_chars_bucket`` — que não é coluna crua — e para as dimensões cujo filtro
+    está ativo, que por definição precisam de um WHERE diferente do das outras.
+
+    O resultado é idêntico ao das doze consultas, e é isso que o
+    ``test_facetas_juntas_batem_com_as_separadas`` prova em toda combinação de
+    filtro que a interface produz.
+    """
+    juntas, sozinhas = queries.particionar_facetas(filtros)
+    bruto: dict[str, dict[Any, int]] = {}
+
+    if juntas:
+        sql, params = queries.sql_facetas_prefixo(filtros, hits_prontos=hits_prontos)
+        linhas = queries.executar_fts(conn, sql, params, filtros.q)
+        bruto.update(queries.marginalizar(linhas, juntas))
+
+    for faceta in sozinhas:
+        sql, params = queries.sql_faceta(filtros, faceta, hits_prontos=hits_prontos)
+        bruto[faceta.nome] = {
+            linha["v"]: int(linha["n"])
+            for linha in queries.executar_fts(conn, sql, params, filtros.q)
+        }
+
+    return {nome: _normalizar(nome, valores) for nome, valores in bruto.items()}
+
+
 @router.get("/api/facets", summary="Contagens por dimensão, sob o filtro atual")
-def facetas(conn: Conexao, filtros: Annotated[Filtros, Query()]) -> dict[str, Any]:
+def facetas(
+    conn: Conexao, cache: Cache, filtros: Annotated[Filtros, Query()]
+) -> dict[str, Any]:
     """As contagens da barra lateral.
 
     Duas regras que o cliente precisa conhecer para não se confundir com os
@@ -306,22 +373,30 @@ def facetas(conn: Conexao, filtros: Annotated[Filtros, Query()]) -> dict[str, An
        parecer que a classe não existe. Enquanto ``rotulagem_pendente`` for
        ``true``, TODAS elas são zero e a interface deve desabilitar o grupo com
        a explicação, não escondê-lo.
+
+    A resposta inteira é **cacheada por filtro** (ver ``app/cache.py``): a
+    interface re-consulta esta rota a cada virada de página, e virar a página não
+    muda faceta nenhuma. Qualquer escrita joga o cache fora.
     """
-    sql_c, params_c = queries.sql_contagem(filtros)
+    chave = (
+        "facets",
+        json.dumps(filtros.model_dump(mode="json"), sort_keys=True, ensure_ascii=False),
+    )
+    return cache.obter(conn, chave, lambda: _facetas(conn, filtros))  # type: ignore[no-any-return]
+
+
+def _facetas(conn: sqlite3.Connection, filtros: Filtros) -> dict[str, Any]:
+    # Com busca, os acertos do FTS são materializados UMA vez e reaproveitados
+    # pelas cinco consultas desta resposta. Ver `queries.materializar_hits` — é o
+    # oposto do que a listagem faz, e o comentário de lá explica por quê.
+    hits = queries.materializar_hits(conn, filtros)
+    sql_c, params_c = queries.sql_contagem(filtros, hits_prontos=hits)
     total = int(queries.executar_fts(conn, sql_c, params_c, filtros.q)[0]["n"])
+    contagens = _contagens_das_facetas(conn, filtros, hits_prontos=hits)
 
     saida: dict[str, list[dict[str, Any]]] = {}
     for faceta in queries.FACETAS:
-        sql, params = queries.sql_faceta(filtros, faceta)
-        bruto: dict[Any, int] = {}
-        for linha in queries.executar_fts(conn, sql, params, filtros.q):
-            valor = linha["v"]
-            if valor is not None and faceta.nome in _FACETAS_BOOL:
-                valor = bool(valor)
-            elif valor is not None and faceta.nome == "quality":
-                valor = int(valor)
-            bruto[valor] = int(linha["n"])
-
+        bruto = contagens[faceta.nome]
         opcoes: list[dict[str, Any]] = []
         vistos: set[Any] = set()
         for valor in faceta.vocabulario:
@@ -381,28 +456,42 @@ def _grupo(conn: sqlite3.Connection, coluna: str, dimensao: str | None = None) -
     ]
 
 
-@router.get("/api/stats", summary="Panorama do banco (sem filtro)")
-def stats(conn: Conexao) -> dict[str, Any]:
-    """O tamanho e a forma do corpus — a tela de abertura, antes de filtrar."""
-    total = int(conn.execute("SELECT count(*) AS n FROM prompts").fetchone()["n"])
-    _, marc, _ = queries.limites()
+#: As contagens globais que saem de UMA varredura de cobertura do
+#: ``idx_prompts_app``. Nenhuma delas toca a coluna ``text`` — e é exatamente por
+#: isso que a soma dos marcadores de chat saiu daqui: junta com estas, ela
+#: obrigava o SQLite a abandonar o índice e ler os 687 MB da tabela (1.468 ms).
+#: Separada, ela responde pelo índice de expressão em 5,5 ms e este bloco em 37.
+_SQL_CONTAGENS = """
+SELECT
+  sum(pii_found IS 1)        AS pii,
+  sum(edited IS 1)           AS editados,
+  sum(needs_review IS 1)     AS needs_review,
+  sum(nsfw IS 1)             AS nsfw_sim,
+  sum(nsfw IS 0)             AS nsfw_nao,
+  sum(nsfw IS NULL)          AS nsfw_nulo,
+  sum(task_type IS NOT NULL) AS rotulados,
+  sum(n_exact_dups > 0)      AS com_duplicata
+FROM prompts
+"""
 
-    contagens = conn.execute(
-        f"""
-        SELECT
-          sum(pii_found IS 1)                   AS pii,
-          sum(edited IS 1)                      AS editados,
-          sum(needs_review IS 1)                AS needs_review,
-          sum(nsfw IS 1)                        AS nsfw_sim,
-          sum(nsfw IS 0)                        AS nsfw_nao,
-          sum(nsfw IS NULL)                     AS nsfw_nulo,
-          sum(task_type IS NOT NULL)            AS rotulados,
-          sum(n_exact_dups > 0)                 AS com_duplicata,
-          sum(substr(text, 1, {marc}) LIKE '%User:%'
-              OR substr(text, 1, {marc}) LIKE '%Assistant:%') AS com_marcadores_chat
-        FROM prompts
-        """
-    ).fetchone()
+
+@router.get("/api/stats", summary="Panorama do banco (sem filtro)")
+def stats(conn: Conexao, cache: Cache) -> dict[str, Any]:
+    """O tamanho e a forma do corpus — a tela de abertura, antes de filtrar.
+
+    Cacheado inteiro (chave única, porque a rota não tem parâmetro) e derrubado
+    por qualquer escrita. Ver ``app/cache.py``.
+    """
+    return cache.obter(conn, ("stats",), lambda: _stats(conn))  # type: ignore[no-any-return]
+
+
+def _stats(conn: sqlite3.Connection) -> dict[str, Any]:
+    total = int(conn.execute("SELECT count(*) AS n FROM prompts").fetchone()["n"])
+
+    contagens = conn.execute(_SQL_CONTAGENS).fetchone()
+    com_marcadores = conn.execute(
+        f"SELECT sum({queries.expr_marcadores_chat()}) AS n FROM prompts"
+    ).fetchone()["n"]
 
     # O robô: os textos que mais se repetem. É o sinal que separa corpus de
     # automação, e é o que justifica o filtro `max_dups`.
@@ -442,7 +531,7 @@ def stats(conn: Conexao) -> dict[str, Any]:
         "rotulados": int(contagens["rotulados"] or 0),
         "sem_rotulo": total - int(contagens["rotulados"] or 0),
         "com_duplicata_exata": int(contagens["com_duplicata"] or 0),
-        "com_marcadores_chat": int(contagens["com_marcadores_chat"] or 0),
+        "com_marcadores_chat": int(com_marcadores or 0),
         "top_duplicados": top_dups,
         # A taxonomia inteira, na ordem canônica: é ela que a interface usa para
         # desenhar os filtros mesmo quando NENHUMA classe tem item ainda.

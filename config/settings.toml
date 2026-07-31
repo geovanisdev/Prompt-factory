@@ -157,6 +157,18 @@ chat_markers_scan_chars = 20000
 # Teto de `page * page_size`. Ninguém pagina até a linha 100.000 com a mão; quem
 # faz isso é robô, e um OFFSET gigante mais o corte de texto viram um scan caro.
 max_offset = 100000
+# A partir de que OFFSET a listagem passa por cima do planner e força o
+# `idx_prompts_created` (só em newest/oldest e só sem busca). Um OFFSET de N só é
+# alcançável se o filtro casar mais de N linhas, e ordenar N linhas num B-tree
+# temporário nunca sai mais barato que caminhar N entradas de um índice já
+# ordenado. Medido no banco real, `lang=pt` na página 2000: 2.256 -> 12 ms.
+# Abaixo do limiar o planner decide sozinho, e decide certo.
+deep_offset_hint = 10000
+# Entradas do cache de agregados (/api/facets por filtro + /api/stats). Toda
+# escrita joga o cache inteiro fora, então isto é só o teto de quantos recortes
+# diferentes ficam quentes ao mesmo tempo. 0 DESLIGA o cache — útil para medir o
+# custo real de uma consulta sem precisar mexer no código.
+cache_max_entradas = 64
 # Tokens que o sanitizador do FTS aceita numa busca (o resto é descartado).
 fts_max_tokens = 24
 

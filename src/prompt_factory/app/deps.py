@@ -25,6 +25,7 @@ from typing import Annotated, Any
 from fastapi import Depends, HTTPException, Request
 
 from .. import db as dbmod
+from .cache import CacheAgregados
 
 
 def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
@@ -100,6 +101,19 @@ def estado(request: Request) -> dict[str, Any]:
 Estado = Annotated[dict[str, Any], Depends(estado)]
 
 
+def cache(request: Request) -> CacheAgregados:
+    """O cache de agregações desta app (``app.state.cache``).
+
+    Vem do ``app.state`` e não de um global de módulo: dois ``criar_app`` no
+    mesmo processo apontam para bancos diferentes, e um cache compartilhado
+    entre eles serviria a contagem de um banco na tela do outro.
+    """
+    return request.app.state.cache  # type: ignore[no-any-return]
+
+
+Cache = Annotated[CacheAgregados, Depends(cache)]
+
+
 # ---------------------------------------------------------------------------
 # guardas
 # ---------------------------------------------------------------------------
@@ -158,8 +172,10 @@ def marcar_atualizado() -> str:
 
 
 __all__ = [
+    "Cache",
     "Conexao",
     "Estado",
+    "cache",
     "estado",
     "exigir_colecao",
     "get_conn",

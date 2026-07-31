@@ -21,10 +21,21 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Response
 
 from . import presenters, queries
-from .deps import Conexao, exigir_colecao, marcar_atualizado
+from .deps import Cache, Conexao, exigir_colecao, marcar_atualizado
 from .models import ColecaoIn, ColecaoPatch, ItensPorFiltro, ItensUids
 
 router = APIRouter(tags=["colecoes"])
+
+# INVALIDAÇÃO DO CACHE DE AGREGADOS (ver app/cache.py)
+# ---------------------------------------------------
+# `collection_id` é campo de `Filtros`: as facetas e a contagem SOB uma coleção
+# mudam quando a lista de membros muda. Por isso quem mexe em `collection_items`
+# — inclusive o DELETE da coleção, que cascateia — derruba o cache.
+#
+# `criar` e `editar` (renomear/redescrever) NÃO derrubam: não tocam em
+# `collection_items`, e nenhuma resposta cacheada depende do nome de uma coleção.
+# A distinção é de propósito; invalidar "por via das dúvidas" a cada coleção
+# criada custaria uma recontagem do corpus no meio da curadoria.
 
 #: Linhas por lote nos INSERT/DELETE em massa. Sem lote, um ``from-filter`` de
 #: 189 mil itens estouraria o teto de variáveis ligadas do SQLite.
@@ -111,12 +122,13 @@ def editar(colecao_id: int, corpo: ColecaoPatch, conn: Conexao) -> dict[str, Any
 
 
 @router.delete("/api/collections/{colecao_id}", status_code=204, summary="Apaga a coleção")
-def apagar(colecao_id: int, conn: Conexao) -> Response:
+def apagar(colecao_id: int, conn: Conexao, cache: Cache) -> Response:
     """Os itens vão junto pelo ``ON DELETE CASCADE`` — que só funciona porque
     ``db.connect`` liga ``foreign_keys``, um PRAGMA **por conexão**. Os prompts
     em si não são tocados: coleção é um recorte, não uma cópia."""
     exigir_colecao(conn, colecao_id)
     conn.execute("DELETE FROM collections WHERE id = ?", (colecao_id,))
+    cache.invalidar()
     return Response(status_code=204)
 
 
@@ -199,10 +211,13 @@ def _ids_do_filtro(conn: sqlite3.Connection, corpo: ItensPorFiltro) -> list[int]
 
 
 @router.post("/api/collections/{colecao_id}/items", summary="Adiciona uids à coleção")
-def adicionar(colecao_id: int, corpo: ItensUids, conn: Conexao) -> dict[str, Any]:
+def adicionar(
+    colecao_id: int, corpo: ItensUids, conn: Conexao, cache: Cache
+) -> dict[str, Any]:
     exigir_colecao(conn, colecao_id)
     ids, faltando = _ids_dos_uids(conn, corpo.uids)
     adicionados = _inserir(conn, colecao_id, ids)
+    cache.invalidar()
     return {
         "collection_id": colecao_id,
         "added": adicionados,
@@ -213,12 +228,16 @@ def adicionar(colecao_id: int, corpo: ItensUids, conn: Conexao) -> dict[str, Any
 
 
 @router.post("/api/collections/{colecao_id}/items/remove", summary="Remove uids da coleção")
-def remover(colecao_id: int, corpo: ItensUids, conn: Conexao) -> dict[str, Any]:
+def remover(
+    colecao_id: int, corpo: ItensUids, conn: Conexao, cache: Cache
+) -> dict[str, Any]:
     exigir_colecao(conn, colecao_id)
     ids, faltando = _ids_dos_uids(conn, corpo.uids)
+    removidos = _remover(conn, colecao_id, ids)
+    cache.invalidar()
     return {
         "collection_id": colecao_id,
-        "removed": _remover(conn, colecao_id, ids),
+        "removed": removidos,
         "not_found": faltando,
         "n_items": _n_itens(conn, colecao_id),
     }
@@ -229,7 +248,7 @@ def remover(colecao_id: int, corpo: ItensUids, conn: Conexao) -> dict[str, Any]:
     summary="Adiciona TODOS os itens que casam com um filtro",
 )
 def adicionar_por_filtro(
-    colecao_id: int, corpo: ItensPorFiltro, conn: Conexao
+    colecao_id: int, corpo: ItensPorFiltro, conn: Conexao, cache: Cache
 ) -> dict[str, Any]:
     """"Adicionar os 12.483 que estou vendo", numa requisição.
 
@@ -241,6 +260,7 @@ def adicionar_por_filtro(
     exigir_colecao(conn, colecao_id)
     ids = _ids_do_filtro(conn, corpo)
     adicionados = _inserir(conn, colecao_id, ids)
+    cache.invalidar()
     return {
         "collection_id": colecao_id,
         "matched": len(ids),
@@ -255,17 +275,19 @@ def adicionar_por_filtro(
     summary="Remove da coleção TODOS os itens que casam com um filtro",
 )
 def remover_por_filtro(
-    colecao_id: int, corpo: ItensPorFiltro, conn: Conexao
+    colecao_id: int, corpo: ItensPorFiltro, conn: Conexao, cache: Cache
 ) -> dict[str, Any]:
     """O simétrico do ``from-filter`` — é assim que a família inteira do robô
     sai da coleção de uma vez (``max_dups`` invertido, ou uma busca pelo
     prefixo do template)."""
     exigir_colecao(conn, colecao_id)
     ids = _ids_do_filtro(conn, corpo)
+    removidos = _remover(conn, colecao_id, ids)
+    cache.invalidar()
     return {
         "collection_id": colecao_id,
         "matched": len(ids),
-        "removed": _remover(conn, colecao_id, ids),
+        "removed": removidos,
         "n_items": _n_itens(conn, colecao_id),
     }
 

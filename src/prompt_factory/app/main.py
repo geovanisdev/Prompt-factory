@@ -38,6 +38,8 @@ from fastapi.staticfiles import StaticFiles
 from .. import __version__, paths
 from .. import db as dbmod
 from ..schema import TAXONOMY_VERSION
+from . import queries
+from .cache import CacheAgregados
 from .deps import Conexao, Estado, rotulagem_pendente
 
 #: Índice de COBERTURA da interface. A ordem é a ordem em que a app filtra
@@ -56,9 +58,49 @@ CREATE INDEX IF NOT EXISTS idx_prompts_app ON prompts(
 )
 """
 
+#: Índice de EXPRESSÃO do "isto parece conversa colada?".
+#:
+#: O ``/api/stats`` soma esse teste sobre o corpus inteiro, e ele é o ÚNICO
+#: número do panorama que precisa ler a coluna ``text`` — ou seja, os 687 MB da
+#: tabela. Medido no banco real: 1.462 ms de 1.877 ms da rota inteira eram esta
+#: soma. Com o índice de expressão a soma vira uma varredura de cobertura de
+#: 5,5 ms, e o SQLite ainda o mantém sozinho a cada UPDATE de ``text``.
+#:
+#: Ele NÃO está no ``db.DDL`` porque a janela (``[app] chat_markers_scan_chars``)
+#: vem do ``settings.toml``: DDL que muda com configuração não é constante. E o
+#: SQLite casa índice de expressão por TEXTO da expressão — mudar a janela no
+#: settings sem refazer o índice não daria erro, daria os 1.462 ms de volta em
+#: silêncio. Por isso ``_indice_marcadores`` compara o SQL guardado no
+#: ``sqlite_master`` com o de agora e refaz quando diverge.
+NOME_INDICE_MARCADORES = "idx_prompts_chatmark"
+
 #: Diretório do ``index.html``. Fica DENTRO do pacote (e não na raiz do repo)
 #: para que ``pf serve`` funcione de qualquer diretório de trabalho.
 STATIC = Path(__file__).resolve().parent / "static"
+
+
+def _indice_marcadores(conn: sqlite3.Connection) -> None:
+    """Cria (ou refaz) o índice de expressão dos marcadores de chat.
+
+    Idempotente e barato quando já está certo: uma leitura do ``sqlite_master``.
+    Quando a janela do ``settings.toml`` muda, o índice velho indexa uma
+    expressão que nenhuma consulta mais escreve — ele não erra, ele só deixa de
+    ser usado. Derrubar e refazer (~1,5 s) é o único jeito de a mudança de
+    configuração continuar valendo alguma coisa.
+    """
+    ddl = (
+        f"CREATE INDEX {NOME_INDICE_MARCADORES} ON prompts("
+        f"{queries.expr_marcadores_chat()})"
+    )
+    linha = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='index' AND name = ?",
+        (NOME_INDICE_MARCADORES,),
+    ).fetchone()
+    if linha is not None:
+        if str(linha["sql"]).strip() == ddl:
+            return
+        conn.execute(f"DROP INDEX {NOME_INDICE_MARCADORES}")
+    conn.execute(ddl)
 
 
 def _preparar(db_file: Path) -> dict[str, Any]:
@@ -80,6 +122,12 @@ def _preparar(db_file: Path) -> dict[str, Any]:
                 f"{dbmod.SCHEMA_VERSION} — recarregue com `pf load-db`"
             )
         conn.execute(DDL_INDICE_APP)
+        # Os índices de ordenação vivem no `db.DDL` (o s11 já os constrói), mas
+        # um banco carregado por uma versão ANTERIOR do load-db não os tem — e
+        # é justamente esse o banco que está no disco hoje. `IF NOT EXISTS`
+        # torna isto um no-op nas próximas cargas.
+        conn.executescript(dbmod.DDL_INDICES_ORDENACAO)
+        _indice_marcadores(conn)
 
         try:
             conn.execute(
@@ -133,6 +181,8 @@ def criar_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.db_file = alvo
         app.state.exports_dir = saida
+        # Antes do _preparar: o cache é por app, e nasce vazio junto com ela.
+        app.state.cache = CacheAgregados()
         app.state.meta = _preparar(alvo)
         try:
             yield
@@ -182,4 +232,4 @@ def criar_app(
     return app
 
 
-__all__ = ["DDL_INDICE_APP", "STATIC", "criar_app"]
+__all__ = ["DDL_INDICE_APP", "NOME_INDICE_MARCADORES", "STATIC", "criar_app"]

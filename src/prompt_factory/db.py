@@ -44,7 +44,39 @@ SCHEMA_VERSION = 1
 #: FTS5 estável). Python 3.12 embute 3.4x.
 MIN_SQLITE = (3, 35, 0)
 
-DDL = """
+#: ÍNDICES DE ORDENAÇÃO (M9-C), num bloco próprio porque a **app também os
+#: cria**: o banco que está no disco hoje foi carregado por um ``load-db``
+#: anterior a eles, e esperar o próximo ``pf load-db`` (horas de pipeline) para
+#: a interface ficar rápida não é uma opção. Ver ``app/main.py``.
+#:
+#: Todo ``ORDER BY`` da listagem que não é ``relevance`` caía num ``SCAN p`` +
+#: ``USE TEMP B-TREE FOR ORDER BY``: ordenar 144.754 linhas de uma tabela de
+#: 687 MB para mostrar 50. Medido no banco real: página 1 por ``newest`` 479 ms,
+#: ``longest`` 557 ms, ``dups`` 207 ms, e a página 2000 (OFFSET 99.950) 8.145 ms.
+DDL_INDICES_ORDENACAO = """
+-- `created_ts DESC, id DESC` é a ordem EXATA do ORDER BY de `newest` (o `oldest`
+-- sai da mesma B-tree lida ao contrário). `nsfw` e `lang` entram no fim NÃO para
+-- ordenar, e sim para o OFFSET profundo poder DESCARTAR linha pelo índice: sem
+-- elas, pular 99.950 linhas custa 99.950 buscas na tabela só para ler o `nsfw`
+-- do filtro padrão (`nsfw IS NOT 1`). Medido: 8.145 -> 497 ms com (created_ts,
+-- id); -> 7,2 ms com o `nsfw` dentro.
+CREATE INDEX IF NOT EXISTS idx_prompts_created ON prompts(created_ts DESC, id DESC, nsfw, lang);
+-- `shortest`/`longest`. Uma B-tree só serve às duas: a ordem inversa é a mesma
+-- árvore lida de trás para frente. O desempate por `id ASC` do `longest` vira um
+-- "TEMP B-TREE FOR LAST TERM" (só dentro de cada grupo de `n_chars` igual), o
+-- que é barato: 557 -> 23 ms.
+CREATE INDEX IF NOT EXISTS idx_prompts_nchars  ON prompts(n_chars, id);
+-- `sort=dups` E o `top_duplicados` do /api/stats, que era uma varredura da
+-- tabela inteira para pegar 10 linhas (160 ms -> 0,04 ms).
+CREATE INDEX IF NOT EXISTS idx_prompts_dups    ON prompts(n_exact_dups DESC, id);
+-- `label_method` é a única dimensão do /api/stats sem índice nenhum: o GROUP BY
+-- dela varria a tabela (183 ms). Com o índice a varredura é de COBERTURA (5 ms),
+-- porque o `_grupo` do /api/stats não tem WHERE.
+CREATE INDEX IF NOT EXISTS idx_prompts_labelm  ON prompts(label_method);
+"""
+
+DDL = (
+    """
 CREATE TABLE IF NOT EXISTS prompts (
   id                 INTEGER PRIMARY KEY,
   uid                TEXT NOT NULL UNIQUE,
@@ -100,7 +132,9 @@ CREATE INDEX IF NOT EXISTS idx_prompts_hash    ON prompts(hash_norm);
 -- que a interface filtra: idioma sempre, depois tarefa, domínio e a fila de
 -- revisão.
 CREATE INDEX IF NOT EXISTS idx_prompts_facets  ON prompts(lang, task_type, domain, needs_review);
-
+"""
+    + DDL_INDICES_ORDENACAO
+    + """
 -- Índice externo (content='prompts'): o texto não é duplicado, o FTS guarda só
 -- o índice invertido. remove_diacritics 2 dobra acento em TODO o Unicode.
 CREATE VIRTUAL TABLE IF NOT EXISTS prompts_fts USING fts5(
@@ -168,6 +202,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
   value TEXT NOT NULL
 );
 """
+)
 
 #: Tabelas próprias (as shadow tables do FTS5 não entram nesta lista).
 TABLES: tuple[str, ...] = (
@@ -183,9 +218,14 @@ TABLES: tuple[str, ...] = (
 #: Triggers de sincronia do índice FTS.
 TRIGGERS: tuple[str, ...] = ("prompts_fts_ai", "prompts_fts_ad", "prompts_fts_au")
 
-#: Índices de ``prompts``, na ordem do DDL. A carga bulk do s11 derruba os onze
-#: antes de inserir (onze B-trees crescendo a cada linha custam mais do que
+#: Índices de ``prompts``, na ordem do DDL. A carga bulk do s11 derruba os quinze
+#: antes de inserir (quinze B-trees crescendo a cada linha custam mais do que
 #: construí-los de uma vez no fim) e recria tudo com ``executescript(DDL)``.
+#:
+#: Os índices de *consulta da app* que NÃO estão aqui (``idx_prompts_app`` e
+#: ``idx_prompts_chatmark``) moram em ``app/main.py``: um depende do
+#: ``[app] chat_markers_scan_chars`` do ``settings.toml``, e DDL que muda com
+#: configuração não pode ser uma constante de módulo.
 INDEXES: tuple[str, ...] = (
     "idx_prompts_lang",
     "idx_prompts_variant",
@@ -198,6 +238,10 @@ INDEXES: tuple[str, ...] = (
     "idx_prompts_review",
     "idx_prompts_hash",
     "idx_prompts_facets",
+    "idx_prompts_created",
+    "idx_prompts_nchars",
+    "idx_prompts_dups",
+    "idx_prompts_labelm",
 )
 
 
@@ -553,6 +597,7 @@ def run_db_check(
 
 __all__ = [
     "DDL",
+    "DDL_INDICES_ORDENACAO",
     "INDEXES",
     "MIN_SQLITE",
     "SCHEMA_VERSION",

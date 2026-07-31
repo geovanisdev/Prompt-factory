@@ -31,7 +31,7 @@ Ordem da carga, que não é arbitrária:
    trigger é ordens de grandeza mais lento, e o comando ``'delete'`` do FTS
    externo exige que ``old.text`` seja EXATAMENTE o texto indexado: qualquer
    divergência corrompe o índice **em silêncio**;
-4. ``executescript(DDL)`` recria os onze índices e os três triggers de uma vez
+4. ``executescript(DDL)`` recria os quinze índices e os três triggers de uma vez
    (todo o DDL é ``IF NOT EXISTS``: tabelas viram no-op, dados permanecem).
 
 **Nunca passe escalar numpy para o sqlite3.** Ele aceita o buffer protocol e
@@ -599,7 +599,7 @@ def construir(
         conn.execute("INSERT INTO prompts_fts(prompts_fts) VALUES('rebuild')")
         print(f"[{ESTAGIO}] índice FTS5 reconstruído em {time.perf_counter() - relogio:.1f} s")
 
-        # Todo o DDL é IF NOT EXISTS: isto recria os 11 índices e os 3 triggers
+        # Todo o DDL é IF NOT EXISTS: isto recria os 15 índices e os 3 triggers
         # sem tocar em tabela nem em dado.
         relogio = time.perf_counter()
         conn.executescript(dbmod.DDL)

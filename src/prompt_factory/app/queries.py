@@ -219,19 +219,86 @@ _CTE_HITS = (
 _FROM_FTS = "FROM prompts p JOIN hits h ON h.id = p.id"
 _FROM_SIMPLES = "FROM prompts p"
 
+#: Tabela TEMPORÁRIA com os acertos da busca, materializada uma vez por
+#: requisição. Vive na conexão (que é uma por request) e morre com ela.
+TABELA_HITS = "pf_hits"
+_FROM_HITS = f"FROM prompts p JOIN temp.{TABELA_HITS} h ON h.id = p.id"
 
-def preparar_busca(f: Filtros) -> tuple[str, str, str, dict[str, Any]]:
+
+def preparar_busca(
+    f: Filtros, *, hits_prontos: bool = False
+) -> tuple[str, str, str, dict[str, Any]]:
     """``(prefixo_cte, from, expressão_de_score, params)``.
 
     ``expressão_de_score`` sai vazia quando não há busca — a listagem então não
     devolve ``score``, e não devolver é melhor que devolver zero: um score 0
     para todo mundo faz a interface desenhar uma barra de relevância que não
     significa nada.
+
+    ``hits_prontos=True`` troca o CTE pela tabela temporária de
+    ``materializar_hits``. Ver lá por que os dois caminhos existem.
     """
     fts = sanitize_fts(f.q)
     if not fts:
         return "", _FROM_SIMPLES, "", {}
+    if hits_prontos:
+        return "", _FROM_HITS, "h.score", {}
     return _CTE_HITS, _FROM_FTS, "h.score", {"fts": fts}
+
+
+def materializar_hits(conn: sqlite3.Connection, f: Filtros) -> bool:
+    """Guarda os acertos da busca numa tabela temporária. ``False`` se não há busca.
+
+    SIM, ISTO CONTRADIZ A ARMADILHA 2 DO CABEÇALHO — E DE PROPÓSITO.
+    =============================================================
+    Materializar os acertos DENTRO de uma consulta (``AS MATERIALIZED``) é 100x
+    mais lento na LISTAGEM, e continua sendo. Materializá-los numa tabela
+    temporária INDEXADA, reaproveitada por várias consultas, é 7x mais rápido
+    nas FACETAS. As duas coisas são verdade porque as duas consultas são
+    diferentes:
+
+    * A listagem tem ``LIMIT 50``: o CTE inline deixa o SQLite usar os acertos
+      como laço externo e parar cedo. Materializar apaga essa saída antecipada.
+    * Uma faceta consome o conjunto INTEIRO de acertos e não devolve texto
+      nenhum. Com o CTE, o plano é ``SCAN prompts_fts`` + ``SEARCH p USING
+      INTEGER PRIMARY KEY`` — 14 mil linhas COMPLETAS carregadas de uma tabela de
+      687 MB, com o ``text`` junto, só para contar. Com a tabela temporária, o
+      plano vira ``SEARCH p USING COVERING INDEX idx_prompts_app`` sondando
+      ``pf_hits`` pelo rowid: **a tabela não é tocada**.
+
+    Medido no banco real, busca ``texto`` (14.020 acertos), sob ``lang=pt``:
+
+    ========================================  ========
+    por consulta de faceta, com o CTE          77 ms
+    por consulta de faceta, com a temporária   11 ms
+    montar a temporária (uma vez)             8,5 ms
+    ========================================  ========
+
+    Cinco consultas por resposta de faceta: 385 ms viram 63 ms.
+
+    A tabela é ``TEMP``: vive na conexão, que é uma por requisição, e some com
+    ela. Nada disso escreve no banco.
+    """
+    fts = sanitize_fts(f.q)
+    if not fts:
+        return False
+    conn.execute(f"DROP TABLE IF EXISTS temp.{TABELA_HITS}")
+    conn.execute(f"CREATE TEMP TABLE {TABELA_HITS} (id INTEGER PRIMARY KEY, score REAL)")
+    sql = (
+        f"INSERT INTO temp.{TABELA_HITS} (id, score) "
+        "SELECT rowid, bm25(prompts_fts) FROM prompts_fts WHERE prompts_fts MATCH :fts"
+    )
+    # O mesmo paraquedas do `executar_fts`: erro de sintaxe do FTS5 vira uma
+    # busca mais burra, nunca um 500. Agora ele acontece UMA vez, aqui, em vez de
+    # uma vez por consulta de faceta.
+    try:
+        conn.execute(sql, {"fts": fts})
+    except sqlite3.OperationalError as exc:
+        aviso = str(exc).lower()
+        if "fts5" not in aviso and "no such column" not in aviso and "syntax" not in aviso:
+            raise
+        conn.execute(sql, {"fts": fts_literal(f.q)})
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -322,9 +389,40 @@ def limites() -> tuple[int, int, int]:
     )
 
 
+def expr_marcadores_chat(coluna: str = "text") -> str:
+    """A expressão "este texto parece uma conversa colada?", com o corte LITERAL.
+
+    **Ponto único da verdade, e não por elegância.** ``app/main.py`` cria um
+    índice de EXPRESSÃO com exatamente esta string; o ``/api/stats`` a soma sobre
+    o corpus inteiro. O SQLite só usa um índice de expressão quando a expressão
+    da consulta é textualmente a mesma da do índice (a menos de espaços) — duas
+    cópias divergentes não dariam erro, dariam 1.462 ms em vez de 5,5 ms, em
+    silêncio. Por isso o corte entra como **literal** e não como parâmetro
+    ligado: ``:marc`` nunca casaria com o índice.
+
+    (A listagem continua usando ``:marc`` parametrizado em ``_COLS_LISTA``: lá a
+    expressão é avaliada sobre as 50 linhas da página, onde o índice não faz
+    diferença nenhuma.)
+    """
+    _, marc, _ = limites()
+    return (
+        f"(substr({coluna}, 1, {marc}) LIKE '%User:%' "
+        f"OR substr({coluna}, 1, {marc}) LIKE '%Assistant:%')"
+    )
+
+
 # ---------------------------------------------------------------------------
 # consultas de listagem
 # ---------------------------------------------------------------------------
+
+
+#: Ordenações que ``idx_prompts_created`` (created_ts DESC, id DESC, nsfw, lang)
+#: serve inteiras — a mesma B-tree, lida para frente ou para trás.
+_ORDENS_DO_INDICE_CRIACAO = frozenset({"newest", "oldest"})
+
+
+def _limiar_offset_profundo() -> int:
+    return int(_cfg("app", "deep_offset_hint", default=10_000))
 
 
 def sql_lista(c: ConsultaPrompts) -> tuple[str, dict[str, Any], str]:
@@ -343,6 +441,30 @@ def sql_lista(c: ConsultaPrompts) -> tuple[str, dict[str, Any], str]:
 
     params["limit"] = c.page_size
     params["offset"] = (c.page - 1) * c.page_size
+
+    # OFFSET PROFUNDO: o único lugar da app que passa por cima do planner.
+    #
+    # Com um filtro de igualdade indexado (`lang=pt`, `source=aya`), o SQLite
+    # prefere BUSCAR por esse índice e ordenar o resultado num TEMP B-TREE. Para
+    # a página 1 essa escolha é CERTA (medido: `source=aya` página 1 = 19 ms).
+    # Para a página 2000 é uma catástrofe, porque o TEMP B-TREE passa a ordenar
+    # dezenas de milhares de linhas — medido no banco real, `lang=pt` na página
+    # 2000: 2.256 ms contra 12 ms percorrendo `idx_prompts_created`.
+    #
+    # O limiar é a justificativa: um OFFSET de N só é alcançável se o filtro
+    # casar mais de N linhas, e ordenar N linhas num B-tree temporário nunca sai
+    # mais barato que caminhar N entradas de um índice já ordenado. Abaixo do
+    # limiar o planner decide sozinho, que é o certo.
+    #
+    # Só sem busca textual: com o CTE do FTS o laço externo são os hits, e forçar
+    # o índice aqui inverteria a junção e varreria o corpus para cada acerto.
+    if (
+        not score
+        and efetivo in _ORDENS_DO_INDICE_CRIACAO
+        and params["offset"] >= _limiar_offset_profundo()
+    ):
+        origem = f"{_FROM_SIMPLES} INDEXED BY idx_prompts_created"
+
     sql = (
         f"{cte}SELECT {colunas} {origem}{_clausula(cond)} "
         f"ORDER BY {ordem} LIMIT :limit OFFSET :offset"
@@ -350,9 +472,9 @@ def sql_lista(c: ConsultaPrompts) -> tuple[str, dict[str, Any], str]:
     return sql, params, efetivo
 
 
-def sql_contagem(f: Filtros) -> tuple[str, dict[str, Any]]:
+def sql_contagem(f: Filtros, *, hits_prontos: bool = False) -> tuple[str, dict[str, Any]]:
     """``count(*)`` sob o filtro — o número grande do topo da interface."""
-    cte, origem, _, params = preparar_busca(f)
+    cte, origem, _, params = preparar_busca(f, hits_prontos=hits_prontos)
     cond, p_where = build_where(f)
     params.update(p_where)
     return f"{cte}SELECT count(*) AS n {origem}{_clausula(cond)}", params
@@ -493,9 +615,11 @@ def bordas_tamanho() -> tuple[int, int]:
     return int(bordas[0]), int(bordas[1])
 
 
-def sql_faceta(f: Filtros, faceta: Faceta) -> tuple[str, dict[str, Any]]:
+def sql_faceta(
+    f: Filtros, faceta: Faceta, *, hits_prontos: bool = False
+) -> tuple[str, dict[str, Any]]:
     """``GROUP BY`` de uma dimensão, com o filtro dela mesma removido."""
-    cte, origem, _, params = preparar_busca(f)
+    cte, origem, _, params = preparar_busca(f, hits_prontos=hits_prontos)
     cond, p_where = build_where(f, ignorar=faceta.ignora)
     params.update(p_where)
     if ":bk0" in faceta.expr:
@@ -507,19 +631,160 @@ def sql_faceta(f: Filtros, faceta: Faceta) -> tuple[str, dict[str, Any]]:
     return sql, params
 
 
+# ---------------------------------------------------------------------------
+# facetas em UMA passada (M9-C)
+# ---------------------------------------------------------------------------
+
+#: A ORDEM DESTA TUPLA É A ORDEM DAS COLUNAS DE ``idx_prompts_app``, E ISSO É
+#: LOAD-BEARING.
+#:
+#: Um ``GROUP BY`` cujas colunas são o **prefixo contíguo** de um índice é
+#: resolvido varrendo o índice já ordenado: o SQLite agrupa na passagem e não
+#: monta B-tree nenhuma. Qualquer outra ordem — ou a mesma ordem com um BURACO —
+#: cai num ``USE TEMP B-TREE FOR GROUP BY`` sobre 144 mil linhas.
+#:
+#: Medido no banco real, as mesmas 11 dimensões, a mesma resposta:
+#:
+#: =========================================  ========
+#: formulação                                 tempo
+#: =========================================  ========
+#: ordem arbitrária (12 dims)                 202 ms
+#: ordem do índice, com buraco                162 ms
+#: ordem do índice, prefixo contíguo           37 ms
+#: =========================================  ========
+#:
+#: ``commercial_ok`` e ``redistributable`` NÃO são facetas: estão aqui só para
+#: tapar o buraco entre ``edited`` e ``pii_found`` e manter o prefixo contíguo.
+#: Tirá-las "porque não são usadas" multiplica o custo por 4,4. Se um dia
+#: ``idx_prompts_app`` mudar de ordem, esta tupla muda junto — ou o ganho some
+#: sem nenhum sintoma além da lentidão.
+#:
+#: ``n_chars_bucket`` fica de fora: agrupar por ``n_chars`` cru seriam 14.571
+#: grupos, e a coluna vem depois de ``pii_found`` no índice. Ela sai numa
+#: segunda passada (47 ms), que ainda é uma varredura de cobertura.
+PREFIXO_FACETAS: tuple[str, ...] = (
+    "lang",
+    "quality",
+    "nsfw",
+    "lang_variant",
+    "task_type",
+    "domain",
+    "source",
+    "license",
+    "needs_review",
+    "edited",
+    "commercial_ok",
+    "redistributable",
+    "pii_found",
+)
+
+#: ``{nome da faceta: coluna}`` para as facetas que são uma coluna crua do
+#: prefixo. Só essas podem entrar na passada única — as demais (hoje só o
+#: ``n_chars_bucket``, que é um ``CASE``) continuam com consulta própria.
+_COLUNA_DA_FACETA: dict[str, str] = {
+    faceta.nome: faceta.expr[2:]
+    for faceta in FACETAS
+    if faceta.expr.startswith("p.") and faceta.expr[2:] in PREFIXO_FACETAS
+}
+
+#: Todo campo de ``Filtros`` que alguma faceta pede para ignorar. É o universo
+#: que ``campos_ativos`` precisa examinar.
+_CAMPOS_FACETADOS: frozenset[str] = frozenset().union(*(f.ignora for f in FACETAS))
+
+
+def campos_ativos(f: Filtros) -> frozenset[str]:
+    """Campos de ``Filtros`` que REALMENTE produzem condição no WHERE.
+
+    Derivado do próprio ``build_where`` (por diferença), nunca de uma segunda
+    lista de "campos preenchidos": uma segunda lista fatalmente diverge, e
+    divergir aqui significa juntar numa passada só duas facetas que deveriam ter
+    WHERE diferentes — ou seja, contagem errada, não lentidão.
+    """
+    base, _ = build_where(f)
+    return frozenset(
+        campo
+        for campo in _CAMPOS_FACETADOS
+        if build_where(f, ignorar=frozenset({campo}))[0] != base
+    )
+
+
+def particionar_facetas(f: Filtros) -> tuple[tuple[Faceta, ...], tuple[Faceta, ...]]:
+    """``(juntas, sozinhas)`` — quem pode dividir uma passada e quem não pode.
+
+    Uma faceta é contada com o filtro DELA MESMA removido (ver ``sql_faceta``).
+    Duas facetas só podem sair da mesma varredura quando o WHERE das duas é o
+    mesmo — o que acontece exatamente quando nenhuma delas ignora um campo que
+    está ativo. Com a tela sem filtro (o primeiro paint), isso vale para TODAS.
+    """
+    ativos = campos_ativos(f)
+    juntas: list[Faceta] = []
+    sozinhas: list[Faceta] = []
+    for faceta in FACETAS:
+        pode = faceta.nome in _COLUNA_DA_FACETA and not (faceta.ignora & ativos)
+        (juntas if pode else sozinhas).append(faceta)
+    return tuple(juntas), tuple(sozinhas)
+
+
+def sql_facetas_prefixo(
+    f: Filtros, *, hits_prontos: bool = False
+) -> tuple[str, dict[str, Any]]:
+    """UMA varredura que devolve a contagem cruzada do prefixo inteiro.
+
+    Sempre o prefixo COMPLETO, mesmo que só três facetas venham a ser
+    marginalizadas dele: um subconjunto viraria um prefixo com buracos e pagaria
+    o TEMP B-TREE (162 ms em vez de 37 ms). Colunas a mais numa varredura de
+    cobertura são de graça; um agrupamento fora da ordem do índice, não.
+
+    O resultado é a distribuição conjunta (82 grupos no corpus real). Quem chama
+    **marginaliza** somando ``n`` por valor de cada coluna — o que é exato, e não
+    uma aproximação, porque os grupos são uma partição das linhas filtradas.
+    """
+    cte, origem, _, params = preparar_busca(f, hits_prontos=hits_prontos)
+    cond, p_where = build_where(f)
+    params.update(p_where)
+    colunas = ", ".join(f"p.{c}" for c in PREFIXO_FACETAS)
+    sql = (
+        f"{cte}SELECT {colunas}, count(*) AS n {origem}"
+        f"{_clausula(cond)} GROUP BY {colunas}"
+    )
+    return sql, params
+
+
+def marginalizar(
+    linhas: list[sqlite3.Row], facetas: tuple[Faceta, ...]
+) -> dict[str, dict[Any, int]]:
+    """``{faceta: {valor: contagem}}`` a partir da distribuição conjunta."""
+    saida: dict[str, dict[Any, int]] = {faceta.nome: {} for faceta in facetas}
+    colunas = [(faceta.nome, _COLUNA_DA_FACETA[faceta.nome]) for faceta in facetas]
+    for linha in linhas:
+        n = int(linha["n"])
+        for nome, coluna in colunas:
+            alvo = saida[nome]
+            valor = linha[coluna]
+            alvo[valor] = alvo.get(valor, 0) + n
+    return saida
+
+
 __all__ = [
     "FACETAS",
     "NSFW_SQL",
     "ORDER_BY",
     "PII_SQL",
+    "PREFIXO_FACETAS",
     "SQL_DETALHE",
+    "TABELA_HITS",
     "Faceta",
     "bordas_tamanho",
     "build_where",
     "buscar_snippets",
+    "campos_ativos",
     "executar_fts",
+    "expr_marcadores_chat",
     "fts_literal",
     "limites",
+    "marginalizar",
+    "materializar_hits",
+    "particionar_facetas",
     "preparar_busca",
     "sanitize_fts",
     "sort_efetivo",
@@ -527,6 +792,7 @@ __all__ = [
     "sql_export",
     "sql_export_ids",
     "sql_faceta",
+    "sql_facetas_prefixo",
     "sql_ids",
     "sql_lista",
     "sql_snippets",
