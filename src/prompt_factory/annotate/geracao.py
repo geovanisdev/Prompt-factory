@@ -506,7 +506,15 @@ def escolher_prompts(
         idioma = str(prompt.get("lang") or "")
         if idioma in por_lingua and (lang == "ambos" or lang == idioma):
             por_lingua[idioma].append(prompt)
-        if lang != "ambos" and len(por_lingua.get(lang, [])) >= n:
+        # Parada antecipada: `resolver_prompt` é uma ida ao corpus por uid, e sem
+        # isto um lote de 8 pagaria uma ida para cada prompt livre do pool
+        # (`[annotate] pool_max`, hoje 500 e configurável). Em `ambos`, ter `n`
+        # de CADA língua já basta para qualquer intercalação — o teto é 2n, e
+        # não o pool inteiro.
+        if lang != "ambos":
+            if len(por_lingua[lang]) >= n:
+                break
+        elif len(por_lingua["pt"]) >= n and len(por_lingua["en"]) >= n:
             break
 
     if lang != "ambos":
