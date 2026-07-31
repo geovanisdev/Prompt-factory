@@ -634,6 +634,16 @@ def test_facetas_taxonomicas_saem_na_ordem_com_os_zeros(cliente: TestClient) -> 
     assert {o["value"] for o in dados["facets"]["domain"]} >= set(schema.DOMAINS)
 
 
+def test_facetas_booleanas_tem_rotulo_em_portugues(cliente: TestClient) -> None:
+    """``str(True)`` daria "True" e ``str(None)`` daria "None" na barra lateral
+    de uma interface em português. O que o usuário precisa ler em ``nsfw=null``
+    é "não rotulado", que é uma informação diferente de "não"."""
+    dados = cliente.get("/api/facets").json()
+    rotulos = {o["value"]: o["label"] for o in dados["facets"]["nsfw"]}
+    assert rotulos == {True: "sim", False: "não", None: "não rotulado"}
+    assert {o["label"] for o in dados["facets"]["needs_review"]} == {"sim", "não"}
+
+
 def test_faceta_de_tamanho_devolve_a_faixa_pronta(cliente: TestClient) -> None:
     dados = cliente.get("/api/facets").json()
     tamanhos = {o["value"]: o for o in dados["facets"]["n_chars_bucket"]}
@@ -812,6 +822,11 @@ def test_export_jsonl_bate_com_o_manifesto_e_com_a_tabela(cliente: TestClient) -
 
     # A ordem das chaves é contrato (um diff entre dois exports iguais é vazio).
     assert tuple(linhas[0]) == exportmod.CAMPOS_FLAT
+
+    # JSON não aceita `null` como chave de objeto: o não rotulado vira "(nulo)",
+    # não "None" (que num manifesto em português parece nome de classe).
+    assert exportmod.CHAVE_NULA in manifest["counts"]["task_type"]
+    assert "None" not in manifest["counts"]["task_type"]
 
 
 def test_export_exclui_nao_redistribuivel_e_conta(cliente: TestClient) -> None:

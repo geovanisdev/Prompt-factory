@@ -47,7 +47,18 @@ def _nomes_taxonomia() -> dict[str, dict[str, str]]:
     }
 
 
+#: Dimensões cujo valor é booleano no banco (0/1) e sai como bool no JSON.
+_FACETAS_BOOL = frozenset({"nsfw", "needs_review", "edited", "pii_found"})
+
+#: Rótulos legíveis das dimensões booleanas. ``str(True)`` daria "True" na
+#: barra lateral de uma interface em português — e, pior, "None" onde o que o
+#: usuário precisa ler é "não rotulado".
+_ROTULOS_BOOL: dict[bool | None, str] = {True: "sim", False: "não", None: "não rotulado"}
+
+
 def _rotulo(dimensao: str, valor: Any) -> str:
+    if isinstance(valor, bool) or (valor is None and dimensao in _FACETAS_BOOL):
+        return _ROTULOS_BOOL[valor]
     if valor is None:
         return "(sem rótulo)" if dimensao in ("task_type", "domain") else "(vazio)"
     nomes = _nomes_taxonomia().get(dimensao, {})
@@ -253,10 +264,6 @@ def reverter(uid: str, conn: Conexao) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # GET /api/facets
 # ---------------------------------------------------------------------------
-
-#: Dimensões cujo valor é booleano no banco (0/1) e deve sair como bool no JSON.
-_FACETAS_BOOL = frozenset({"nsfw", "needs_review", "edited", "pii_found"})
-
 
 def _selecionado(f: Filtros, faceta: queries.Faceta, valor: Any) -> bool:
     """A opção está marcada no filtro atual?"""

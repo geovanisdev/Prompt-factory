@@ -154,6 +154,16 @@ class EscritorCsv:
         self._fh.close()
 
 
+#: Como um valor NULO aparece como CHAVE nas contagens do manifesto. JSON não
+#: aceita ``null`` como chave de objeto, e ``str(None)`` daria ``"None"`` — que
+#: num manifesto em português parece nome de classe, não "sem rótulo".
+CHAVE_NULA = "(nulo)"
+
+
+def _chave_de_contagem(valor: Any) -> str:
+    return CHAVE_NULA if valor is None else str(valor)
+
+
 def _celula(valor: Any) -> str:
     """Valor Python → célula de CSV: bool vira ``true``/``false``, ``None`` vira vazio."""
     if valor is None:
@@ -344,7 +354,7 @@ def executar(
             if credito:
                 atribuicoes_usadas[fonte] = credito
             for chave in contagens:
-                contagens[chave][str(registro[chave])] += 1
+                contagens[chave][_chave_de_contagem(registro[chave])] += 1
             if not registro["commercial_ok"]:
                 nao_comercial += 1
             if registro["nsfw"]:
@@ -477,6 +487,7 @@ def linhas_em_lotes(
 __all__ = [
     "CAMPOS_FLAT",
     "CAMPO_ORIGINAL",
+    "CHAVE_NULA",
     "LIMITE_CAMPO_CSV_PADRAO",
     "REGISTRY",
     "Escritor",
