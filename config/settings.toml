@@ -114,9 +114,17 @@ batch_size = 80        # 77 itens novos + 3 de calibração ocultos
 gold_per_batch = 3
 calibration_size = 100 # batch_0000: revisado à mão pelo humano, vira o ouro
 # Corte do texto entregue ao agente. Prompt de 1 milhão de caracteres existe no
-# corpus e estouraria a janela do lote inteiro; 1.500 caracteres decidem a
-# classe com folga e o item cortado termina com " …[TRUNCADO]".
-truncate_chars = 1500
+# corpus e estouraria a janela do lote inteiro; o item cortado termina com
+# " …[TRUNCADO]".
+#
+# O número vem da JANELA DO CLASSIFICADOR, não de gosto: o e5 trunca em 512
+# tokens, o que foi medido neste corpus em ~1.879 caracteres no português e
+# ~2.117 no inglês (mediana de 120 textos longos por idioma). Rotular acima
+# disso produz rótulo que depende de informação AUSENTE do vetor — ruído que o
+# M7 não tem como aprender. Rotular abaixo, como os 1.500 originais, joga fora
+# sinal que o classificador enxerga de graça: 23,1% da semente saía cortada,
+# contra 18,0% aqui.
+truncate_chars = 1900
 # Portão por lote: concordância com o ouro nos 3 itens de calibração, medindo
 # task_type E domain (6 comparações). A granularidade é 1/6, então 0.80 exige
 # 5 acertos em 6 — abaixo disso o lote volta para `pending`.
