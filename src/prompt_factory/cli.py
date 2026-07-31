@@ -652,6 +652,11 @@ def _annotate(args: argparse.Namespace) -> int:
             f"[annotate] {rel['copiadas']['anotacoes']} anotação(ões) preservada(s) — "
             "nenhuma linha de trabalho humano foi apagada"
         )
+        # Os avisos vêm DEPOIS do relatório, e não antes: eles falam do que ainda
+        # falta fazer (publicar a diretriz de um tipo novo, por exemplo), e o que
+        # falta se lê melhor no fim do que no meio de uma lista de contagens.
+        for aviso in rel.get("avisos") or []:
+            print(f"[annotate] AVISO: {aviso}")
         return 0
 
     if acao == "serve":
@@ -738,9 +743,12 @@ def _annotate(args: argparse.Namespace) -> int:
                 "estrutura (o texto canônico não mudou)"
             )
         pool = relatorio["pool"]
+        # Genérico, e não dois nomes literais: com o P4d são quatro tipos que
+        # um prompt cru sustenta, e uma lista escrita à mão aqui esconderia o
+        # quinto no dia em que ele aparecesse.
         print(
-            f"[annotate] tarefas sobre o corpus: {pool['escrever_rubrica']} escrever_rubrica, "
-            f"{pool['sft_resposta']} sft_resposta"
+            "[annotate] tarefas sobre o corpus: "
+            + ", ".join(f"{n} {tipo}" for tipo, n in pool.items())
         )
         for aviso in relatorio["avisos"]:
             print(f"[annotate] AVISO: {aviso}")

@@ -961,7 +961,7 @@ def test_a_copia_da_v3_cobre_todas_as_tabelas(tmp_path: Path) -> None:
     """`app_meta` é escrita à parte; o resto tem de estar na lista, senão a
     migração perde uma tabela inteira em silêncio."""
     cobertas = {t for t, _ in migracao.COPIA_V3_ANTES + migracao.COPIA_V3_DEPOIS}
-    assert cobertas == set(adb.TABELAS) - {"app_meta"}
+    assert cobertas == set(adb.TABELAS) - {"app_meta"} - migracao.SEM_ORIGEM[3]
 
 
 def test_migrar_da_v3_preserva_o_alvo_escondido(

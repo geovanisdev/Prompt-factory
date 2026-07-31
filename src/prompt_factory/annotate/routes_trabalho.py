@@ -35,6 +35,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import ValidationError
 
 from . import catalogo as cat
+from . import conversa as convmod
 from . import db as adb
 from . import diretrizes as dirmod
 from . import eventos as evmod
@@ -393,8 +394,28 @@ def submeter(
 
     tipo = str(linha["tipo"])
     modelo = payloads.escolher(tipo)
+    bruto = dict(corpo.payload)
+    if tipo in adb.TIPOS_CONVERSA:
+        # OS TURNOS VÊM DO SERVIDOR, sempre, sobrescrevendo o que o cliente
+        # mandou. Não é desconfiança genérica: no duelo o cliente **não sabe**
+        # qual modelo respondeu — é o ponto inteiro do rótulo cego —, e um
+        # "quem respondeu" vindo de quem não sabia seria fabricação. O que ele
+        # manda é a avaliação: as notas, os turnos marcados e o porquê.
+        bruto.update(convmod.para_payload(anot, atribuicao_id, tipo))
+        # ANTES do Pydantic: o contrato exige ao menos um turno, e o 422 dele
+        # diria "List should have at least 1 item" sobre um campo que o cliente
+        # nem manda. 409 com a frase certa — o estado é "você ainda não
+        # conversou", não "seu payload está malformado".
+        if not bruto.get("turnos"):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "esta conversa não tem turno nenhum — converse com o modelo antes "
+                    "de avaliá-la"
+                ),
+            )
     try:
-        dados = modelo.model_validate(corpo.payload)
+        dados = modelo.model_validate(bruto)
     except ValidationError as exc:
         # 422 com o CAMINHO do campo, não "payload inválido": a tela precisa
         # apontar para o campo que está errado.
@@ -412,6 +433,15 @@ def submeter(
 
     if isinstance(dados, payloads.AvaliarRubrica):
         _conferir_contra_a_rubrica(anot, str(linha["prompt_uid"]), dados)
+    if isinstance(dados, payloads._AvaliacaoDeConversa):
+        # A MESMA função pura, contra a rubrica multi-turno da plataforma. Ela é
+        # de arquivo e não de tabela, e `erro_contra_a_rubrica` não precisa saber
+        # disso: o que ela confere é a escala de cada critério.
+        problema = tmod.erro_contra_a_rubrica(
+            convmod.rubrica(), [(nota.criterio, nota.nota) for nota in dados.notas]
+        )
+        if problema:
+            raise HTTPException(status_code=422, detail=problema)
 
     # O RE-TRABALHO VERSIONA SOZINHO. Uma devolução não apaga a versão 1: o
     # `max + 1` é o que faz "devolver → corrigir → aprovar" gravar `versao = 2`
@@ -485,6 +515,11 @@ def submeter(
             "prompt_uid": str(linha["prompt_uid"]),
             "origem": "continuacao",
         }
+    # A REVELAÇÃO DO DUELO, e só AGORA. Quem era "A" fica no servidor a conversa
+    # inteira; com a avaliação gravada, a preferência já não pode ser sobre a
+    # marca — e esconder o resultado a partir daqui seria esconder por esconder.
+    if tipo == "duelo_modelos":
+        resposta["revelacao"] = convmod.revelacao(anot, atribuicao_id)
     return resposta
 
 
@@ -501,6 +536,11 @@ def abandonar(atribuicao_id: int, corpo: AbandonarIn, anot: ConAnotacao) -> dict
     linha = _atribuicao_minha(anot, atribuicao_id, corpo.anotador_id)
     if str(linha["status"]) in ("submetida", "aprovada"):
         raise HTTPException(status_code=409, detail="esta anotação já foi enviada")
+    # A CONVERSA VAI JUNTO. Quem retomar esta tarefa (pelo catálogo, ou outra
+    # pessoa pela fila) precisa começar de uma conversa vazia: herdar os turnos
+    # de quem desistiu faria a rubrica ser aplicada a uma conversa que a pessoa
+    # não teve — e os turnos abandonados não são anotação de ninguém.
+    turnos_apagados = convmod.apagar(anot, atribuicao_id)
     anot.execute(
         f"UPDATE atribuicoes SET status = 'abandonada', terminada_em = {tmod.SQL_AGORA} "
         "WHERE id = ?",
@@ -514,8 +554,13 @@ def abandonar(atribuicao_id: int, corpo: AbandonarIn, anot: ConAnotacao) -> dict
         ator_id=corpo.anotador_id,
         tarefa_id=int(linha["tarefa_id"]),
         tipo=str(linha["tipo"]),
+        turnos_apagados=turnos_apagados,
     )
-    return {"atribuicao_id": atribuicao_id, "status": "abandonada"}
+    return {
+        "atribuicao_id": atribuicao_id,
+        "status": "abandonada",
+        "turnos_apagados": turnos_apagados,
+    }
 
 
 @router.get("/api/atribuicoes", summary="Minhas tarefas")

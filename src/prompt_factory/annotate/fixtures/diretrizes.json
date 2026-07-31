@@ -53,6 +53,34 @@
         "As duas colunas rolam juntas para a comparação ser trecho a trecho.",
         "Pelo teclado: ← escolhe A, → escolhe B, E marca empate, Ctrl+Enter envia."
       ]
+    },
+    "conversa_modelo": {
+      "en": [
+        "Talk to the model the way a real person would, in the language of the prompt — the conversation is the data being produced.",
+        "Push on what only shows up over several turns: state a constraint early and see whether it still holds later; correct the model and see whether it backs down.",
+        "Click any turn to flag it, with a score and a reason, right where it went wrong.",
+        "The rubric appears when you close the conversation. Keyboard: Ctrl+Enter sends a turn, then scores the criterion in focus."
+      ],
+      "pt": [
+        "Converse como uma pessoa real conversaria, na língua do prompt — a conversa é o dado que está sendo produzido.",
+        "Force o que só aparece em vários turnos: declare uma restrição cedo e veja se ela ainda vale depois; corrija o modelo e veja se ele recua.",
+        "Clique num turno para marcá-lo, com nota e motivo, exatamente onde ele descarrilou.",
+        "A rubrica aparece quando você encerra a conversa. Pelo teclado: Ctrl+Enter manda o turno e depois gradua o critério em foco."
+      ]
+    },
+    "duelo_modelos": {
+      "en": [
+        "The two columns are A and B, and which model is which is hidden on purpose — a preference for a brand is not a preference for a text.",
+        "Pick one and the conversation carries on with it. Every pick needs its own reason: round 1 and round 3 can be won for opposite reasons, and that is the signal.",
+        "Keyboard: ← picks A, → picks B, E records a tie — and a tie closes the duel, because there is no winner to carry the conversation forward.",
+        "The real names appear only after you submit the evaluation."
+      ],
+      "pt": [
+        "As duas colunas são A e B, e qual modelo é qual fica escondido de propósito — preferência por marca não é preferência por texto.",
+        "Escolher uma faz a conversa continuar com ela. Cada escolha pede o próprio motivo: a rodada 1 e a rodada 3 podem ser ganhas por razões opostas, e é isso que vale.",
+        "Pelo teclado: ← escolhe A, → escolhe B, E marca empate — e o empate encerra o duelo, porque não há vencedora para continuar a conversa.",
+        "Os nomes reais só aparecem depois que você envia a avaliação."
+      ]
     }
   }
 }

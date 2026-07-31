@@ -1,7 +1,8 @@
-"""Os quatro payloads versionados — o contrato do que o anotador produz.
+"""Os seis payloads versionados — o contrato do que o anotador produz.
 
 ``avaliar_rubrica@1`` · ``escrever_rubrica@1`` · ``sft_resposta@1`` ·
-``comparar_ab@1``. O nome do schema é gravado numa COLUNA de ``anotacoes``
+``comparar_ab@1`` · ``conversa_modelo@1`` · ``duelo_modelos@1``.
+O nome do schema é gravado numa COLUNA de ``anotacoes``
 (``payload_schema``), e não deduzido do tipo da tarefa na hora de ler: a versão
 viaja com o dado, para que uma anotação de hoje continue legível quando o
 formato evoluir.
@@ -38,7 +39,7 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..config import get as _cfg
-from .db import ROTULOS_MODELO, TIPOS_TAREFA
+from .db import ESCALA_TURNO, PAPEIS_TURNO, ROTULOS_DUELO, ROTULOS_MODELO, TIPOS_TAREFA
 
 #: Sufixo de versão dos quatro contratos. ``"avaliar_rubrica" -> "avaliar_rubrica@1"``.
 VERSAO_PAYLOAD = 1
@@ -318,6 +319,232 @@ class CompararAB(_Base):
 
 
 # ---------------------------------------------------------------------------
+# conversa_modelo@1 e duelo_modelos@1  (P4d)
+# ---------------------------------------------------------------------------
+#
+# DUAS CHAVES DESTES DOIS CONTRATOS NÃO VÊM DO CLIENTE
+# =====================================================
+# ``turnos`` (e ``rodadas``, no duelo) são SOBRESCRITAS pela rota de submissão
+# com o que ``conversa.para_payload`` lê de ``turnos_conversa``. Não é
+# desconfiança genérica: no duelo o cliente **não sabe** qual modelo respondeu —
+# esse é o ponto inteiro do rótulo cego —, e um "quem" vindo de quem não sabia
+# seria fabricação. Elas continuam declaradas aqui porque o contrato do dado
+# gravado é este, e é ele que o export vai ler.
+
+
+class TurnoConversa(_Base):
+    """Um turno da conversa. ``modelo``/``digest`` vazios no turno do humano."""
+
+    ordem: int
+    papel: str
+    texto: Annotated[str, Field(min_length=1, max_length=MAX_RESPOSTA_SFT)]
+    #: O ``message.thinking`` do Ollama, quando houve. Guardado e NÃO filtrado —
+    #: ver ``modelos.py``: descartá-lo em silêncio seria decidir pelo anotador
+    #: que o raciocínio não conta.
+    raciocinio: Annotated[str, Field(max_length=MAX_RESPOSTA_SFT)] = ""
+    #: O NOSSO teto de tokens cortou este turno? É informação sobre a coleta, não
+    #: sobre o modelo, e sem ela um turno cortado no meio parece decisão dele.
+    truncado: bool = False
+    #: A TAG (``qwen3:4b``) e o CONTEÚDO (o digest). A tag é reescrita quando o
+    #: autor republica o modelo; sem o digest, "o B era melhor" não significa
+    #: nada daqui a seis meses.
+    modelo: Annotated[str, Field(max_length=200)] = ""
+    digest: Annotated[str, Field(max_length=200)] = ""
+    duracao_ms: int = 0
+    criado_em: Annotated[str | None, Field(max_length=64)] = None
+
+    @field_validator("ordem", "duracao_ms", mode="before")
+    @classmethod
+    def _numeros_nao_sao_bool(cls, v: Any) -> Any:
+        return _sem_bool(v, "ordem/duracao_ms")
+
+    @field_validator("papel")
+    @classmethod
+    def _papel_conhecido(cls, v: str) -> str:
+        if v not in PAPEIS_TURNO:
+            raise ValueError(f"papel fora de {list(PAPEIS_TURNO)}: {v!r}")
+        return v
+
+
+class TurnoProblematico(_Base):
+    """Um turno marcado: qual, quão grave e por quê.
+
+    É a metade da avaliação que a rubrica não alcança. A rubrica mede a conversa
+    INTEIRA; esta lista aponta o turno exato em que ela descarrilou — e é a
+    diferença entre "coerência 2" e "no turno 5 ele inverteu a restrição do
+    turno 2". Sem o índice, quem lê a anotação depois teria de reler a conversa
+    para descobrir do que ela fala.
+    """
+
+    ordem: int
+    nota: int
+    motivo: Annotated[str, Field(min_length=1, max_length=MAX_TEXTO_LIVRE)]
+
+    @field_validator("ordem", "nota", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        # A mesma pegadinha de `NotaCriterio.nota`, e pela quinta vez neste repo:
+        # `{"nota": true}` chegaria a um validador comum já convertido em 1.
+        return _sem_bool(v, "ordem/nota")
+
+    @field_validator("ordem")
+    @classmethod
+    def _ordem_valida(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError(f"ordem de turno negativa: {v}")
+        return v
+
+    @field_validator("nota")
+    @classmethod
+    def _nota_na_escala(cls, v: int) -> int:
+        piso, teto = ESCALA_TURNO
+        if not piso <= v <= teto:
+            raise ValueError(f"a nota de um turno vai de {piso} a {teto}; veio {v}")
+        return v
+
+    @field_validator("motivo", mode="before")
+    @classmethod
+    def _motivo_limpo(cls, v: Any) -> Any:
+        return _limpo(v) if isinstance(v, str) else v
+
+
+class _AvaliacaoDeConversa(_Base):
+    """O que os dois contratos têm em comum: a rubrica, as notas e o porquê."""
+
+    #: A IDENTIDADE do instrumento aplicado (``multiturno@1``). O ``payload_schema``
+    #: versiona o FORMATO e o ``versao_diretriz`` versiona a INSTRUÇÃO; esta
+    #: coluna versiona a RÉGUA. São três coisas e as três mudam sozinhas.
+    rubrica: Annotated[str, Field(min_length=1, max_length=120)]
+    turnos: Annotated[list[TurnoConversa], Field(min_length=1, max_length=200)] = []
+    notas: Annotated[list[NotaCriterio], Field(min_length=1, max_length=32)]
+    turnos_problematicos: Annotated[list[TurnoProblematico], Field(max_length=64)] = []
+    justificativa: Annotated[str, Field(max_length=MAX_TEXTO_LIVRE)]
+
+    @field_validator("justificativa", mode="before")
+    @classmethod
+    def _justificativa_limpa(cls, v: Any) -> Any:
+        return _limpo(v) if isinstance(v, str) else v
+
+    @field_validator("justificativa")
+    @classmethod
+    def _justificativa_suficiente(cls, v: str) -> str:
+        piso = int(_cfg("annotate", "min_chars_justificativa", default=30))
+        if len(v) < piso:
+            raise ValueError(
+                f"a justificativa precisa de ao menos {piso} caracteres (tem {len(v)}) — "
+                "uma conversa avaliada sem motivo é um número que ninguém contesta"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _coerente(self) -> _AvaliacaoDeConversa:
+        nomes = [nota.criterio for nota in self.notas]
+        if len(set(nomes)) != len(nomes):
+            raise ValueError("o mesmo critério aparece duas vezes nas notas")
+        # Um turno marcado que não existe na conversa é uma nota órfã: ela
+        # apontaria para um índice que ninguém consegue reencontrar depois.
+        existentes = {turno.ordem for turno in self.turnos}
+        if existentes:
+            fora = sorted({p.ordem for p in self.turnos_problematicos} - existentes)
+            if fora:
+                raise ValueError(f"turno(s) marcado(s) que não existem na conversa: {fora}")
+        marcados = [p.ordem for p in self.turnos_problematicos]
+        if len(set(marcados)) != len(marcados):
+            raise ValueError("o mesmo turno foi marcado duas vezes")
+        return self
+
+
+class ConversaModelo(_AvaliacaoDeConversa):
+    """``conversa_modelo@1`` — a conversa com UM modelo, avaliada por inteiro.
+
+    Aqui o nome do modelo **não** é segredo (a tela o mostra durante a conversa):
+    sem duas respostas não há preferência a enviesar, e saber com quem se fala é
+    o que permite ao anotador dizer "esta família faz isto".
+    """
+
+
+class RespostaDeRodada(_Base):
+    """Um dos dois lados de uma rodada de duelo, com QUEM o escreveu."""
+
+    rotulo: str
+    texto: Annotated[str, Field(min_length=1, max_length=MAX_RESPOSTA_SFT)]
+    raciocinio: Annotated[str, Field(max_length=MAX_RESPOSTA_SFT)] = ""
+    truncado: bool = False
+    modelo: Annotated[str, Field(max_length=200)] = ""
+    digest: Annotated[str, Field(max_length=200)] = ""
+    duracao_ms: int = 0
+
+    @field_validator("duracao_ms", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        return _sem_bool(v, "duracao_ms")
+
+    @field_validator("rotulo")
+    @classmethod
+    def _rotulo_conhecido(cls, v: str) -> str:
+        if v not in ROTULOS_DUELO:
+            raise ValueError(f"rótulo fora de {list(ROTULOS_DUELO)}: {v!r}")
+        return v
+
+
+class RodadaDuelo(_Base):
+    """Uma rodada: as duas respostas, qual venceu e **por quê**.
+
+    A justificativa é por RODADA, e não uma só no fim, porque é isso que torna o
+    dado multi-turno mais valioso que o de turno único: "escolhi B na rodada 1
+    pela concisão e A na rodada 3 porque B esqueceu a restrição" são dois sinais
+    diferentes, e uma justificativa única os fundiria num só.
+    """
+
+    ordem: int
+    respostas: Annotated[list[RespostaDeRodada], Field(min_length=2, max_length=2)]
+    vencedora: str
+    justificativa: Annotated[str, Field(max_length=MAX_TEXTO_LIVRE)] = ""
+
+    @field_validator("ordem", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        return _sem_bool(v, "ordem")
+
+    @field_validator("vencedora")
+    @classmethod
+    def _vencedora_conhecida(cls, v: str) -> str:
+        if v not in ROTULOS_DUELO:
+            raise ValueError(f"vencedora fora de {list(ROTULOS_DUELO)}: {v!r}")
+        return v
+
+    @model_validator(mode="after")
+    def _vencedora_existe(self) -> RodadaDuelo:
+        rotulos = [r.rotulo for r in self.respostas]
+        if len(set(rotulos)) != 2:
+            raise ValueError("uma rodada tem de ter os dois lados, A e B")
+        if self.vencedora not in rotulos:
+            raise ValueError(f"a vencedora {self.vencedora!r} não é um dos lados desta rodada")
+        return self
+
+
+class DueloModelos(_AvaliacaoDeConversa):
+    """``duelo_modelos@1`` — preferência MULTI-TURNO, com a conversa que ela gerou.
+
+    ``turnos`` é a conversa como ela aconteceu (o humano + a resposta vencedora
+    de cada rodada); ``rodadas`` é o dado de preferência (os dois lados, quem
+    venceu, por quê). São duas chaves porque são dois produtos: quem treina um
+    modelo lê a primeira, quem treina um juiz lê a segunda.
+    """
+
+    rodadas: Annotated[list[RodadaDuelo], Field(max_length=100)] = []
+
+    @model_validator(mode="after")
+    def _rodadas_batem_com_os_turnos(self) -> DueloModelos:
+        ordens = {turno.ordem for turno in self.turnos}
+        if ordens:
+            fora = sorted({r.ordem for r in self.rodadas} - ordens)
+            if fora:
+                raise ValueError(f"rodada(s) sem turno correspondente: {fora}")
+        return self
+
+
+# ---------------------------------------------------------------------------
 # despacho
 # ---------------------------------------------------------------------------
 
@@ -329,6 +556,8 @@ MODELOS: dict[str, type[_Base]] = {
     "escrever_rubrica": EscreverRubrica,
     "sft_resposta": SftResposta,
     "comparar_ab": CompararAB,
+    "conversa_modelo": ConversaModelo,
+    "duelo_modelos": DueloModelos,
 }
 assert set(MODELOS) == set(TIPOS_TAREFA), "MODELOS e TIPOS_TAREFA divergiram"
 
@@ -355,11 +584,17 @@ __all__ = [
     "AvaliarRubrica",
     "ComparacaoCriterio",
     "CompararAB",
+    "ConversaModelo",
     "CriterioProposto",
+    "DueloModelos",
     "EscreverRubrica",
     "ItemChecklist",
     "NotaCriterio",
+    "RespostaDeRodada",
+    "RodadaDuelo",
     "SftResposta",
+    "TurnoConversa",
+    "TurnoProblematico",
     "escolher",
     "nome_schema",
 ]

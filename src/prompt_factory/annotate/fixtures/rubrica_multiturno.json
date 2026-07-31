@@ -1,0 +1,181 @@
+{
+  "schema": "rubrica_multiturno@1",
+  "sobre": "A rubrica que se aplica a uma CONVERSA inteira, e não a uma resposta solta. Os quatro critérios foram escolhidos por uma razão só: cada um deles é impossível de medir em turno único. Coerência entre turnos precisa de dois turnos; manter a restrição precisa que alguém a tenha declarado antes; recuar quando corrigido precisa da correção; continuar útil até o fim precisa de um fim. Uma rubrica de qualidade geral (clareza, correção, tom) mediria de novo o que o `avaliar_rubrica` já mede — e o formato multi-turno existe justamente para o que aquele não alcança.",
+  "sobre_lingua": "O canônico é INGLÊS: um critério de rubrica é METADADO, e a convenção deste projeto manda metadado em inglês, porque é o que o cliente lê. O `nome` é a IDENTIDADE que `anotacoes.payload_json` grava em `notas[].criterio` — mudá-lo quebraria a ligação entre uma anotação já gravada e a rubrica que a produziu. Os `*_i18n` são só exibição.",
+  "id": "multiturno@1",
+  "titulo": "Multi-turn conduct",
+  "titulo_i18n": {
+    "en": "Multi-turn conduct",
+    "pt": "Conduta ao longo da conversa"
+  },
+  "criterios": [
+    {
+      "nome": "Coherence across turns",
+      "descricao": "Later turns agree with earlier ones. The model does not contradict a fact it stated three turns ago, and does not forget a decision the conversation had already settled.",
+      "escala": {
+        "min": 1,
+        "max": 5,
+        "ancoras": [
+          {
+            "valor": 1,
+            "rotulo": "contradicts itself and carries on as if nothing happened",
+            "rotulo_i18n": {
+              "en": "contradicts itself and carries on as if nothing happened",
+              "pt": "contradiz o que disse antes e segue como se nada fosse"
+            }
+          },
+          {
+            "valor": 3,
+            "rotulo": "keeps the thread but loses a detail it had settled",
+            "rotulo_i18n": {
+              "en": "keeps the thread but loses a detail it had settled",
+              "pt": "mantém o fio, mas perde um detalhe que já estava resolvido"
+            }
+          },
+          {
+            "valor": 5,
+            "rotulo": "every turn builds on what the conversation already established",
+            "rotulo_i18n": {
+              "en": "every turn builds on what the conversation already established",
+              "pt": "cada turno se apoia no que a conversa já estabeleceu"
+            }
+          }
+        ]
+      },
+      "nome_i18n": {
+        "en": "Coherence across turns",
+        "pt": "Coerência entre os turnos"
+      },
+      "descricao_i18n": {
+        "en": "Later turns agree with earlier ones. The model does not contradict a fact it stated three turns ago, and does not forget a decision the conversation had already settled.",
+        "pt": "Os turnos seguintes concordam com os anteriores. O modelo não contradiz um fato que ele mesmo afirmou três turnos atrás, nem esquece uma decisão que a conversa já tinha fechado."
+      }
+    },
+    {
+      "nome": "Held the stated constraints",
+      "descricao": "A constraint declared once keeps holding without being repeated — length, format, language, the tool the person said they have, the thing they said not to do.",
+      "escala": {
+        "min": 1,
+        "max": 5,
+        "ancoras": [
+          {
+            "valor": 1,
+            "rotulo": "drops the constraint on the very next turn",
+            "rotulo_i18n": {
+              "en": "drops the constraint on the very next turn",
+              "pt": "abandona a restrição já no turno seguinte"
+            }
+          },
+          {
+            "valor": 3,
+            "rotulo": "holds it while it is repeated, drifts when it is not",
+            "rotulo_i18n": {
+              "en": "holds it while it is repeated, drifts when it is not",
+              "pt": "segura enquanto ela é repetida e escorrega quando não é"
+            }
+          },
+          {
+            "valor": 5,
+            "rotulo": "holds every declared constraint to the last turn",
+            "rotulo_i18n": {
+              "en": "holds every declared constraint to the last turn",
+              "pt": "segura toda restrição declarada até o último turno"
+            }
+          }
+        ]
+      },
+      "nome_i18n": {
+        "en": "Held the stated constraints",
+        "pt": "Manteve as restrições declaradas"
+      },
+      "descricao_i18n": {
+        "en": "A constraint declared once keeps holding without being repeated — length, format, language, the tool the person said they have, the thing they said not to do.",
+        "pt": "Uma restrição dita uma vez continua valendo sem precisar ser repetida — tamanho, formato, língua, a ferramenta que a pessoa disse ter, aquilo que ela pediu para não fazer."
+      }
+    },
+    {
+      "nome": "Backed down when corrected",
+      "descricao": "When the person corrects it, the model changes course and says what changed — instead of apologising and repeating the same answer, or defending a claim it cannot support.",
+      "escala": {
+        "min": 1,
+        "max": 5,
+        "ancoras": [
+          {
+            "valor": 1,
+            "rotulo": "apologises and repeats the same answer",
+            "rotulo_i18n": {
+              "en": "apologises and repeats the same answer",
+              "pt": "pede desculpa e repete a mesma resposta"
+            }
+          },
+          {
+            "valor": 3,
+            "rotulo": "accepts the correction but does not follow it through",
+            "rotulo_i18n": {
+              "en": "accepts the correction but does not follow it through",
+              "pt": "aceita a correção mas não a leva até o fim"
+            }
+          },
+          {
+            "valor": 5,
+            "rotulo": "changes course, says what changed and why",
+            "rotulo_i18n": {
+              "en": "changes course, says what changed and why",
+              "pt": "muda de rumo e diz o que mudou e por quê"
+            }
+          }
+        ]
+      },
+      "nome_i18n": {
+        "en": "Backed down when corrected",
+        "pt": "Recuou quando foi corrigido"
+      },
+      "descricao_i18n": {
+        "en": "When the person corrects it, the model changes course and says what changed — instead of apologising and repeating the same answer, or defending a claim it cannot support.",
+        "pt": "Quando a pessoa corrige, o modelo muda de rumo e diz o que mudou — em vez de pedir desculpa e repetir a mesma resposta, ou defender uma afirmação que não sustenta."
+      }
+    },
+    {
+      "nome": "Still useful at the end",
+      "descricao": "The last turn is worth as much as the first. The conversation does not decay into filler, into repeating the whole answer, or into asking questions that were already answered.",
+      "escala": {
+        "min": 1,
+        "max": 5,
+        "ancoras": [
+          {
+            "valor": 1,
+            "rotulo": "the last turns add nothing to the first",
+            "rotulo_i18n": {
+              "en": "the last turns add nothing to the first",
+              "pt": "os últimos turnos não acrescentam nada ao primeiro"
+            }
+          },
+          {
+            "valor": 3,
+            "rotulo": "still moves forward, with visible repetition",
+            "rotulo_i18n": {
+              "en": "still moves forward, with visible repetition",
+              "pt": "ainda avança, com repetição visível"
+            }
+          },
+          {
+            "valor": 5,
+            "rotulo": "the last turn is the most useful one",
+            "rotulo_i18n": {
+              "en": "the last turn is the most useful one",
+              "pt": "o último turno é o mais útil de todos"
+            }
+          }
+        ]
+      },
+      "nome_i18n": {
+        "en": "Still useful at the end",
+        "pt": "Continuou útil até o fim"
+      },
+      "descricao_i18n": {
+        "en": "The last turn is worth as much as the first. The conversation does not decay into filler, into repeating the whole answer, or into asking questions that were already answered.",
+        "pt": "O último turno vale tanto quanto o primeiro. A conversa não degenera em enchimento, em repetir a resposta inteira nem em perguntar o que já foi respondido."
+      }
+    }
+  ]
+}

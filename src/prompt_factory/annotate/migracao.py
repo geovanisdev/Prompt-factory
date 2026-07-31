@@ -68,6 +68,14 @@ EXISTS`` não reescreve o CHECK de uma tabela que já existe, e o banco do dono
 continuaria recusando o INSERT da campanha com uma regra que nenhum arquivo do
 repositório mostra mais. **Um CHECK velho não parece quebrado: ele parece um
 bug do código que está tentando escrever.**
+
+O QUE MUDA NOS DADOS, VINDO DA v4 (P4d)
+=======================================
+Nada de novo, e pela mesma razão: a v5 alarga DOIS CHECKs (``tarefas.tipo`` e
+``diretrizes.tipo`` ganham ``conversa_modelo`` e ``duelo_modelos``) e cria
+``turnos_conversa``, que nasce vazia porque nunca houve conversa num banco v4.
+As diretrizes dos dois tipos novos ficam para o ``pf annotate seed``: publicar
+regra nova no meio de uma migração misturaria preservar com publicar.
 """
 
 from __future__ import annotations
@@ -253,15 +261,77 @@ COPIA_V3_ANTES: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: nenhuma delas mudou de forma.
 COPIA_V3_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = COPIA_V2_DEPOIS
 
+#: A cópia vinda da **v4**. Como na v3, nenhuma tabela existente muda de forma:
+#: a v5 alarga dois CHECKs (``tarefas.tipo`` e ``diretrizes.tipo``, que ganham
+#: ``conversa_modelo`` e ``duelo_modelos``) e cria ``turnos_conversa`` — que
+#: **não** entra em lista de cópia nenhuma, porque nasce vazia num banco que
+#: nunca teve conversa.
+#:
+#: Escrita por extenso e não reaproveitada de ``COPIA_V3_ANTES`` pela regra 3 do
+#: cabeçalho, e desta vez com um motivo concreto: as duas listas são idênticas
+#: HOJE e vão divergir na primeira coluna que a v6 acrescentar. Um alias faria a
+#: v4 passar a copiar uma coluna que ela não tem.
+COPIA_V4_ANTES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("projetos", ("id", "nome", "cliente", "descricao", "status", "criado_em")),
+    ("diretrizes", ("id", "tipo", "versao", "texto_json", "criada_em")),
+    ("anotadores", ("id", "nome", "papel", "ativo", "qualificacoes_json", "criado_em")),
+    ("prompts_demo", ("uid", "text", "lang", "criado_em")),
+    (
+        "tarefas",
+        ("id", "tipo", "prompt_uid", "origem", "projeto_id", "payload_json", "gabarito_json",
+         "n_anotacoes_alvo", "prioridade", "status", "db_build_id", "criado_em"),
+    ),
+    (
+        "atribuicoes",
+        ("id", "tarefa_id", "anotador_id", "status", "iniciada_em", "expira_em", "terminada_em"),
+    ),
+    (
+        "anotacoes",
+        ("id", "atribuicao_id", "versao", "payload_schema", "versao_diretriz", "payload_json",
+         "gabarito_avaliacao_json", "tempo_ativo_ms", "iniciada_em", "submetida_em", "status"),
+    ),
+    (
+        "respostas_modelo",
+        ("id", "prompt_uid", "rotulo_modelo", "texto", "origem", "meta_json", "criada_em"),
+    ),
+    (
+        "criacoes",
+        ("id", "autor_id", "texto", "lang", "task_type_sugerido", "domain_sugerido", "brief",
+         "hash_norm", "duplicata_corpus", "status", "revisor_id", "comentario_revisao",
+         "revisada_em", "uid_previsto", "exportada_em", "criada_em"),
+    ),
+    ("pool", ("uid", "ordem")),
+)
+
+#: E o que depende de ``anotacoes`` já existir. Iguais às da v2/v3 — nenhuma
+#: dessas tabelas mudou de forma desde então.
+COPIA_V4_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = COPIA_V2_DEPOIS
+
 #: As versões de origem que este módulo sabe ler. Uma lista, e não um ``if``
 #: solto: acrescentar uma versão é acrescentar uma função e uma chave.
-ORIGENS_CONHECIDAS: tuple[int, ...] = (1, 2, 3)
+ORIGENS_CONHECIDAS: tuple[int, ...] = (1, 2, 3, 4)
 
 #: As tabelas que a própria migração faz crescer, e que por isso são conferidas
 #: por "nunca menos" em vez de "exatamente igual": ``app_meta`` ganha chaves e
 #: ``eventos`` ganha o registro ``banco_migrado``. Ver a conferência em
 #: ``migrar``.
 TABELAS_QUE_CRESCEM: frozenset[str] = frozenset({"app_meta", "eventos"})
+
+#: ``versão de origem -> as tabelas que AINDA NÃO EXISTIAM nela``, e que por isso
+#: não aparecem em lista de cópia nenhuma: elas nascem vazias do ``db.DDL``.
+#:
+#: Isto é DADO, e não uma exceção escrita à mão dentro de cada teste, pelo mesmo
+#: motivo de ``TRANSICOES``: o teste "a cópia cobre todas as tabelas" existe para
+#: pegar uma tabela que alguém esqueceu de copiar, e a única forma de ele
+#: continuar valendo depois de uma tabela nova é descontar aqui — no código, uma
+#: vez — em vez de relaxar o teste.
+SEM_ORIGEM: dict[int, frozenset[str]] = {
+    # `turnos_conversa` nasce na v5 (P4d): um banco v1..v4 nunca teve conversa.
+    1: frozenset({"turnos_conversa"}),
+    2: frozenset({"turnos_conversa"}),
+    3: frozenset({"turnos_conversa"}),
+    4: frozenset({"turnos_conversa"}),
+}
 
 
 class MigracaoImpossivel(RuntimeError):
@@ -588,8 +658,70 @@ def _da_v3(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any
     return relatorio
 
 
+def _da_v4(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any]:
+    """Copia a v4 no arquivo já inicializado no schema de HOJE.
+
+    A v5 acrescenta dois VALORES ao CHECK de ``tarefas.tipo`` e de
+    ``diretrizes.tipo`` (``conversa_modelo`` e ``duelo_modelos``) e cria
+    ``turnos_conversa``. É o mesmo caso da v3→v4, e a mesma armadilha: sem
+    migrar, o banco do dono continuaria recusando o INSERT das tarefas novas com
+    um CHECK que nenhum arquivo do repositório mostra mais — e ``CREATE TABLE IF
+    NOT EXISTS`` não reescreve o CHECK de uma tabela que já existe.
+
+    ``turnos_conversa`` não é copiada: ela não existe na v4, e nasce vazia. A
+    conferência de contagens do ``migrar`` a ignora sozinha, porque ela compara o
+    que existia ANTES.
+
+    As diretrizes dos dois tipos novos **não** são semeadas aqui: quem semeia é o
+    ``pf annotate seed``, e semear no meio de uma migração misturaria "preservar
+    o que existe" com "publicar regra nova". A CLI diz isso na saída.
+    """
+    relatorio: dict[str, Any] = {"copiadas": {}, "avisos": []}
+
+    for tabela, colunas in COPIA_V4_ANTES:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+    for tabela, colunas in COPIA_V4_DEPOIS:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+
+    for linha in velho.execute("SELECT key, value FROM app_meta ORDER BY key"):
+        if str(linha["key"]) == adb.CHAVE_VERSAO:
+            continue
+        adb.set_meta(novo, str(linha["key"]), linha["value"])
+
+    projetos = novo.execute("SELECT id, nome FROM projetos ORDER BY id").fetchall()
+    relatorio["projetos"] = {str(p["nome"]): int(p["id"]) for p in projetos}
+    relatorio["alocacao"] = {
+        str(p["nome"]): int(
+            novo.execute(
+                "SELECT count(*) AS n FROM tarefas WHERE projeto_id = ?", (int(p["id"]),)
+            ).fetchone()["n"]
+        )
+        for p in projetos
+    }
+    relatorio["diretrizes"] = relatorio["copiadas"].get("diretrizes", 0)
+    relatorio["status_backfill"] = {}
+    relatorio["avisos"].append(
+        "os dois tipos de conversa (conversa_modelo, duelo_modelos) ainda não têm "
+        "diretriz publicada neste banco — rode `pf annotate seed` para publicá-las"
+    )
+
+    evmod.registrar(
+        novo,
+        acao="banco_migrado",
+        entidade="banco",
+        de=4,
+        para=adb.SCHEMA_VERSION_ANOTACAO,
+        anotacoes_preservadas=relatorio["copiadas"]["anotacoes"],
+        avaliacoes_preservadas=relatorio["copiadas"]["avaliacoes"],
+        tipos_novos=list(adb.TIPOS_CONVERSA),
+        projetos=relatorio["projetos"],
+        alocacao=relatorio["alocacao"],
+    )
+    return relatorio
+
+
 #: versão de origem → a função que sabe lê-la. Ver ``ORIGENS_CONHECIDAS``.
-PASSOS = {1: _da_v1, 2: _da_v2, 3: _da_v3}
+PASSOS = {1: _da_v1, 2: _da_v2, 3: _da_v3, 4: _da_v4}
 
 
 def precisa_migrar(caminho: Path) -> int | None:
@@ -724,10 +856,13 @@ __all__ = [
     "COPIA_V2_DEPOIS",
     "COPIA_V3_ANTES",
     "COPIA_V3_DEPOIS",
+    "COPIA_V4_ANTES",
+    "COPIA_V4_DEPOIS",
     "MAPA_STATUS",
     "MAPA_VEREDITO",
     "ORIGENS_CONHECIDAS",
     "PASSOS",
+    "SEM_ORIGEM",
     "TABELAS_QUE_CRESCEM",
     "VERSAO_DIRETRIZ_HERDADA",
     "MigracaoImpossivel",

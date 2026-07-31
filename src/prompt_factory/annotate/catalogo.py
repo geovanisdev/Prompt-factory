@@ -243,7 +243,10 @@ def marcar_material(conn: sqlite3.Connection, itens: list[dict[str, Any]]) -> No
     for item in itens:
         uid = item["uid"]
         n_respostas = respostas.get(uid, 0)
-        pode = ["escrever_rubrica", "sft_resposta"]
+        # As duas de CONVERSA (P4d) não precisam de material nenhum: a resposta
+        # do modelo é gerada na hora, e a rubrica delas é da plataforma. Um
+        # prompt cru do corpus sustenta as quatro daqui.
+        pode = ["escrever_rubrica", "sft_resposta", "conversa_modelo", "duelo_modelos"]
         if uid in com_rubrica and n_respostas >= 1:
             pode.append("avaliar_rubrica")
         if n_respostas >= 2:

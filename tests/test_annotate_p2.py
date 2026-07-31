@@ -220,7 +220,10 @@ def test_seed_e_idempotente(banco: Path, corpus: Path) -> None:
         # Nada a traduzir: o banco nasceu com o pacote já bilíngue.
         "traduzidas": 0,
     }
-    assert primeira["pool"] == {"escrever_rubrica": 8, "sft_resposta": 8}
+    # Os tipos que um PROMPT CRU sustenta, `seed_pool_tarefas` de cada. Lido de
+    # `TIPOS_DO_POOL` e não escrito à mão: com o P4d passaram a ser quatro, e uma
+    # lista literal aqui só diria "mudou" sem dizer se mudou para o certo.
+    assert primeira["pool"] == dict.fromkeys(seedmod.TIPOS_DO_POOL, 8)
     assert segunda["personas"] == 0
     assert set(segunda["pacote"].values()) == {0}
     assert set(segunda["pool"].values()) == {0}
@@ -236,7 +239,7 @@ def test_seed_sem_corpus_semeia_so_o_pacote_e_avisa(banco: Path) -> None:
     finally:
         conn.close()
     assert relatorio["pacote"]["tarefas"] == 11
-    assert relatorio["pool"] == {"escrever_rubrica": 0, "sft_resposta": 0}
+    assert relatorio["pool"] == dict.fromkeys(seedmod.TIPOS_DO_POOL, 0)
     assert any("sem corpus" in a for a in relatorio["avisos"])
 
 
@@ -793,10 +796,16 @@ def test_escrever_rubrica_oferece_a_continuacao(cliente: TestClient) -> None:
 
 
 def test_os_quatro_tipos_fecham_o_ciclo(cliente: TestClient) -> None:
-    """Uma tarefa de CADA tipo, completada pela fila. É a DoD do P2 em teste."""
+    """Uma tarefa de CADA tipo, completada pela fila. É a DoD do P2 em teste.
+
+    **Os quatro de TEXTO PARADO.** Os dois de conversa (P4d) só existem depois de
+    um modelo local responder, e o ciclo deles é fechado em
+    ``test_annotate_p4d.py``, com o cliente HTTP trocado — um teste que precisasse
+    do Ollama de pé passaria ou falharia conforme a máquina de quem o rodou.
+    """
     ana = anotadores(cliente)[0]
     gravados: dict[str, str] = {}
-    for tipo in adb.TIPOS_TAREFA:
+    for tipo in [t for t in adb.TIPOS_TAREFA if t not in adb.TIPOS_CONVERSA]:
         env = pegar(cliente, ana, tipo)["tarefa"]
         assert env is not None, tipo
         if tipo == "avaliar_rubrica":
@@ -980,7 +989,16 @@ def test_catalogo_diz_o_que_cada_prompt_sustenta(cliente: TestClient) -> None:
         "/api/catalogo", params={"anotador_id": ana, "tipo": "comparar_ab"}
     ).json()
     for item in corpo["items"]:
-        assert set(item["pode"]) == {"escrever_rubrica", "sft_resposta"}, item["uid"]
+        # Os quatro que um prompt CRU sustenta: os dois de escrita e os dois de
+        # conversa (P4d), que geram a resposta na hora e cuja rubrica é da
+        # plataforma. `avaliar_rubrica` e `comparar_ab` continuam de fora — eles
+        # exigem material que um prompt cru do corpus não tem.
+        assert set(item["pode"]) == {
+            "escrever_rubrica",
+            "sft_resposta",
+            "conversa_modelo",
+            "duelo_modelos",
+        }, item["uid"]
         assert item["n_respostas"] == 0
         assert item["tem_rubrica"] is False
 

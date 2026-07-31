@@ -366,10 +366,22 @@ def fatias_por_passo(
     return escolhidos[0::2], escolhidos[1::2]
 
 
+#: Os tipos que nascem de PROMPT CRU do corpus, sem material a mais. Os outros
+#: dois (``avaliar_rubrica`` e ``comparar_ab``) exigem rubrica ativa e respostas
+#: de modelo, e por isso só existem no pacote de demonstração e no material que
+#: a campanha do P4c gera.
+TIPOS_DO_POOL: tuple[str, ...] = (
+    "escrever_rubrica",
+    "sft_resposta",
+    "conversa_modelo",
+    "duelo_modelos",
+)
+
+
 def semear_pool(
     conn: sqlite3.Connection, conn_corpus: sqlite3.Connection
 ) -> dict[str, int]:
-    """``seed_pool_tarefas`` de ``escrever_rubrica`` + o mesmo tanto de ``sft_resposta``.
+    """``seed_pool_tarefas`` tarefas de cada tipo que um prompt cru sustenta.
 
     **Prompts diferentes para cada tipo**, e não os mesmos: com os mesmos, a fila
     de SFT já traria a rubrica pronta e a oferta de continuação (rubrica → SFT)
@@ -382,16 +394,28 @@ def semear_pool(
     """
     quantas = int(_cfg("annotate", "seed_pool_tarefas", default=8))
     uids = poolmod.uids(conn, conn_corpus)
+    vazio = dict.fromkeys(TIPOS_DO_POOL, 0)
     if not uids:
-        return {"escrever_rubrica": 0, "sft_resposta": 0}
+        return dict(vazio)
 
     para_rubrica, para_sft = fatias_por_passo(uids, quantas)
     # As tarefas sobre o corpus REAL vão para o projeto do portfólio: é este o
     # trabalho que um avaliador vai ler.
     projeto_id = projmod.garantir(conn)
 
-    conta = {"escrever_rubrica": 0, "sft_resposta": 0}
-    for tipo, lista in (("escrever_rubrica", para_rubrica), ("sft_resposta", para_sft)):
+    conta = dict(vazio)
+    for tipo, lista in (
+        ("escrever_rubrica", para_rubrica),
+        ("sft_resposta", para_sft),
+        # As duas de CONVERSA (P4d) reusam as MESMAS fatias, e não uma terceira:
+        # elas não precisam de material nenhum (a resposta é gerada na hora), e
+        # o mesmo prompt em estilos diferentes é justamente o desenho desta
+        # plataforma — "o mesmo prompt em dois tipos são duas linhas". Uma
+        # terceira fatia só empurraria a amostra para outra faixa do pool sem
+        # nada em troca.
+        ("conversa_modelo", para_rubrica),
+        ("duelo_modelos", para_sft),
+    ):
         for i, uid in enumerate(lista):
             if _existe(
                 conn, "SELECT 1 FROM tarefas WHERE tipo = ? AND prompt_uid = ?", (tipo, uid)
@@ -473,7 +497,7 @@ def semear(
     relatorio["personas"] = semear_personas(conn)
     relatorio["pacote"] = semear_pacote(conn)
     if conn_corpus is None:
-        relatorio["pool"] = {"escrever_rubrica": 0, "sft_resposta": 0}
+        relatorio["pool"] = dict.fromkeys(TIPOS_DO_POOL, 0)
         relatorio["avisos"].append(
             "sem corpus: só o pacote de demonstração foi semeado. "
             "Rode `pf load-db` e depois `pf annotate seed` de novo para as tarefas "

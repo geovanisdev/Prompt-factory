@@ -24,6 +24,7 @@ from .db import (
     AVALIACOES_DEPOIS,
     DECISOES_ADMIN,
     PAPEIS,
+    ROTULOS_DUELO,
     TIPOS_TAREFA,
     VEREDITOS,
 )
@@ -184,6 +185,84 @@ class SubmeterIn(_ComAnotador):
 
 class AbandonarIn(_ComAnotador):
     """``POST /api/atribuicoes/{id}/abandonar`` — devolve a vaga na hora."""
+
+
+#: Teto de um turno escrito pelo anotador. Generoso: um turno de red-team
+#: costuma ser uma colagem longa, e o teto existe contra o paste acidental de
+#: 1 MB, não contra quem escreve muito.
+MAX_TURNO = 20_000
+
+
+class TurnoIn(_ComAnotador):
+    """``POST /api/conversa/{id}/turno`` — mandar um turno ao modelo.
+
+    ``texto`` é **opcional de propósito**: ausente, a rota entende "tente gerar
+    de novo o turno que ficou sem resposta". O turno do humano é gravado antes
+    da chamada ao Ollama, então um timeout de 180 s deixa a conversa num estado
+    nomeado em vez de custar o parágrafo que a pessoa escreveu — e obrigá-la a
+    redigitá-lo seria cobrar dela o preço do relógio.
+    """
+
+    texto: Annotated[str | None, Field(max_length=MAX_TURNO)] = None
+
+    @field_validator("texto")
+    @classmethod
+    def _texto_limpo(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        limpo = v.strip()
+        if not limpo:
+            # `""` chegaria aqui de um campo em branco enviado por engano, e
+            # viraria um turno vazio mandado ao modelo. `None` significa
+            # "regerar", e são coisas diferentes: recusar é a única leitura
+            # honesta de um envio em branco.
+            raise ValueError("um turno vazio não vai para o modelo — escreva alguma coisa")
+        return limpo
+
+
+class EscolherRodadaIn(_ComAnotador):
+    """``POST /api/conversa/{id}/escolher`` — a vencedora de uma rodada do duelo.
+
+    A justificativa é obrigatória e tem o mesmo piso do A/B, pelo mesmo motivo:
+    o valor de uma preferência está no motivo, não na preferência. Aqui vale
+    ainda mais — é **por rodada**, e "escolhi B pela concisão na rodada 1 e A na
+    rodada 3 porque B esqueceu a restrição" são dois sinais que uma justificativa
+    única fundiria num só.
+    """
+
+    ordem: Annotated[int, Field(ge=0)]
+    rotulo: str
+    justificativa: Annotated[str, Field(max_length=4_000)]
+
+    @field_validator("ordem", mode="before")
+    @classmethod
+    def _ordem_nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("ordem não é booleano")
+        return v
+
+    @field_validator("rotulo")
+    @classmethod
+    def _rotulo_conhecido(cls, v: str) -> str:
+        if v not in ROTULOS_DUELO:
+            raise ValueError(f"rótulo fora de {list(ROTULOS_DUELO)}: {v!r}")
+        return v
+
+    @field_validator("justificativa", mode="before")
+    @classmethod
+    def _justificativa_limpa(cls, v: Any) -> Any:
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("justificativa")
+    @classmethod
+    def _justificativa_suficiente(cls, v: str) -> str:
+        piso = int(_cfg("annotate", "min_chars_justificativa", default=30))
+        if len(v) < piso:
+            raise ValueError(
+                f"a escolha precisa de ao menos {piso} caracteres de motivo "
+                f"(tem {len(v)}) — o valor da preferência está no motivo"
+            )
+        return v
 
 
 class TriarIn(BaseModel):
@@ -453,14 +532,17 @@ __all__ = [
     "MAX_MOTIVO",
     "MAX_NOME",
     "MAX_TEMPO_ATIVO_MS",
+    "MAX_TURNO",
     "AbandonarIn",
     "AvaliarIn",
     "DecisaoAdminIn",
     "EdicaoIn",
+    "EscolherRodadaIn",
     "LivreIn",
     "PerfilIn",
     "ProximaIn",
     "SubmeterIn",
     "TriarIn",
+    "TurnoIn",
     "perfil",
 ]

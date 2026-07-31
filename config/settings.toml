@@ -347,6 +347,49 @@ min_criterios_rubrica = 3
 # honesto e longo o bastante para barrar um envio acidental de campo em branco.
 min_chars_sft = 40
 
+# --- conversa com modelo local (P4d) ------------------------------------------
+# As duas abas de INFERÊNCIA AO VIVO (`conversa_modelo` e `duelo_modelos`) falam
+# com o **Ollama**, um servidor à parte, por HTTP. Ele fica fora do ambiente
+# Python por um motivo específico deste projeto: o `torch` do venv é CPU e foi
+# ele que gerou os embeddings do corpus (s05). Trocá-lo por torch-CUDA para
+# rodar um modelo aqui dentro arriscaria a reprodutibilidade do s05 e a
+# invariante posicional de que a busca semântica depende.
+ollama_url = "http://127.0.0.1:11434"
+# Os DOIS modelos do duelo, nesta ordem — o primeiro é também o da conversa de
+# um modelo só. Gerações e famílias diferentes, portes parecidos, ambos com
+# português decente: o que o anotador vai julgar é diferença de FAMÍLIA, não de
+# porte. Medido nesta máquina, com a pergunta "explique em duas frases por que
+# pão de queijo cresce sem fermento": o gemma respondeu em português e no
+# tamanho pedido (6,9 s, 534 tokens); o qwen ignorou o tamanho e respondeu em
+# inglês (17,6 s, 2.065 tokens). Essa assimetria É o dado — não a equilibre por
+# parâmetro, e não a conserte com prompt de sistema.
+ollama_modelos = ["gemma3n:e4b", "qwen3:4b"]
+# Iguais para os dois modelos, sempre. Parâmetro diferente por lado faria o
+# duelo medir a nossa configuração em vez do modelo.
+ollama_temperature = 0.7
+ollama_num_ctx = 4096
+# Teto de tokens de UM turno. É um teto NOSSO, e o turno que bate nele sai
+# MARCADO como truncado na tela — senão a parede cortada pareceria decisão do
+# modelo.
+#
+# Ele existe contra o turno que NÃO TERMINA, e não contra o modelo prolixo:
+# apertá-lo para forçar concisão seria consertar o modelo por outro caminho, e a
+# verbosidade é um dos sinais que o anotador vai julgar. Medido no navegador com
+# 800: o qwen gastava o teto inteiro no raciocínio (`message.thinking`) e
+# devolvia turno VAZIO — o que não é "modelo prolixo", é "modelo mudo por culpa
+# nossa". 2.000 é o que ele consome para responder uma frase. 0 desliga o teto.
+ollama_num_predict = 2000
+# Timeout de uma geração. Folgado o bastante para a primeira chamada depois de
+# uma subida (que carrega 2,5–7,5 GB para a VRAM antes do primeiro token) e
+# curto o bastante para não deixar a aba pendurada. Estourar é ESTADO: o turno
+# do humano é gravado antes da chamada, e a tela oferece "tentar de novo" sobre
+# ele — uma conversa de trinta turnos não se perde por causa de um relógio.
+ollama_timeout_s = 180
+# Teto de turnos de uma conversa (os do humano e os do modelo juntos). O
+# histórico inteiro volta ao modelo a cada geração, então o custo por turno é
+# quadrático; e uma conversa de 80 turnos não é avaliável com rubrica.
+max_turnos_conversa = 24
+
 # --- triagem (P3a, passagem 1 da revisão) -------------------------------------
 # Piso do comentário de DEVOLUÇÃO. O comentário volta para o anotador e é a
 # única informação que ele recebe sobre o que corrigir: "refaça" devolve

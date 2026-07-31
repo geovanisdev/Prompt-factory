@@ -25,6 +25,7 @@ from .. import __version__
 from ..config import get as _cfg
 from . import db as adb
 from . import diretrizes as dirmod
+from . import modelos as modmod
 from . import pool as poolmod
 from . import projetos as projmod
 from . import solo as solomod
@@ -56,6 +57,9 @@ LIMITES: tuple[tuple[str, int], ...] = (
     ("min_chars_motivo_edicao", 10),
     ("claim_ttl_min", 120),
     ("page_size", 20),
+    # P4d: o teto de turnos, para a tela dizer "24 de 24" ANTES de o botão de
+    # enviar turno virar um 409.
+    ("max_turnos_conversa", 24),
 )
 
 
@@ -141,6 +145,18 @@ def health(anot: ConAnotacao, corpus: ConCorpus, meta: Estado) -> dict[str, Any]
         # dois lugares — eles moram em `config/settings.toml`, e uma cópia no
         # JavaScript divergiria na primeira vez que alguém ajustasse o arquivo.
         "limites": limites(),
+        # O RUNTIME DE INFERÊNCIA (P4d), sondado AO VIVO — pela mesma razão de
+        # tudo neste health: o Ollama sobe e desce por fora, e um retrato lido no
+        # lifespan seria mentira com data de validade. A sonda tem timeout de 3 s
+        # e `estado()` nunca levanta: servidor fora do ar e modelo não baixado
+        # são estados de primeira classe, e o health é onde eles aparecem.
+        #
+        # `escala_turno` sai daqui e não do JS pela razão dos `limites`: uma
+        # cópia no cliente divergiria do 422 na primeira vez que ela mudasse.
+        "modelos": {
+            **modmod.estado(),
+            "escala_turno": {"min": adb.ESCALA_TURNO[0], "max": adb.ESCALA_TURNO[1]},
+        },
         # MODO SOLO à vista, ligado ou desligado. É dele que a tela monta a
         # faixa permanente na fila de revisão. Um modo que muda a regra de QC e
         # não aparece na tela seria exatamente a mentira que este projeto não

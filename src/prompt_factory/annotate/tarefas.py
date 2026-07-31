@@ -36,6 +36,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..config import get as _cfg
+from . import conversa as convmod
 from . import db as adb
 from . import pool as poolmod
 
@@ -633,6 +634,21 @@ def hidratar(
         rubrica = rubrica_ativa(conn, uid)
         if rubrica is None and tipo == "sft_resposta":
             rubrica = _rubrica_proposta_por_mim(conn, uid, int(linha["anotador_id"]))
+    elif tipo in adb.TIPOS_CONVERSA:
+        # A rubrica da conversa é da PLATAFORMA, não do prompt: os quatro
+        # critérios dela (coerência entre turnos, restrição mantida, recuo ao ser
+        # corrigido, utilidade até o fim) só existem em multi-turno e valem para
+        # qualquer assunto. Uma rubrica por prompt criaria uma cópia por item, e
+        # a primeira que divergisse seria impossível de encontrar.
+        rubrica = convmod.rubrica()
+
+    # A CONVERSA EM ANDAMENTO vem no envelope, e não do `localStorage`: ela é
+    # trabalho já produzido, e recarregar a página não pode custá-la. No duelo,
+    # `conversa.estado` a devolve CEGA — sem `modelo` nem `digest` —, e é por
+    # esta função que ela passaria se fosse vazar.
+    conversa: dict[str, Any] | None = None
+    if tipo in adb.TIPOS_CONVERSA:
+        conversa = convmod.estado(conn, int(linha["atribuicao_id"]), tipo)
 
     quais: list[str] = []
     if tipo == "avaliar_rubrica":
@@ -663,6 +679,7 @@ def hidratar(
         "prompt": prompt,
         "rubrica": rubrica,
         "respostas": _respostas(conn, uid, quais),
+        "conversa": conversa,
         "versao_anterior": _versao_anterior(conn, int(linha["atribuicao_id"])),
     }
 

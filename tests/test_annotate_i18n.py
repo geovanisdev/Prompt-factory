@@ -777,6 +777,27 @@ def test_um_pool_materializado_antes_do_p3i_nao_mostra_marcador_cru(tmp_path: Pa
     conn.close()
 
 
+def test_as_chaves_do_runtime_de_modelos_existem_no_dicionario(
+    textos: dict[str, dict[str, str]],
+) -> None:
+    """P4d: o backend escolhe a chave do estado do runtime, como faz com o pool.
+
+    E os MARCADORES de cada uma têm de ser preenchíveis pelos dados que a
+    exceção correspondente carrega — foi assim que ``{url}`` apareceu literal na
+    tela: uma falha herdou a chave de outra, cujos dados não tinham ``url``.
+    """
+    from prompt_factory.annotate import modelos as modmod
+
+    chaves = [v for k, v in vars(modmod).items() if k.startswith("T_") and isinstance(v, str)]
+    assert len(chaves) == 6, "acrescentou uma frase e esqueceu de listá-la?"
+    for chave in chaves:
+        assert chave in textos["en"], chave
+        assert chave in textos["pt"], chave
+    # A genérica não promete marcador nenhum: ela é o destino de toda falha
+    # imprevista, e uma promessa que os dados não cumprem vira `{x}` na tela.
+    assert not re.search(r"\{\w+\}", textos["en"][modmod.T_FALHOU])
+
+
 def test_as_chaves_de_pool_do_backend_existem_no_dicionario(
     textos: dict[str, dict[str, str]],
 ) -> None:

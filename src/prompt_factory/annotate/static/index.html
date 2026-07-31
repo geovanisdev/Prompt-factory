@@ -695,6 +695,91 @@ textarea{
 .ab-texto{padding:14px;overflow:auto;height:46vh}
 .ab-empate{display:flex;justify-content:center;margin-top:12px}
 
+/* ---- conversa com modelo local (P4d) ----
+   A conversa é uma COLUNA de turnos, não um chat de mensageiro: não há bolha
+   alinhada à direita, não há avatar e não há hora ao lado de cada linha. O que
+   está sendo julgado é o texto, e todo enfeite que compete com ele é ruído numa
+   tela cujo trabalho é ler com atenção. O que distingue quem falou é a cor de
+   fundo e um rótulo — o mínimo que resolve. */
+.conversa{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.turno{
+  border:1px solid var(--linha);border-radius:var(--raio);
+  background:var(--superficie);overflow:hidden;
+}
+.turno.eu{background:var(--superficie-2);border-color:var(--linha-forte)}
+/* Turno marcado como problemático: âmbar, a MESMA cor da devolução — as duas
+   coisas são "isto aqui precisa de conserto", e usar dois âmbares diferentes
+   faria a pessoa aprender duas vezes o mesmo código. */
+.turno.marcado{border-color:var(--devolvido);box-shadow:0 0 0 1px var(--devolvido)}
+.turno-cabeca{
+  display:flex;gap:9px;align-items:center;flex-wrap:wrap;
+  padding:8px 13px;border-bottom:1px solid var(--linha);
+  font-size:.8rem;color:var(--texto-3);
+}
+.turno-quem{font-weight:600;color:var(--texto-2)}
+.turno-corpo{padding:12px 14px}
+.turno-acao{
+  background:none;border:none;padding:0;cursor:pointer;color:var(--texto-3);
+  font:inherit;font-size:.8rem;text-decoration:underline;
+}
+.turno-acao:hover{color:var(--acento)}
+/* SEM MODAL: marcar um turno abre o editor ALI, embaixo do turno — o mesmo
+   padrão do motivo por edição do P3b. Um modal esconderia justamente o texto
+   sobre o qual a nota está sendo dada. */
+.marca-turno{
+  border-top:1px dashed var(--linha);padding:11px 14px;
+  background:var(--devolvido-fundo);display:flex;flex-direction:column;gap:8px;
+}
+/* O raciocínio do modelo (`message.thinking`) NÃO é descartado e NÃO é a
+   resposta: fica recolhido, com marcador, à parte do corpo do turno. */
+.raciocinio{border-top:1px dashed var(--linha)}
+.raciocinio summary{
+  cursor:pointer;padding:7px 14px;font-size:.8rem;color:var(--texto-3);list-style:none;
+}
+.raciocinio summary::-webkit-details-marker{display:none}
+.raciocinio summary::before{content:"› "}
+.raciocinio[open] summary::before{content:"⌄ "}
+.raciocinio-corpo{
+  padding:0 14px 12px;color:var(--texto-2);font-size:.9rem;
+  white-space:pre-wrap;overflow-wrap:anywhere;max-height:30vh;overflow:auto;
+}
+.compositor{
+  display:flex;flex-direction:column;gap:9px;
+  border-top:1px solid var(--linha);padding-top:13px;margin-top:14px;
+}
+.compositor textarea{font-family:var(--fonte-leitura);font-size:1rem;line-height:1.6}
+/* O ÚNICO relógio à vista nesta plataforma, e ele é do MODELO: 17 s de geração
+   sem indicador parecem travamento. Nada aqui cronometra a pessoa. */
+.gerando{display:flex;gap:10px;align-items:center;color:var(--acento);font-size:.92rem}
+.ponto-gerando{width:9px;height:9px;border-radius:50%;background:var(--acento);flex:none}
+@media (prefers-reduced-motion: no-preference){
+  .ponto-gerando{animation:pulsa 1.1s ease-in-out infinite}
+}
+@keyframes pulsa{0%,100%{opacity:.25}50%{opacity:1}}
+.decorrido{font-variant-numeric:tabular-nums;color:var(--texto-3)}
+/* O estado do runtime: o que falta e o comando que conserta. Não é um erro —
+   é uma instrução, e por isso tem a cor da devolução e não a do erro. */
+.runtime{
+  display:flex;flex-direction:column;gap:9px;
+  border:1px solid var(--devolvido);background:var(--devolvido-fundo);
+  border-radius:var(--raio);padding:12px 14px;margin-bottom:14px;
+}
+.runtime.pronto{border-color:var(--linha);background:var(--superficie-2)}
+.comando{
+  font-family:var(--fonte-mono);font-size:.86rem;
+  background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:6px;padding:6px 10px;user-select:all;overflow-wrap:anywhere;
+}
+/* A rodada do duelo reusa a grade do A/B: duas colunas, rótulo cego. */
+.rodada{margin-top:2px}
+.rodada-nota{color:var(--texto-3);font-size:.82rem;margin-bottom:8px}
+.duelo-escolha{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.revelacao{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.revelacao-linha{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:.9rem;
+  border:1px solid var(--linha);border-radius:6px;padding:8px 12px;
+}
+
 /* ---- checklist da rubrica-guia (SFT vindo de continuação) ---- */
 .guia{display:flex;flex-direction:column;gap:8px}
 .marcavel{
@@ -969,10 +1054,19 @@ async function api(caminho, opcoes) {
   const txt = await r.text();
   let corpo = null;
   try { corpo = txt ? JSON.parse(txt) : null; } catch (_) { corpo = null; }
-  if (!r.ok) { const e = new Error(detalhe(corpo) || ("HTTP " + r.status)); e.status = r.status; throw e; }
+  if (!r.ok) {
+    const e = new Error(detalhe(corpo) || ("HTTP " + r.status));
+    e.status = r.status;
+    // O CORPO INTEIRO vai junto. O 503 da inferência (P4d) manda um objeto com
+    // a chave do dicionário, os dados e a conversa como ela ficou — e uma
+    // mensagem em português não bastaria numa tela que fala duas línguas.
+    e.corpo = corpo;
+    throw e;
+  }
   return corpo;
 }
-/** O `detail` do FastAPI é string em HTTPException e lista de dicts em 422. */
+/** O `detail` do FastAPI é string em HTTPException, lista de dicts em 422 — e um
+    OBJETO nas falhas de inferência, que precisam viajar com chave e dados. */
 function detalhe(corpo) {
   const d = corpo && corpo.detail;
   if (!d) return "";
@@ -980,7 +1074,7 @@ function detalhe(corpo) {
   if (Array.isArray(d)) {
     return d.map((e) => (e.loc ? e.loc.slice(1).join(".") + ": " : "") + (e.msg || "")).join(" · ");
   }
-  return "";
+  return String(d.mensagem || "");
 }
 const postar = (c, corpo) =>
   api(c, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
@@ -1074,6 +1168,82 @@ const TEXTOS = {
   "tipo.comparar_ab.titulo": "Compare two answers",
   "tipo.comparar_ab.vazio_titulo": "Nothing in the A/B comparison queue.",
   "tipo.comparar_ab.vazio_linha": "When there is a pair, the two answers open side by side with blind labels: you do not see which model wrote which.",
+  "tipo.conversa_modelo.nome": "Talk to a model",
+  "tipo.conversa_modelo.titulo": "Hold a conversation and evaluate it",
+  "tipo.conversa_modelo.vazio_titulo": "Nothing in the conversation queue.",
+  "tipo.conversa_modelo.vazio_linha": "Any prompt in the catalog opens a conversation: the answer is generated live by a model running on this machine.",
+  "tipo.duelo_modelos.nome": "Model duel",
+  "tipo.duelo_modelos.titulo": "Two models, one conversation",
+  "tipo.duelo_modelos.vazio_titulo": "Nothing in the duel queue.",
+  "tipo.duelo_modelos.vazio_linha": "Two models answer the same turn under blind labels. You pick one, the conversation carries on with it, and the preference is multi-turn.",
+  "modelos.fora_do_ar": "The local model runtime is not answering at {url}.",
+  "modelos.faltam": "{n} model(s) still to download: {modelos}",
+  "modelos.pronto": "{n} local model(s) ready.",
+  "modelos.nenhum": "No model declared under `[annotate] ollama_modelos`.",
+  "modelos.falhou": "This turn could not be generated.",
+  "modelos.sem_resposta": "{modelo} spent the whole {n}-token budget on its reasoning and never got to the answer. Raise `[annotate] ollama_num_predict`.",
+  "runtime.titulo": "Local model runtime",
+  "runtime.conserto": "Run this in a terminal, then check again:",
+  "runtime.rever": "Check again",
+  "runtime.instalados": "installed here: {lista}",
+  "runtime.timeout": "up to {n}s per turn",
+  "runtime.nenhum_instalado": "none",
+  "conversa.eu": "You",
+  "conversa.modelo": "Model",
+  "conversa.turno_n": "turn {n}",
+  "conversa.enviar": "Send turn",
+  "conversa.enviar_ph": "Write the next turn.",
+  "conversa.primeiro_ph": "Open the conversation with this prompt, or rewrite it first.",
+  "conversa.gerando": "{modelo} is answering",
+  "conversa.gerando_dois": "Both models are answering",
+  "conversa.decorrido": "{s}s",
+  "conversa.decorrido_titulo": "How long this generation has been running. Nothing here times you.",
+  "conversa.vazia": "No turn yet.",
+  "conversa.vazia_linha": "The prompt of this task is already in the box below — send it as it is, or rewrite it first.",
+  "conversa.encerrar": "End and evaluate",
+  "conversa.encerrar_atalho": "E",
+  "conversa.encerrada": "Conversation closed — {n} turns. It is what the rubric below is about.",
+  "conversa.reabrir": "Back to the conversation",
+  "conversa.teto": "{n} of {max} turns",
+  "conversa.teto_cheio": "Turn cap reached ({max}). End the conversation and evaluate it.",
+  "conversa.falhou": "This turn got no answer.",
+  "conversa.falhou_linha": "What you wrote is saved. Nothing was lost.",
+  "conversa.tentar": "Try this turn again",
+  "conversa.truncado": "cut at our token cap",
+  "conversa.raciocinio": "reasoning written before the answer ({n} characters)",
+  "conversa.duracao": "{s}s",
+  "conversa.marcar": "Flag this turn",
+  "conversa.marcado": "flagged",
+  "conversa.marca_nota": "How badly it went",
+  "conversa.marca_motivo": "What this turn did wrong",
+  "conversa.marca_motivo_ph": "One line: what this turn did that the previous ones did not.",
+  "conversa.marca_salvar": "Save flag",
+  "conversa.marca_remover": "Remove flag",
+  "conversa.rubrica_titulo": "Evaluate the conversation",
+  "conversa.geral": "Overall justification",
+  "conversa.geral_ph": "What this conversation shows across the turns, and where it turned.",
+  "conversa.problemas_n": "{n} turn(s) flagged",
+  "conversa.marcar_dica": "Click any turn to flag it, right where it went wrong.",
+  "duelo.lado": "blind label",
+  "duelo.rodada": "Round {n}",
+  "duelo.escolher": "Pick the one the conversation carries on with",
+  "duelo.por_que": "Why this one, in this round",
+  "duelo.por_que_ph": "What this answer did better here. Rounds can be won for opposite reasons — that is the signal.",
+  "duelo.continuar": "Continue with {lado}",
+  "duelo.vencedora": "carried on with {lado}",
+  "duelo.oculto": "Which model is which stays hidden until you submit — a preference for a brand is not a preference for a text.",
+  "duelo.revelacao_titulo": "Who was who",
+  "duelo.revelacao_linha": "round {n}: {lado} was {modelo}",
+  "duelo.revelado": "The names appear only now, with the evaluation already recorded.",
+  "falta.encerrar": "End the conversation to evaluate it",
+  "falta.sem_turno": "Talk to the model first",
+  "ws.rubrica_multiturno": "This rubric belongs to the platform and fits any conversation: its four criteria only exist across turns.",
+  "botao.proxima_tarefa": "Next task",
+  "a11y.turno_nota": "Flag turn {n} with {valor}",
+  "a11y.conversa": "Conversation with the model",
+  "recado.escolha_registrada": "Round decided — the conversation carries on with it.",
+  "recado.conversa_encerrada": "Conversation closed. The rubric is right below.",
+  "recado.erro_modelos": "Could not read the model runtime: {erro}",
   "vista.fila": "Queue",
   "vista.catalogo": "Catalog",
   "vista.minhas": "My tasks",
@@ -1503,6 +1673,82 @@ const TEXTOS = {
   "tipo.comparar_ab.titulo": "Comparar duas respostas",
   "tipo.comparar_ab.vazio_titulo": "Nada na fila de comparação A/B.",
   "tipo.comparar_ab.vazio_linha": "Quando houver par, as duas respostas abrem lado a lado, com rótulos cegos: você não vê qual modelo escreveu o quê.",
+  "tipo.conversa_modelo.nome": "Conversar com um modelo",
+  "tipo.conversa_modelo.titulo": "Conversar e avaliar a conversa",
+  "tipo.conversa_modelo.vazio_titulo": "Nada na fila de conversa.",
+  "tipo.conversa_modelo.vazio_linha": "Qualquer prompt do catálogo abre uma conversa: a resposta é gerada ao vivo por um modelo rodando nesta máquina.",
+  "tipo.duelo_modelos.nome": "Duelo de modelos",
+  "tipo.duelo_modelos.titulo": "Dois modelos, uma conversa",
+  "tipo.duelo_modelos.vazio_titulo": "Nada na fila de duelo.",
+  "tipo.duelo_modelos.vazio_linha": "Dois modelos respondem ao mesmo turno sob rótulos cegos. Você escolhe uma, a conversa continua com ela, e a preferência é multi-turno.",
+  "modelos.fora_do_ar": "O runtime de modelos locais não responde em {url}.",
+  "modelos.faltam": "{n} modelo(s) ainda por baixar: {modelos}",
+  "modelos.pronto": "{n} modelo(s) local(is) pronto(s).",
+  "modelos.nenhum": "Nenhum modelo declarado em `[annotate] ollama_modelos`.",
+  "modelos.falhou": "Não deu para gerar este turno.",
+  "modelos.sem_resposta": "{modelo} gastou o teto de {n} tokens no raciocínio e não chegou à resposta. Suba `[annotate] ollama_num_predict`.",
+  "runtime.titulo": "Runtime de modelos locais",
+  "runtime.conserto": "Rode isto num terminal e confira de novo:",
+  "runtime.rever": "Conferir de novo",
+  "runtime.instalados": "instalados aqui: {lista}",
+  "runtime.timeout": "até {n}s por turno",
+  "runtime.nenhum_instalado": "nenhum",
+  "conversa.eu": "Você",
+  "conversa.modelo": "Modelo",
+  "conversa.turno_n": "turno {n}",
+  "conversa.enviar": "Mandar o turno",
+  "conversa.enviar_ph": "Escreva o próximo turno.",
+  "conversa.primeiro_ph": "Abra a conversa com este prompt, ou reescreva antes.",
+  "conversa.gerando": "{modelo} está respondendo",
+  "conversa.gerando_dois": "Os dois modelos estão respondendo",
+  "conversa.decorrido": "{s}s",
+  "conversa.decorrido_titulo": "Há quanto tempo esta geração está rodando. Nada aqui cronometra você.",
+  "conversa.vazia": "Nenhum turno ainda.",
+  "conversa.vazia_linha": "O prompt desta tarefa já está na caixa abaixo — mande como está, ou reescreva antes.",
+  "conversa.encerrar": "Encerrar e avaliar",
+  "conversa.encerrar_atalho": "E",
+  "conversa.encerrada": "Conversa encerrada — {n} turnos. É dela que a rubrica abaixo fala.",
+  "conversa.reabrir": "Voltar para a conversa",
+  "conversa.teto": "{n} de {max} turnos",
+  "conversa.teto_cheio": "Teto de turnos atingido ({max}). Encerre a conversa e avalie.",
+  "conversa.falhou": "Este turno ficou sem resposta.",
+  "conversa.falhou_linha": "O que você escreveu está salvo. Nada se perdeu.",
+  "conversa.tentar": "Tentar este turno de novo",
+  "conversa.truncado": "cortado no nosso teto de tokens",
+  "conversa.raciocinio": "raciocínio escrito antes da resposta ({n} caracteres)",
+  "conversa.duracao": "{s}s",
+  "conversa.marcar": "Marcar este turno",
+  "conversa.marcado": "marcado",
+  "conversa.marca_nota": "Quão mal foi",
+  "conversa.marca_motivo": "O que este turno fez de errado",
+  "conversa.marca_motivo_ph": "Uma linha: o que este turno fez que os anteriores não faziam.",
+  "conversa.marca_salvar": "Salvar a marcação",
+  "conversa.marca_remover": "Tirar a marcação",
+  "conversa.rubrica_titulo": "Avaliar a conversa",
+  "conversa.geral": "Justificativa geral",
+  "conversa.geral_ph": "O que esta conversa mostra ao longo dos turnos, e onde ela virou.",
+  "conversa.problemas_n": "{n} turno(s) marcado(s)",
+  "conversa.marcar_dica": "Clique num turno para marcá-lo, exatamente onde ele descarrilou.",
+  "duelo.lado": "rótulo cego",
+  "duelo.rodada": "Rodada {n}",
+  "duelo.escolher": "Escolha com qual delas a conversa continua",
+  "duelo.por_que": "Por que esta, nesta rodada",
+  "duelo.por_que_ph": "O que esta resposta fez melhor aqui. Rodadas podem ser ganhas por razões opostas — é isso que vale.",
+  "duelo.continuar": "Continuar com {lado}",
+  "duelo.vencedora": "seguiu com {lado}",
+  "duelo.oculto": "Qual modelo é qual fica escondido até você enviar — preferência por marca não é preferência por texto.",
+  "duelo.revelacao_titulo": "Quem era quem",
+  "duelo.revelacao_linha": "rodada {n}: {lado} era {modelo}",
+  "duelo.revelado": "Os nomes só aparecem agora, com a avaliação já gravada.",
+  "falta.encerrar": "Encerre a conversa para avaliá-la",
+  "falta.sem_turno": "Converse com o modelo primeiro",
+  "ws.rubrica_multiturno": "Esta rubrica é da plataforma e serve a qualquer conversa: os quatro critérios dela só existem entre turnos.",
+  "botao.proxima_tarefa": "Próxima tarefa",
+  "a11y.turno_nota": "Marcar o turno {n} com {valor}",
+  "a11y.conversa": "Conversa com o modelo",
+  "recado.escolha_registrada": "Rodada decidida — a conversa continua com ela.",
+  "recado.conversa_encerrada": "Conversa encerrada. A rubrica está logo abaixo.",
+  "recado.erro_modelos": "Não deu para ler o runtime de modelos: {erro}",
   "vista.fila": "Fila",
   "vista.catalogo": "Catálogo",
   "vista.minhas": "Minhas tarefas",
@@ -2032,8 +2278,29 @@ const TIPOS = [
     vazioTitulo: "tipo.comparar_ab.vazio_titulo",
     vazioLinha: "tipo.comparar_ab.vazio_linha",
   },
+  /* As DUAS de inferência ao vivo (P4d). Ficam no fim porque são as únicas que
+     dependem de um serviço fora deste processo — e quando ele não está de pé, é
+     a última aba que falha, não a primeira que o avaliador abre. */
+  {
+    id: "conversa_modelo",
+    nome: "tipo.conversa_modelo.nome",
+    titulo: "tipo.conversa_modelo.titulo",
+    vazioTitulo: "tipo.conversa_modelo.vazio_titulo",
+    vazioLinha: "tipo.conversa_modelo.vazio_linha",
+  },
+  {
+    id: "duelo_modelos",
+    nome: "tipo.duelo_modelos.nome",
+    titulo: "tipo.duelo_modelos.titulo",
+    vazioTitulo: "tipo.duelo_modelos.vazio_titulo",
+    vazioLinha: "tipo.duelo_modelos.vazio_linha",
+  },
 ];
 const TIPO_POR_ID = Object.fromEntries(TIPOS.map((x) => [x.id, x]));
+
+/** Os dois tipos que falam com o modelo local. Espelha `db.TIPOS_CONVERSA`. */
+const TIPOS_CONVERSA = ["conversa_modelo", "duelo_modelos"];
+const ehConversa = (tipo) => TIPOS_CONVERSA.indexOf(tipo) >= 0;
 
 /** O nome do estilo de tarefa na língua de agora, com o id como último recurso. */
 function nomeTipo(id) {
@@ -2146,6 +2413,18 @@ const est = {
   abertoEm: 0,
   catalogo: { q: "", lang: "", fonte: "", faixa: "", page: 1, dados: null },
   minhas: null,
+
+  /* ---- P4d: a conversa com o modelo local ---- */
+  // A GERAÇÃO EM VOO: {desde, dois}. Existe só enquanto a chamada está aberta,
+  // e é dela que sai o indicador com o tempo decorrido — 17 s sem indicador
+  // (medido) parecem travamento. O relógio é do MODELO, nunca da pessoa.
+  gerando: null,
+  // O último erro do runtime, guardado como CHAVE + dados (nunca a frase pronta
+  // do servidor, que vem numa língua só). Ver `blocoRuntime`.
+  erroModelo: null,
+  // A revelação do duelo, depois do envio: quem era A e quem era B. Mora em
+  // `est` e não no DOM porque trocar de idioma redesenha a tela a partir daqui.
+  revelacao: null,
 
   /* ---- P3a: a triagem ---- */
   // {itens, total, minhas_excluidas, sel, detalhe, form, devolvendo, comentario,
@@ -2584,6 +2863,16 @@ function trocarAba(tipo) {
   est.aba = tipo;
   est.envelope = null;
   est.form = null;
+  // O MOTIVO DA FILA VAZIA É DA ABA QUE O PRODUZIU. Sem limpá-lo aqui,
+  // `desenharArea` vê um `motivoChave` preenchido, decide que já sabe por que a
+  // fila está vazia e NÃO chama `carregarFila` — a aba nova abre mostrando o
+  // vazio da aba anterior, com trabalho esperando. Aparece só quando a primeira
+  // aba está vazia e a segunda não, que é exatamente o banco real de hoje.
+  est.motivo = "";
+  est.motivoChave = null;
+  est.motivoDados = null;
+  est.revelacao = null;
+  est.erroModelo = null;
   est.minhas = null;
   est.catalogo = { q: "", lang: "", fonte: "", faixa: "", page: 1, dados: null };
   desenharAnotador();
@@ -2600,6 +2889,10 @@ function irPara(vista) {
 function desenharArea() {
   const area = $("#area-trabalho");
   limpar(area);
+  // A REVELAÇÃO do duelo segura a tela até a pessoa pedir a próxima: ela é a
+  // única chance de ver quem era quem, e um redesenho (uma troca de idioma, por
+  // exemplo) não pode engoli-la.
+  if (est.revelacao && est.vista === "fila") { revelarDuelo(est.revelacao); return; }
   if (est.vista === "catalogo") {
     desenharCatalogo(area);
     if (!est.catalogo.dados) carregarCatalogo();
@@ -2654,6 +2947,10 @@ function aceitarEnvelope(envelope, motivoChave, motivoDados) {
   est.foco = 0;
   est.rascunhoRecuperado = false;
   est.abertoEm = Date.now();
+  est.gerando = null;
+  est.erroModelo = null;
+  est.revelacao = null;
+  pararTique();
   if (!envelope) { est.form = null; return; }
   const guardado = lerRascunho(envelope.atribuicao_id);
   if (guardado) {
@@ -2978,6 +3275,8 @@ function desenharWorkspace(env, ctx) {
   if (tipo === "escrever_rubrica") caixa.appendChild(wsEscrever(env, c));
   if (tipo === "sft_resposta") caixa.appendChild(wsSft(env, c));
   if (tipo === "comparar_ab") caixa.appendChild(wsComparar(env, c));
+  if (tipo === "conversa_modelo") caixa.appendChild(wsConversa(env, c));
+  if (tipo === "duelo_modelos") caixa.appendChild(wsDuelo(env, c));
   if (meu) caixa.appendChild(barraAcoes());
   return caixa;
 }
@@ -3429,6 +3728,798 @@ function wsComparar(env, ctx) {
   return caixa;
 }
 
+/* ==========================================================================
+   5.6b CONVERSA COM MODELO LOCAL  (P4d)
+
+   Duas abas, um mecanismo. A diferença entre elas cabe numa frase: na CONVERSA
+   um modelo responde e o nome dele está à vista; no DUELO dois respondem sob
+   rótulos cegos e o anotador escolhe com qual a conversa continua.
+
+   O NOME DO MODELO NÃO ENTRA NO DUELO, E ISSO É ESTRUTURAL
+   ========================================================
+   O servidor não manda `modelo` nem `digest` nos turnos de um duelo (ver
+   `conversa._dict`), e as funções que desenham o duelo nunca leem esses campos.
+   São as duas metades da mesma garantia: se a tela lesse, bastaria o dia em que
+   alguém "só acrescentasse o campo no envelope" para a preferência passar a ser
+   sobre a marca. Quem revela é `blocoRevelacao`, e só depois do envio.
+
+   A CONVERSA VIVE NO SERVIDOR
+   ===========================
+   Os turnos vêm no envelope (`env.conversa`), não do localStorage: recarregar a
+   página, fechar a aba ou derrubar o servidor não custa trinta turnos. O
+   rascunho guarda uma CÓPIA deles mesmo assim (`form.turnos`), porque perder
+   trabalho é a maior fricção que existe e uma segunda rede não custa nada.
+   ========================================================================== */
+
+/** As chaves que o SERVIDOR escolhe para o estado do runtime.
+
+    Numa tabela com a chave INTEIRA pelo mesmo motivo de `TIPOS`: uma chave
+    montada (ou vinda crua do servidor) é invisível para o teste de chave órfã, e
+    o dicionário passaria a acumular entradas mortas. Ela também é a guarda: uma
+    chave que o front não conhece cai na de servidor fora do ar, em vez de
+    escrever `modelos.qualquer_coisa` na tela. */
+const CHAVES_RUNTIME = [
+  "modelos.falhou",
+  "modelos.fora_do_ar",
+  "modelos.faltam",
+  "modelos.pronto",
+  "modelos.nenhum",
+  "modelos.sem_resposta",
+];
+/** Uma chave desconhecida cai na genérica — que não tem marcador nenhum.
+
+    Cair na de "servidor fora do ar" seria pior que cair em nada: ela promete
+    `{url}` e, com dados de outra falha, escreve `{url}` literal na tela. Foi
+    exatamente o que apareceu no navegador quando uma resposta vazia herdou a
+    chave errada. */
+function chaveRuntime(bruta) {
+  return CHAVES_RUNTIME.indexOf(bruta) >= 0 ? bruta : CHAVES_RUNTIME[0];
+}
+
+/** O estado do runtime como a tela o mostra: o que falta e o comando que arruma.
+
+    NÃO É UM ERRO, é uma instrução. A máquina que abre esta plataforma pode não
+    ter baixado 7,5 GB ainda, e isso é normal — tratar como falha faria "falta
+    baixar um arquivo" parecer "a plataforma quebrou". */
+function blocoRuntime() {
+  const m = (est.saude && est.saude.modelos) || null;
+  if (!m) return null;
+  const erro = est.erroModelo;
+  const pronto = m.ok && !erro;
+  const caixa = el("div", "runtime" + (pronto ? " pronto" : ""));
+  const cabeca = el("div", "forma");
+  juntar(cabeca,
+    el("strong", null, t("runtime.titulo")),
+    el("span", "crescer"),
+    el("span", "fraco", t("runtime.timeout", { n: m.timeout_s })));
+  caixa.appendChild(cabeca);
+
+  const chave = erro ? chaveRuntime(erro.chave) : chaveRuntime(m.erro_chave);
+  const dados = erro ? erro.dados : m.erro_dados;
+  caixa.appendChild(el("p", null, t(chave, dados || {})));
+  // A frase CRUA do servidor, quando houver, como `.dado`: ela vem numa língua
+  // só (é a mesma que a API põe em /docs) e traz o detalhe que a chave
+  // generaliza. Sem ela, uma falha imprevista viraria "não deu para gerar" e
+  // nada mais — e o diagnóstico ficaria no terminal, longe de quem está vendo.
+  if (erro && erro.mensagem) caixa.appendChild(el("p", "fraco dado", erro.mensagem));
+
+  const nomes = (m.instalados || []).map((x) => x.nome);
+  // `.dado`: nome de modelo e URL vêm do servidor, não do dicionário.
+  caixa.appendChild(el("p", "fraco dado", t("runtime.instalados", {
+    lista: nomes.length ? nomes.join(", ") : t("runtime.nenhum_instalado"),
+  }) + " · " + m.url));
+
+  const comandos = (erro && erro.comandos) || m.comandos || [];
+  if (!pronto && comandos.length) {
+    caixa.appendChild(el("span", "fraco", t("runtime.conserto")));
+    // O comando é COMANDO: sai igual nas duas línguas e é selecionável inteiro.
+    for (const c of comandos) caixa.appendChild(el("code", "comando dado", c));
+  }
+  const rever = el("button", "botao discreta", t("runtime.rever"));
+  rever.type = "button";
+  rever.addEventListener("click", reconferirModelos);
+  caixa.appendChild(juntar(el("div", "forma"), rever));
+  return caixa;
+}
+
+/** Reconfere o runtime sem recarregar a tela — o caminho de quem acabou de
+    rodar `ollama pull` no terminal ao lado. */
+async function reconferirModelos() {
+  try {
+    const m = await api("/api/modelos");
+    if (est.saude) est.saude.modelos = m;
+    est.erroModelo = null;
+  } catch (e) {
+    recado(t("recado.erro_modelos", { erro: e.message }), true);
+  }
+  desenharArea();
+}
+
+/* ---- o tempo decorrido da GERAÇÃO ----
+   O único relógio à vista nesta plataforma, e ele mede a MÁQUINA. Medido: 17,6 s
+   para um turno do modelo mais verboso — sem indicador, isso é indistinguível de
+   um travamento. `setTimeout` recursivo, e não um intervalo: quando o nó do
+   indicador sai da tela o laço se encerra sozinho, sem ninguém para limpá-lo. */
+let tiqueGeracao = null;
+function pararTique() { clearTimeout(tiqueGeracao); tiqueGeracao = null; }
+function tiquetaque() {
+  const no = $("#decorrido");
+  if (!no || !est.gerando) { pararTique(); return; }
+  no.textContent = t("conversa.decorrido",
+    { s: Math.max(0, Math.round((Date.now() - est.gerando.desde) / 1000)) });
+  tiqueGeracao = setTimeout(tiquetaque, 1000);
+}
+
+function blocoGerando() {
+  const g = est.gerando;
+  if (!g) return null;
+  const caixa = el("div", "gerando");
+  const quem = g.dois
+    ? t("conversa.gerando_dois")
+    : t("conversa.gerando", { modelo: g.modelo || "" });
+  const decorrido = el("span", "decorrido", t("conversa.decorrido", { s: 0 }));
+  decorrido.id = "decorrido";
+  decorrido.title = t("conversa.decorrido_titulo");
+  juntar(caixa, el("span", "ponto-gerando"), el("span", null, quem), decorrido);
+  pararTique();
+  tiqueGeracao = setTimeout(tiquetaque, 250);
+  return caixa;
+}
+
+/** Qual modelo responde na conversa de um só: o PRIMEIRO da configuração. É a
+    mesma regra do servidor (`modelos.modelos_configurados()[0]`), e aqui ela só
+    serve para nomear quem está gerando. */
+function modeloDaVez() {
+  const m = (est.saude && est.saude.modelos) || {};
+  return (m.configurados || [])[0] || "";
+}
+
+/* ---- as peças de um turno ---- */
+
+/** A casca de um turno: cabeça (quem, quando, quanto demorou) e corpo.
+
+    `extras` entra na cabeça — é por onde o nome do modelo aparece na CONVERSA e
+    por onde ele NÃO aparece no duelo. */
+function bolha(papel, texto, extras, opcoes) {
+  const o = opcoes || {};
+  const caixa = el("div", "turno" + (papel === "usuario" ? " eu" : "") +
+    (o.marcado ? " marcado" : ""));
+  const cabeca = el("div", "turno-cabeca");
+  juntar(cabeca,
+    el("span", "turno-quem", papel === "usuario" ? t("conversa.eu") : t("conversa.modelo")));
+  for (const extra of extras || []) if (extra) cabeca.appendChild(extra);
+  caixa.appendChild(cabeca);
+  const corpo = el("div", "turno-corpo");
+  // `.dado`: o texto do prompt e o do modelo são DADOS, na língua deles.
+  corpo.appendChild(el("div", "leitura dado", texto));
+  caixa.appendChild(corpo);
+  return caixa;
+}
+
+/** O raciocínio do modelo, RECOLHIDO e à parte da resposta.
+
+    Não é filtrado em silêncio: ele é conteúdo que o anotador pode querer
+    avaliar, e descartá-lo seria decidir por ele que não conta. Também não é a
+    resposta — por isso vem fechado, embaixo, com marcador. */
+function blocoRaciocinio(turno) {
+  const bruto = turno.raciocinio || "";
+  if (!bruto.trim()) return null;
+  const det = el("details", "raciocinio");
+  det.appendChild(el("summary", null, t("conversa.raciocinio", { n: n(bruto.length) })));
+  det.appendChild(el("div", "raciocinio-corpo dado", bruto));
+  return det;
+}
+
+/** MARCAR UM TURNO: nota + motivo, ALI, sem modal.
+
+    O mesmo padrão do motivo por edição do P3b, e pela mesma razão: um modal
+    esconderia justamente o texto sobre o qual a nota está sendo dada. */
+function marcacaoDeTurno(ordem, c0) {
+  const form = c0.form;
+  const atual = form.problemas[String(ordem)];
+  if (c0.leitura && !atual) return null;
+  if (!atual && form.marcando !== ordem) return null;
+
+  const escala = escalaDoTurno();
+  const caixa = el("div", "marca-turno");
+  const linha = el("div", "forma");
+  juntar(linha, el("span", "fraco", t("conversa.marca_nota")));
+  for (let v = escala.min; v <= escala.max; v++) {
+    const b = el("button", "nota", String(v));
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(!!atual && atual.nota === v));
+    b.setAttribute("aria-label", t("a11y.turno_nota", { n: ordem, valor: v }));
+    if (c0.leitura) b.tabIndex = -1;
+    else b.addEventListener("click", () => { marcarTurno(c0, ordem, v, null); });
+    linha.appendChild(b);
+  }
+  caixa.appendChild(linha);
+
+  const campo = el("div", "campo");
+  const area = el("textarea");
+  area.rows = 2;
+  area.placeholder = t("conversa.marca_motivo_ph");
+  area.value = (atual && atual.motivo) || "";
+  if (c0.leitura) area.readOnly = true;
+  else area.addEventListener("input", () => {
+    marcarTurno(c0, ordem, undefined, area.value, true);
+  });
+  juntar(campo, el("span", null, t("conversa.marca_motivo")), area);
+  if (!c0.leitura) campo.appendChild(dicaLinguaMeta("lingua.meta"));
+  caixa.appendChild(campo);
+
+  if (!c0.leitura) {
+    const tirar = el("button", "botao discreta", t("conversa.marca_remover"));
+    tirar.type = "button";
+    tirar.addEventListener("click", () => {
+      delete form.problemas[String(ordem)];
+      form.marcando = null;
+      c0.aoMudar();
+    });
+    caixa.appendChild(juntar(el("div", "forma"), tirar));
+  }
+  return caixa;
+}
+
+/** A escala da marcação, LIDA DO SERVIDOR — nunca uma cópia no JS, pela mesma
+    razão dos `limites`: uma cópia divergiria do 422 na primeira vez que ela
+    mudasse, e o botão prometeria o que o servidor desmente. */
+function escalaDoTurno() {
+  const m = (est.saude && est.saude.modelos) || {};
+  const e = m.escala_turno || {};
+  return { min: Number(e.min) || 1, max: Number(e.max) || 5 };
+}
+
+function marcarTurno(c0, ordem, nota, motivo, soDigitou) {
+  const chave = String(ordem);
+  const atual = c0.form.problemas[chave] || { nota: escalaDoTurno().min, motivo: "" };
+  if (nota !== undefined && nota !== null) atual.nota = nota;
+  if (motivo !== undefined && motivo !== null) atual.motivo = motivo;
+  c0.form.problemas[chave] = atual;
+  c0.form.marcando = ordem;
+  // Digitar não redesenha (tiraria o foco do campo no meio da frase); mudar a
+  // nota sim, porque o botão pressionado precisa mudar de cor.
+  if (soDigitou) c0.aoDigitar(); else c0.aoMudar();
+}
+
+/** O botão que abre a marcação de um turno. Fora da bolha para não competir com
+    o texto — a leitura vem primeiro, a marcação é a exceção. */
+function botaoMarcar(ordem, c0) {
+  if (c0.leitura) return null;
+  const marcado = !!c0.form.problemas[String(ordem)];
+  const b = el("button", "turno-acao", marcado ? t("conversa.marcado") : t("conversa.marcar"));
+  b.type = "button";
+  b.addEventListener("click", () => {
+    c0.form.marcando = c0.form.marcando === ordem ? null : ordem;
+    if (c0.form.marcando === ordem && !marcado) marcarTurno(c0, ordem, null, "");
+    else c0.aoMudar();
+  });
+  return b;
+}
+
+/** Os turnos que a tela desenha: os do SERVIDOR quando existem, o espelho do
+    rascunho quando não (leitura de uma anotação já enviada, ou uma rede que
+    caiu no meio). */
+function turnosDe(env, c0) {
+  const doServidor = (env.conversa && env.conversa.turnos) || null;
+  if (doServidor && doServidor.length) {
+    // O rascunho guarda a conversa INTEIRA, e não só o formulário: é a segunda
+    // rede sob os trinta turnos.
+    c0.form.turnos = doServidor;
+    return doServidor;
+  }
+  return c0.form.turnos || [];
+}
+
+function selo(texto) { return el("span", "selo", texto); }
+
+/* ---- CONVERSA: um modelo, nome à vista ---- */
+
+function fluxoConversa(env, c0) {
+  const caixa = el("div", "conversa");
+  caixa.setAttribute("aria-label", t("a11y.conversa"));
+  for (const turno of turnosDe(env, c0)) {
+    const extras = [selo(t("conversa.turno_n", { n: turno.ordem }))];
+    if (turno.papel === "modelo") {
+      // Na conversa de um modelo só NÃO há preferência a enviesar, e saber com
+      // quem se fala é o que permite dizer "esta família faz isto".
+      if (turno.modelo) extras.push(el("span", "selo dado", turno.modelo));
+      extras.push(selo(t("conversa.duracao", { s: Math.round(turno.duracao_ms / 1000) })));
+      if (turno.truncado) extras.push(selo(t("conversa.truncado")));
+    }
+    extras.push(el("span", "crescer"), botaoMarcar(turno.ordem, c0));
+    const bola = bolha(turno.papel, turno.texto, extras,
+      { marcado: !!c0.form.problemas[String(turno.ordem)] });
+    const raciocinio = blocoRaciocinio(turno);
+    if (raciocinio) bola.appendChild(raciocinio);
+    const marca = marcacaoDeTurno(turno.ordem, c0);
+    if (marca) bola.appendChild(marca);
+    caixa.appendChild(bola);
+  }
+  return caixa;
+}
+
+/* ---- DUELO: dois modelos, rótulo cego ----
+   NENHUMA das duas funções abaixo lê `modelo` ou `digest` de um turno. Ver o
+   cabeçalho desta seção: é metade da garantia de que o rótulo é cego de verdade,
+   e a outra metade é o servidor não mandar os campos. */
+
+function fluxoDuelo(env, c0) {
+  const caixa = el("div", "conversa");
+  caixa.setAttribute("aria-label", t("a11y.conversa"));
+  const turnos = turnosDe(env, c0);
+  const porOrdem = {};
+  for (const turno of turnos) {
+    (porOrdem[turno.ordem] = porOrdem[turno.ordem] || []).push(turno);
+  }
+  const ordens = Object.keys(porOrdem).map(Number).sort((a, b) => a - b);
+  const pendente = env.conversa ? env.conversa.rodada_pendente : null;
+
+  for (const ordem of ordens) {
+    const grupo = porOrdem[ordem];
+    if (grupo[0].papel === "usuario") {
+      const extras = [selo(t("conversa.turno_n", { n: ordem })), el("span", "crescer"),
+        botaoMarcar(ordem, c0)];
+      const bola = bolha("usuario", grupo[0].texto, extras,
+        { marcado: !!c0.form.problemas[String(ordem)] });
+      const marca = marcacaoDeTurno(ordem, c0);
+      if (marca) bola.appendChild(marca);
+      caixa.appendChild(bola);
+      continue;
+    }
+    caixa.appendChild(rodadaDuelo(ordem, grupo, c0, ordem === pendente));
+  }
+  return caixa;
+}
+
+/** Uma rodada: duas colunas cegas, rolagem sincronizada, e a escolha embaixo. */
+function rodadaDuelo(ordem, respostas, c0, pendente) {
+  const caixa = el("div", "rodada");
+  const cabeca = el("div", "forma");
+  juntar(cabeca,
+    el("span", "rotulo-bloco", t("duelo.rodada", { n: ordem })),
+    el("span", "crescer"),
+    botaoMarcar(ordem, c0));
+  caixa.appendChild(cabeca);
+
+  const grade = el("div", "ab");
+  const areas = [];
+  const vencedora = respostas.find((r) => r.escolhida);
+  respostas.slice().sort((a, b) => (a.rotulo < b.rotulo ? -1 : 1)).forEach((r, i) => {
+    const escolhivel = pendente && !c0.leitura;
+    const coluna = el("button", "ab-coluna");
+    coluna.type = "button";
+    coluna.setAttribute("aria-pressed", String(!!r.escolhida));
+    const cab = el("div", "ab-cabeca");
+    juntar(cab,
+      el("strong", null, r.rotulo),
+      el("span", "fraco", t("duelo.lado")),
+      el("span", "crescer"),
+      r.truncado ? selo(t("conversa.truncado")) : null,
+      selo(t("conversa.duracao", { s: Math.round(r.duracao_ms / 1000) })),
+      el("span", "atalho", escolhivel ? (i === 0 ? "←" : "→")
+        : (r.escolhida ? t("duelo.vencedora", { lado: r.rotulo }) : "")));
+    const texto = el("div", "ab-texto");
+    texto.appendChild(el("div", "leitura dado", r.texto));
+    juntar(coluna, cab, texto);
+    if (!escolhivel) coluna.tabIndex = -1;
+    else coluna.addEventListener("click", () => escolherLado(r.rotulo));
+    const raciocinio = blocoRaciocinio(r);
+    if (raciocinio) coluna.appendChild(raciocinio);
+    areas.push(texto);
+    grade.appendChild(coluna);
+  });
+  caixa.appendChild(grade);
+  sincronizarRolagem(areas);
+
+  const marca = marcacaoDeTurno(ordem, c0);
+  if (marca) caixa.appendChild(marca);
+
+  if (pendente && !c0.leitura) caixa.appendChild(caixaDeEscolha(ordem, c0));
+  else if (vencedora && vencedora.justificativa) {
+    caixa.appendChild(el("p", "rodada-nota dado", vencedora.justificativa));
+  }
+  return caixa;
+}
+
+/** A escolha da rodada: um motivo POR RODADA, e ele é obrigatório.
+
+    Por rodada e não uma no fim porque é isso que torna o dado multi-turno mais
+    valioso que o de turno único: "escolhi B na rodada 1 pela concisão e A na 3
+    porque B esqueceu a restrição" são dois sinais, e uma justificativa única os
+    fundiria num só. */
+function caixaDeEscolha(ordem, c0) {
+  const minimo = lim("min_chars_justificativa", 30);
+  const caixa = el("div", "duelo-escolha");
+  juntar(caixa, el("span", "rotulo-bloco", t("duelo.escolher")));
+  caixa.appendChild(el("p", "fraco", t("duelo.oculto")));
+
+  const campo = el("div", "campo");
+  const area = el("textarea");
+  area.rows = 3;
+  area.placeholder = t("duelo.por_que_ph");
+  area.value = c0.form.escolha || "";
+  area.addEventListener("input", () => {
+    c0.form.escolha = area.value;
+    c0.aoDigitar();
+    atualizarBotoesDaConversa();
+  });
+  juntar(campo, el("span", null, t("duelo.por_que")), area);
+  campo.appendChild(dicaLinguaMeta("lingua.meta"));
+  caixa.appendChild(campo);
+
+  const botoes = el("div", "forma");
+  for (const lado of ["A", "B"]) {
+    const b = el("button", "botao primaria escolher-lado",
+      t("duelo.continuar", { lado: lado }));
+    b.type = "button";
+    b.disabled = (c0.form.escolha || "").trim().length < minimo || est.carregando;
+    b.addEventListener("click", () => escolherLado(lado));
+    botoes.appendChild(b);
+  }
+  juntar(botoes, el("span", "atalho", "←"), el("span", "atalho", "→"),
+    el("span", "fraco", t("ws.contador_de", {
+      n: n((c0.form.escolha || "").trim().length), min: minimo,
+    })));
+  caixa.appendChild(botoes);
+  return caixa;
+}
+
+/* ---- o compositor e o encerramento ---- */
+
+function compositor(env) {
+  const conversa = env.conversa || {};
+  const caixa = el("div", "compositor");
+
+  if (conversa.rodada_pendente !== null && conversa.rodada_pendente !== undefined) {
+    // Sem vencedora não se sabe com qual resposta a conversa continua — e
+    // inventar a continuação seria fabricar uma escolha que ninguém fez.
+    caixa.appendChild(el("p", "fraco", t("duelo.escolher")));
+    return caixa;
+  }
+
+  if (conversa.aguardando !== null && conversa.aguardando !== undefined) {
+    const aviso = el("div", "aviso-rascunho");
+    juntar(aviso,
+      el("span", null, t("conversa.falhou") + " " + t("conversa.falhou_linha")));
+    const tentar = el("button", "botao primaria", t("conversa.tentar"));
+    tentar.type = "button";
+    tentar.disabled = !!est.gerando;
+    tentar.addEventListener("click", () => mandarTurno(null));
+    aviso.appendChild(tentar);
+    caixa.appendChild(aviso);
+    return caixa;
+  }
+
+  const cheio = conversa.n_turnos >= conversa.max_turnos;
+  if (cheio) {
+    caixa.appendChild(el("p", "fraco", t("conversa.teto_cheio", { max: conversa.max_turnos })));
+    return caixa;
+  }
+
+  const area = el("textarea");
+  area.rows = 4;
+  area.id = "compositor";
+  const primeiro = !(conversa.turnos || []).length;
+  area.placeholder = primeiro ? t("conversa.primeiro_ph") : t("conversa.enviar_ph");
+  area.value = est.form.rascunho || "";
+  area.disabled = !!est.gerando;
+  area.addEventListener("input", () => {
+    est.form.rascunho = area.value;
+    salvarRascunho();
+    // SÓ o botão, sem redesenhar: um redesenho a cada tecla tiraria o foco do
+    // campo no meio da frase — o mesmo motivo de `atualizarBotaoEnviar`.
+    atualizarBotoesDaConversa();
+  });
+  caixa.appendChild(area);
+  // A CONVERSA É DADO: ela sai na língua do prompt, não na da interface. É a
+  // mesma convenção da resposta de referência, e ela é dita aqui porque é aqui
+  // que a dúvida ocorre.
+  caixa.appendChild(dicaLinguaDado(env.prompt.lang));
+
+  const linha = el("div", "forma");
+  const mandar = el("button", "botao primaria", t("conversa.enviar"));
+  mandar.type = "button";
+  mandar.id = "mandar-turno";
+  mandar.disabled = !!est.gerando || !(est.form.rascunho || "").trim();
+  mandar.addEventListener("click", () => mandarTurno((est.form.rascunho || "").trim()));
+  juntar(linha, mandar, el("span", "atalho", "Ctrl+Enter"),
+    el("span", "crescer"),
+    el("span", "fraco", t("conversa.teto", {
+      n: conversa.n_turnos, max: conversa.max_turnos,
+    })));
+  caixa.appendChild(linha);
+  return caixa;
+}
+
+/** Reabilita os botões que dependem do que está sendo DIGITADO, sem redesenhar.
+
+    Existe pelo mesmo motivo de `atualizarBotaoEnviar`, e o defeito que ele
+    conserta apareceu no navegador: o botão de mandar o turno nasce desabilitado
+    (o compositor está vazio), e sem isto ele continuava desabilitado **enquanto
+    a pessoa digitava** — a aba inteira parecia travada depois do primeiro turno.
+    Redesenhar a cada tecla não serve: tiraria o foco do campo no meio da frase. */
+function atualizarBotoesDaConversa() {
+  if (!est.form) return;
+  const mandar = $("#mandar-turno");
+  if (mandar) mandar.disabled = !!est.gerando || !(est.form.rascunho || "").trim();
+  const minimo = lim("min_chars_justificativa", 30);
+  const podeEscolher = (est.form.escolha || "").trim().length >= minimo && !est.carregando;
+  for (const b of document.querySelectorAll(".escolher-lado")) b.disabled = !podeEscolher;
+}
+
+/** O botão que ENCERRA e revela a rubrica. Divulgação progressiva levada a
+    sério: enquanto se conversa, a rubrica não existe na tela — ela é a decisão
+    do fim, e mostrá-la antes competiria com a conversa que está acontecendo. */
+function barraEncerrar(env) {
+  const conversa = env.conversa || {};
+  const linha = el("div", "forma");
+  linha.style.marginTop = "14px";
+  const b = el("button", "botao", t("conversa.encerrar"));
+  b.type = "button";
+  b.disabled = !conversa.avaliavel;
+  b.addEventListener("click", encerrarConversa);
+  juntar(linha, b, el("span", "atalho", t("conversa.encerrar_atalho")));
+  if (!conversa.avaliavel) linha.appendChild(el("span", "fraco", t("falta.sem_turno")));
+  return linha;
+}
+
+function encerrarConversa() {
+  if (!est.form || est.form.encerrada) return;
+  est.form.encerrada = true;
+  salvarEDesenhar();
+  recado(t("recado.conversa_encerrada"));
+}
+
+/** A avaliação: a rubrica multi-turno + os turnos marcados + a geral.
+
+    A rubrica é a MESMA de `wsAvaliar` no desenho, e de propósito — quem já
+    graduou uma rubrica nesta plataforma reconhece o controle em vez de aprender
+    outro. O que muda é o objeto: aqui ela fala da conversa inteira. */
+function avaliacaoDaConversa(env, c0) {
+  const form = c0.form;
+  const caixa = separador(el("div", "painel-corpo"));
+  const cabeca = el("div", "forma");
+  juntar(cabeca,
+    el("h3", null, t("conversa.rubrica_titulo")),
+    el("span", "crescer"),
+    el("span", "fraco", t("conversa.problemas_n", {
+      n: Object.keys(form.problemas || {}).length,
+    })));
+  caixa.appendChild(cabeca);
+  if (!c0.leitura) {
+    const voltar = el("button", "botao discreta", t("conversa.reabrir"));
+    voltar.type = "button";
+    voltar.addEventListener("click", () => { form.encerrada = false; salvarEDesenhar(); });
+    cabeca.appendChild(voltar);
+  }
+  caixa.appendChild(el("p", "fraco", t("ws.rubrica_multiturno")));
+
+  const rubrica = env.rubrica || { criterios: [] };
+  const lista = el("div", "criterios");
+  lista.style.marginTop = "10px";
+  rubrica.criterios.forEach((c, i) => {
+    const escala = c.escala || { min: 1, max: 5, ancoras: [] };
+    const nomeC = bi(c.nome_i18n, c.nome);
+    const cartao = el("div", "criterio");
+    cartao.dataset.foco = String(!c0.leitura && c0.foco === i);
+    juntar(cartao,
+      el("div", "criterio-nome", nomeC),
+      el("div", "criterio-desc", bi(c.descricao_i18n, c.descricao)));
+    const botoes = el("div", "notas");
+    for (let v = escala.min; v <= escala.max; v++) {
+      const b = el("button", "nota", String(v));
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(form.notas[i] === v));
+      b.setAttribute("aria-label", t("a11y.nota", { criterio: nomeC, valor: v }));
+      if (c0.leitura) b.tabIndex = -1;
+      else b.addEventListener("click", () => { c0.aoFocar(i); graduarEm(c0, i, v); });
+      botoes.appendChild(b);
+    }
+    cartao.appendChild(botoes);
+    const ancoras = (escala.ancoras || []).slice().sort((a, b) => a.valor - b.valor);
+    if (ancoras.length) {
+      const ponta = (a) => a.valor + " — " + bi(a.rotulo_i18n, a.rotulo);
+      const linha = el("div", "ancoras");
+      juntar(linha,
+        el("span", null, ponta(ancoras[0])),
+        el("span", null, ponta(ancoras[ancoras.length - 1])));
+      cartao.appendChild(linha);
+    }
+    if (c0.motivos) cartao.appendChild(c0.motivos("notas." + i + "."));
+    lista.appendChild(cartao);
+  });
+  caixa.appendChild(lista);
+
+  const minimo = lim("min_chars_justificativa", 30);
+  const campo = el("div", "campo");
+  campo.style.marginTop = "16px";
+  const area = el("textarea");
+  area.rows = 4;
+  area.placeholder = t("conversa.geral_ph");
+  area.value = form.justificativa;
+  if (c0.leitura) area.readOnly = true;
+  else area.addEventListener("input", () => {
+    form.justificativa = area.value;
+    contador.textContent = t("ws.contador_de", {
+      n: n(area.value.trim().length), min: minimo,
+    });
+    c0.aoDigitar();
+  });
+  juntar(campo, el("span", null, t("conversa.geral")), area);
+  const contador = el("div", "contador", t("ws.contador_de", {
+    n: n((form.justificativa || "").trim().length), min: minimo,
+  }));
+  campo.appendChild(contador);
+  if (!c0.leitura) campo.appendChild(dicaLinguaMeta("lingua.meta"));
+  if (c0.motivos) campo.appendChild(c0.motivos("justificativa"));
+  caixa.appendChild(campo);
+  return caixa;
+}
+
+function wsConversa(env, ctx) {
+  const c0 = ctx || ctxEdicao();
+  const caixa = el("div");
+  const bloco = separador(el("div", "painel-corpo"));
+  const runtime = c0.leitura ? null : blocoRuntime();
+  if (runtime) bloco.appendChild(runtime);
+
+  const turnos = turnosDe(env, c0);
+  if (!turnos.length) {
+    juntar(bloco,
+      el("div", "vazio-titulo", t("conversa.vazia")),
+      el("p", "vazio-linha", t("conversa.vazia_linha")));
+  } else {
+    bloco.appendChild(el("p", "fraco", t("conversa.marcar_dica")));
+    bloco.appendChild(fluxoConversa(env, c0));
+  }
+  const gerando = c0.leitura ? null : blocoGerando();
+  if (gerando) bloco.appendChild(gerando);
+  if (!c0.leitura && !c0.form.encerrada) {
+    bloco.appendChild(compositor(env));
+    bloco.appendChild(barraEncerrar(env));
+  }
+  caixa.appendChild(bloco);
+  if (c0.leitura || c0.form.encerrada) caixa.appendChild(avaliacaoDaConversa(env, c0));
+  return caixa;
+}
+
+function wsDuelo(env, ctx) {
+  const c0 = ctx || ctxEdicao();
+  const caixa = el("div");
+  const bloco = separador(el("div", "painel-corpo"));
+  const runtime = c0.leitura ? null : blocoRuntime();
+  if (runtime) bloco.appendChild(runtime);
+
+  const turnos = turnosDe(env, c0);
+  if (!turnos.length) {
+    juntar(bloco,
+      el("div", "vazio-titulo", t("conversa.vazia")),
+      el("p", "vazio-linha", t("conversa.vazia_linha")),
+      el("p", "fraco", t("duelo.oculto")));
+  } else {
+    bloco.appendChild(el("p", "fraco", t("conversa.marcar_dica")));
+    bloco.appendChild(fluxoDuelo(env, c0));
+  }
+  const gerando = c0.leitura ? null : blocoGerando();
+  if (gerando) bloco.appendChild(gerando);
+  if (!c0.leitura && !c0.form.encerrada) {
+    bloco.appendChild(compositor(env));
+    bloco.appendChild(barraEncerrar(env));
+  }
+  caixa.appendChild(bloco);
+  if (c0.leitura || c0.form.encerrada) {
+    caixa.appendChild(avaliacaoDaConversa(env, c0));
+    // QUEM ERA QUEM, e só aqui: em modo leitura a avaliação já foi enviada, e
+    // esconder a partir daí seria esconder por esconder.
+    const revelacao = blocoRevelacao(c0.form.rodadas || []);
+    if (revelacao) caixa.appendChild(revelacao);
+  }
+  return caixa;
+}
+
+/** A REVELAÇÃO. Função à parte de `wsDuelo` de propósito: é a ÚNICA do caminho
+    do duelo que lê o nome do modelo, e mantê-la separada é o que permite provar
+    — lendo o arquivo — que o desenho do duelo não o lê nunca. */
+function blocoRevelacao(rodadas) {
+  if (!rodadas.length) return null;
+  const caixa = separador(el("div", "painel-corpo"));
+  juntar(caixa,
+    el("div", "rotulo-bloco", t("duelo.revelacao_titulo")),
+    el("p", "fraco", t("duelo.revelado")));
+  const lista = el("div", "revelacao");
+  for (const rodada of rodadas) {
+    for (const r of rodada.respostas || []) {
+      const linha = el("div", "revelacao-linha");
+      // O nome do modelo é DADO: vem do servidor e sai como está.
+      juntar(linha,
+        el("span", "dado", t("duelo.revelacao_linha", {
+          n: rodada.ordem, lado: r.rotulo, modelo: r.modelo,
+        })),
+        el("span", "crescer"),
+        r.rotulo === rodada.vencedora
+          ? el("span", "etiqueta aprovado", t("duelo.vencedora", { lado: r.rotulo }))
+          : null);
+      lista.appendChild(linha);
+    }
+  }
+  caixa.appendChild(lista);
+  return caixa;
+}
+
+/* ---- as chamadas ---- */
+
+/** Manda um turno (ou repete o que ficou sem resposta) e redesenha.
+
+    O turno do humano é gravado pelo SERVIDOR antes de ele chamar o modelo, então
+    um erro aqui nunca custa o que a pessoa escreveu — o 503 volta com a conversa
+    como ela ficou, e a tela oferece "tentar de novo". */
+async function mandarTurno(texto) {
+  if (!est.envelope || est.gerando) return;
+  const env = est.envelope;
+  const duelo = env.tarefa.tipo === "duelo_modelos";
+  est.gerando = { desde: Date.now(), dois: duelo, modelo: modeloDaVez() };
+  est.erroModelo = null;
+  desenharArea();
+  try {
+    const r = await postar("/api/conversa/" + env.atribuicao_id + "/turno", {
+      anotador_id: est.persona.id,
+      texto: texto,
+    });
+    env.conversa = r.conversa;
+    if (texto) est.form.rascunho = "";
+  } catch (e) {
+    // O 503 da inferência traz a conversa junto: nada se perde, e a tela sabe
+    // dizer o que falta (modelo não baixado, servidor fora do ar).
+    const d = e.corpo && e.corpo.detail;
+    if (d && typeof d === "object" && d.chave) {
+      est.erroModelo = {
+        chave: d.chave,
+        dados: d.dados || {},
+        mensagem: d.mensagem || "",
+        comandos: (d.dados || {}).comandos,
+      };
+      if (d.conversa) env.conversa = d.conversa;
+    } else {
+      recado(e.message, true);
+    }
+  } finally {
+    est.gerando = null;
+    pararTique();
+  }
+  salvarRascunho();
+  desenharArea();
+}
+
+/** Escolhe a vencedora da rodada aberta — e a conversa continua com ela. */
+async function escolherLado(lado) {
+  if (!est.envelope || est.carregando || est.gerando) return;
+  const env = est.envelope;
+  const pendente = env.conversa && env.conversa.rodada_pendente;
+  if (pendente === null || pendente === undefined) return;
+  const motivo = (est.form.escolha || "").trim();
+  if (motivo.length < lim("min_chars_justificativa", 30)) return;
+  est.carregando = true;
+  desenharArea();
+  try {
+    const r = await postar("/api/conversa/" + env.atribuicao_id + "/escolher", {
+      anotador_id: est.persona.id,
+      ordem: pendente,
+      rotulo: lado,
+      justificativa: motivo,
+    });
+    env.conversa = r.conversa;
+    est.form.escolha = "";
+    recado(t("recado.escolha_registrada"));
+  } catch (e) {
+    recado(e.message, true);
+  } finally {
+    est.carregando = false;
+  }
+  salvarRascunho();
+  desenharArea();
+}
+
 /** Escolhe (ou desmarca) um lado do A/B DENTRO de um contexto. */
 function escolherABEm(c0, rotulo) {
   c0.form.preferencia = c0.form.preferencia === rotulo ? null : rotulo;
@@ -3517,6 +4608,50 @@ function formDoPayload(env, anterior) {
       }),
     };
   }
+  if (ehConversa(tipo)) {
+    // A rubrica das duas abas de conversa é a da PLATAFORMA, e ela vem sempre no
+    // envelope — as notas são posicionais nela, como no `avaliar_rubrica`.
+    const criterios = (env.rubrica && env.rubrica.criterios) || [];
+    const problemas = {};
+    for (const p of (anterior && anterior.turnos_problematicos) || []) {
+      problemas[String(p.ordem)] = { nota: p.nota, motivo: p.motivo || "" };
+    }
+    const form = {
+      // Fechada quando se está LENDO uma anotação já enviada: a conversa acabou,
+      // e a rubrica é o que o revisor veio ver.
+      encerrada: !!anterior,
+      // A conversa em si. Do payload na leitura; do envelope (e do rascunho)
+      // enquanto ela está acontecendo — ver `turnosDe`.
+      turnos: (anterior && anterior.turnos) || [],
+      rodadas: (anterior && anterior.rodadas) || [],
+      notas: criterios.map(() => null),
+      justificativas: criterios.map(() => null),
+      problemas: problemas,
+      marcando: null,
+      justificativa: (anterior && anterior.justificativa) || "",
+      // O PRIMEIRO TURNO JÁ VEM ESCRITO: é o prompt da tarefa, e ele é
+      // EDITÁVEL. Uma caixa em branco sobre um prompt que está logo acima
+      // obrigaria a pessoa a copiá-lo à mão para começar — e um prompt de
+      // sistema escondido faria a avaliação medir o nosso prompt, não o modelo.
+      // O tamanho é o do pool (`pool_fallback_max_chars`), então não há parede.
+      rascunho: !anterior && !((env.conversa && env.conversa.turnos) || []).length
+        ? env.prompt.text : "",
+      // O motivo da rodada aberta. Mora no FORM (e não no DOM) porque o rascunho
+      // é por atribuição e porque trocar de idioma redesenha a tela a partir de
+      // `est` — o que só existisse no DOM sumiria.
+      escolha: "",
+    };
+    if (anterior && anterior.notas) {
+      criterios.forEach((c, i) => {
+        const achado = anterior.notas.find((x) => x.criterio === c.nome);
+        if (achado) {
+          form.notas[i] = achado.nota;
+          if (achado.justificativa) form.justificativas[i] = achado.justificativa;
+        }
+      });
+    }
+    return form;
+  }
   return {
     preferencia: (anterior && anterior.preferencia) || null,
     justificativa: (anterior && anterior.justificativa) || "",
@@ -3563,6 +4698,23 @@ function oQueFalta() {
     const piso = lim("min_chars_sft", 40);
     const tem = est.form.resposta.trim().length;
     if (tem < piso) return t("falta.sft", { n: piso - tem });
+    return null;
+  }
+  if (ehConversa(tipo)) {
+    const conversa = env.conversa || {};
+    // ENCERRAR É A PRIMEIRA COISA QUE FALTA, e o botão diz isso em vez de
+    // aparecer habilitado e devolver um 409: enquanto a conversa está aberta, o
+    // que se está fazendo é conversar, não avaliar.
+    if (!conversa.avaliavel && !(est.form.turnos || []).length) return t("falta.sem_turno");
+    if (!est.form.encerrada) return t("falta.encerrar");
+    const total = est.form.notas.length;
+    const semNota = est.form.notas.filter((v) => v === null || v === undefined).length;
+    if (semNota) return t("falta.notas", { n: semNota, total: total });
+    const pisoConversa = lim("min_chars_justificativa", 30);
+    const temConversa = (est.form.justificativa || "").trim().length;
+    if (temConversa < pisoConversa) {
+      return t("falta.justificativa", { n: pisoConversa - temConversa });
+    }
     return null;
   }
   if (!est.form.preferencia) return t("falta.preferencia");
@@ -3652,6 +4804,32 @@ function montarPayload(env, form) {
     }
     return corpo;
   }
+  if (ehConversa(tipo)) {
+    const criterios = (env.rubrica && env.rubrica.criterios) || [];
+    // `turnos` (e `rodadas`) NÃO SAEM DAQUI. Quem os monta é o servidor, a
+    // partir do que ele mesmo gravou em `turnos_conversa` — no duelo o cliente
+    // sequer sabe qual modelo respondeu, e um "quem" vindo de quem não sabia
+    // seria fabricação. Mandá-los aqui seria, no melhor caso, redundante.
+    return {
+      rubrica: (env.rubrica && env.rubrica.rubrica_id) || "",
+      notas: criterios.map((c, i) => {
+        const nota = { criterio: c.nome, nota: f.notas[i] };
+        const just = f.justificativas[i];
+        if (just && just.trim()) nota.justificativa = just.trim();
+        return nota;
+      }),
+      turnos_problematicos: Object.keys(f.problemas || {})
+        .map(Number)
+        .sort((a, b) => a - b)
+        .filter((ordem) => (f.problemas[String(ordem)].motivo || "").trim())
+        .map((ordem) => ({
+          ordem: ordem,
+          nota: f.problemas[String(ordem)].nota,
+          motivo: f.problemas[String(ordem)].motivo.trim(),
+        })),
+      justificativa: (f.justificativa || "").trim(),
+    };
+  }
   return { preferencia: f.preferencia, justificativa: f.justificativa.trim() };
 }
 
@@ -3674,6 +4852,9 @@ async function enviar() {
       ? t("recado.enviado_expirado")
       : t("recado.enviado", { versao: r.versao }));
     est.carregando = false;
+    // A REVELAÇÃO do duelo, e só agora: com a avaliação já gravada, a
+    // preferência não pode mais ser contaminada pela marca.
+    if (r.revelacao && r.revelacao.length) { revelarDuelo(r.revelacao); return; }
     if (r.continuacao) { oferecerContinuacao(r.continuacao); return; }
     // FECHAR O LOOP ANTES DE PEDIR A PRÓXIMA COISA: enviar leva direto à
     // próxima tarefa, sem uma tela intermediária perguntando "e agora?".
@@ -3687,6 +4868,50 @@ async function enviar() {
     recado(e.message, true);
     desenharArea();
   }
+}
+
+/** QUEM ERA QUEM, depois do envio do duelo. Uma tela, uma saída.
+
+    O estado mora em `est.revelacao` e não só no DOM: trocar de idioma aqui
+    redesenha a partir da memória, e uma revelação que sumisse ao trocar de
+    língua faria a pessoa perder a única chance de ver o resultado. */
+function revelarDuelo(revelacao) {
+  est.revelacao = revelacao;
+  const area = $("#area-trabalho");
+  limpar(area);
+  const painel = el("div", "painel");
+  painel.appendChild(juntar(el("div", "painel-cabeca"),
+    el("h2", null, t("duelo.revelacao_titulo"))));
+  const corpo = el("div", "painel-corpo");
+  corpo.appendChild(el("p", "fraco", t("duelo.revelado")));
+  const lista = el("div", "revelacao");
+  for (const rodada of revelacao) {
+    for (const lado of rodada.lados || []) {
+      const linha = el("div", "revelacao-linha");
+      // Nome de modelo é DADO: vem do servidor e sai como está.
+      juntar(linha,
+        el("span", "dado", t("duelo.revelacao_linha", {
+          n: rodada.ordem, lado: lado.rotulo, modelo: lado.modelo,
+        })),
+        el("span", "crescer"),
+        lado.rotulo === rodada.vencedora
+          ? el("span", "etiqueta aprovado", t("duelo.vencedora", { lado: lado.rotulo }))
+          : null);
+      lista.appendChild(linha);
+    }
+  }
+  corpo.appendChild(lista);
+  const seguir = el("button", "botao primaria", t("botao.proxima_tarefa"));
+  seguir.type = "button";
+  seguir.addEventListener("click", () => {
+    est.revelacao = null;
+    est.motivo = "";
+    est.motivoChave = null;
+    carregarFila();
+  });
+  corpo.appendChild(juntar(el("div", "vazio-saidas"), seguir));
+  painel.appendChild(corpo);
+  area.appendChild(painel);
 }
 
 /** A oferta rubrica → SFT. Uma pergunta, duas saídas, nenhuma delas um beco. */
@@ -4135,6 +5360,35 @@ function ehCampo(alvo) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (alvo && alvo.isContentEditable);
 }
 
+/** ↑/↓ andam entre critérios, 1..9 gradua o que está em foco.
+
+    Uma função e não duas cópias: o `avaliar_rubrica` e as duas abas de conversa
+    graduam a MESMA forma de rubrica, e duas cópias divergiriam justamente no
+    detalhe que faz o gesto funcionar — andar sozinho para o próximo critério, que
+    é o que transforma a rubrica inteira numa sequência de teclas. */
+function graduarPeloTeclado(ev, criterios) {
+  const total = est.form.notas.length;
+  if (!total) return;
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+    const passo = ev.key === "ArrowDown" ? 1 : -1;
+    est.foco = (est.foco + passo + total) % total;
+    ev.preventDefault();
+    desenharArea();
+    return;
+  }
+  if (!/^[1-9]$/.test(ev.key)) return;
+  const criterio = criterios[est.foco];
+  const escala = (criterio && criterio.escala) || { min: 1, max: 9 };
+  const valor = Number(ev.key);
+  if (valor < escala.min || valor > escala.max) {
+    recado(t("recado.escala", { min: escala.min, max: escala.max }), true);
+    return;
+  }
+  ev.preventDefault();
+  graduar(est.foco, valor);
+  if (est.foco < total - 1) { est.foco += 1; desenharArea(); }
+}
+
 function teclado(ev) {
   if (!est.persona) return;
   if (est.persona.papel === "revisor" || est.persona.papel === "admin") {
@@ -4147,37 +5401,48 @@ function teclado(ev) {
   // escrever", e obrigar a sair do campo antes de enviar é fricção.
   if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
     ev.preventDefault();
+    // NUMA CONVERSA ABERTA, "terminei de escrever" é MANDAR O TURNO, não enviar
+    // a anotação: são a mesma frase mental em dois momentos, e a tecla segue o
+    // momento. Depois de encerrada, ela volta a ser o envio.
+    const emConversa = est.envelope && ehConversa(est.envelope.tarefa.tipo)
+      && est.form && !est.form.encerrada && est.vista === "fila";
+    if (emConversa) {
+      const escrito = (est.form.rascunho || "").trim();
+      const conversa = est.envelope.conversa || {};
+      if (conversa.aguardando !== null && conversa.aguardando !== undefined) mandarTurno(null);
+      else if (escrito) mandarTurno(escrito);
+      return;
+    }
     enviar();
     return;
   }
   if (ehCampo(ev.target) || !est.envelope || est.vista !== "fila") return;
 
   const tipo = est.envelope.tarefa.tipo;
+  if (ehConversa(tipo)) {
+    // `E` ENCERRA. Não é "empate": num duelo o empate não tem vencedora para
+    // continuar a conversa, e inventar uma continuação seria fabricar a escolha
+    // que ninguém fez. `E` de encerrar/end é a mesma letra nas duas línguas.
+    if ((ev.key === "e" || ev.key === "E") && est.form && !est.form.encerrada) {
+      ev.preventDefault();
+      encerrarConversa();
+      return;
+    }
+    const pendente = est.envelope.conversa && est.envelope.conversa.rodada_pendente;
+    if (tipo === "duelo_modelos" && pendente !== null && pendente !== undefined) {
+      if (ev.key === "ArrowLeft") { ev.preventDefault(); escolherLado("A"); return; }
+      if (ev.key === "ArrowRight") { ev.preventDefault(); escolherLado("B"); return; }
+    }
+    // Depois de encerrada, os números graduam a rubrica multi-turno — o mesmo
+    // gesto do `avaliar_rubrica`, sobre a mesma forma de rubrica.
+    if (est.form && est.form.encerrada && est.envelope.rubrica) {
+      graduarPeloTeclado(ev, est.envelope.rubrica.criterios || []);
+    }
+    return;
+  }
   if (tipo === "avaliar_rubrica" && est.envelope.rubrica) {
-    const total = est.form.notas.length;
-    if (!total) return;
-    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
-      const passo = ev.key === "ArrowDown" ? 1 : -1;
-      est.foco = (est.foco + passo + total) % total;
-      ev.preventDefault();
-      desenharArea();
-      return;
-    }
-    if (/^[1-9]$/.test(ev.key)) {
-      const criterio = est.envelope.rubrica.criterios[est.foco];
-      const escala = (criterio && criterio.escala) || { min: 1, max: 9 };
-      const valor = Number(ev.key);
-      if (valor < escala.min || valor > escala.max) {
-        recado(t("recado.escala", { min: escala.min, max: escala.max }), true);
-        return;
-      }
-      ev.preventDefault();
-      graduar(est.foco, valor);
-      // Andar sozinho para o próximo é o que torna a rubrica inteira uma
-      // sequência de teclas, sem uma navegação entre cada nota.
-      if (est.foco < total - 1) { est.foco += 1; desenharArea(); }
-      return;
-    }
+    graduarPeloTeclado(ev, est.envelope.rubrica.criterios || []);
+    return;
   }
   if (tipo === "comparar_ab") {
     if (ev.key === "ArrowLeft") { ev.preventDefault(); escolherAB("modelo-a"); }

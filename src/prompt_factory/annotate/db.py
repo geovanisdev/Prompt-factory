@@ -71,7 +71,16 @@ from typing import Any
 #: ``IF NOT EXISTS`` não o reescreve num banco que já existe. Ou seja: sem a
 #: migração, o banco do dono continuaria recusando o INSERT com um CHECK velho
 #: que nenhum arquivo do repositório mostra mais. Meio-schema de novo.
-SCHEMA_VERSION_ANOTACAO = 4
+#:
+#: **v5 (P4d)**: as duas tarefas de INFERÊNCIA AO VIVO — ``conversa_modelo`` e
+#: ``duelo_modelos`` entram em ``TIPOS_TAREFA`` (dois CHECKs alargados, em
+#: ``tarefas`` e em ``diretrizes``) e nasce a tabela ``turnos_conversa``. Ela é a
+#: primeira tabela deste schema a guardar trabalho produzido DURANTE a tarefa e
+#: não no envio: o anotador conversa por vinte minutos antes de existir uma
+#: linha em ``anotacoes``. Guardá-la no servidor (em vez de só no
+#: ``localStorage``) é o que faz o duelo ser cego de verdade — o mapa de qual
+#: modelo é "A" nunca sai daqui antes de a avaliação ser enviada.
+SCHEMA_VERSION_ANOTACAO = 5
 
 #: Chave de ``app_meta`` onde a versão acima mora.
 CHAVE_VERSAO = "schema_version_anotacao"
@@ -82,14 +91,45 @@ CHAVE_VERSAO = "schema_version_anotacao"
 #: em que alguém pusesse isto na rede.
 PAPEIS: tuple[str, ...] = ("anotador", "revisor", "admin")
 
-#: Os quatro estilos de tarefa (as quatro abas do anotador). São também o
-#: prefixo do ``payload_schema`` das anotações: ``comparar_ab@1``.
+#: Os estilos de tarefa (as abas do anotador). São também o prefixo do
+#: ``payload_schema`` das anotações: ``comparar_ab@1``.
+#:
+#: Os quatro primeiros trabalham sobre **texto parado**; os dois últimos (P4d)
+#: exigem **inferência ao vivo** — um modelo local respondendo enquanto a pessoa
+#: anota. A ordem é a das abas na tela, e as duas novas ficam no fim porque são
+#: as únicas que dependem de um serviço fora deste processo.
 TIPOS_TAREFA: tuple[str, ...] = (
     "avaliar_rubrica",
     "escrever_rubrica",
     "sft_resposta",
     "comparar_ab",
+    "conversa_modelo",
+    "duelo_modelos",
 )
+
+#: Os dois tipos que falam com o Ollama. Uma tupla, e não um ``in (...)`` solto
+#: em cinco módulos: quem acrescentar um terceiro formato de conversa muda um
+#: lugar. Toda regra que vale "só para conversa" (rubrica multi-turno, turnos no
+#: envelope, injeção dos turnos na submissão) consulta daqui.
+TIPOS_CONVERSA: tuple[str, ...] = ("conversa_modelo", "duelo_modelos")
+
+#: Quem falou num turno. ``modelo`` é o Ollama; ``usuario`` é o anotador — e a
+#: tradução para os papéis do ``/api/chat`` (``assistant``/``user``) mora em
+#: ``conversa.historico``, num lugar só.
+PAPEIS_TURNO: tuple[str, ...] = ("usuario", "modelo")
+
+#: Os rótulos CEGOS de uma rodada de duelo. ``""`` é o turno do humano (que não
+#: tem lado). São "A"/"B" e não ``modelo-a``/``modelo-b`` de propósito: os
+#: primeiros são o que a tela mostra, e o identificador interno do A/B de turno
+#: único (``ROTULOS_MODELO``) descreve OUTRA coisa — uma linha de
+#: ``respostas_modelo``, que é material parado.
+ROTULOS_DUELO: tuple[str, ...] = ("A", "B")
+
+#: A escala da nota de um TURNO PROBLEMÁTICO. Fixa e curta: marcar um turno é um
+#: gesto de passagem no meio da leitura da conversa, não uma segunda rubrica.
+#: Cinco posições é o mesmo tamanho dos critérios das fixtures, então a mão já
+#: sabe onde ficam as pontas.
+ESCALA_TURNO: tuple[int, int] = (1, 5)
 
 #: De onde a tarefa veio. ``semente`` = ``pf annotate seed``; ``admin`` = gerada
 #: no painel; ``livre`` = o anotador escolheu o prompt no catálogo (find-or-
@@ -467,6 +507,61 @@ CREATE TABLE IF NOT EXISTS anotacoes (
 -- índice serve às duas.
 CREATE INDEX IF NOT EXISTS idx_anotacoes_fila ON anotacoes(status, id);
 
+-- ---------------------------------------------------------------------------
+-- A CONVERSA COM O MODELO LOCAL  (P4d)
+-- ---------------------------------------------------------------------------
+-- A única tabela deste schema que guarda trabalho produzido ANTES do envio: o
+-- anotador conversa por vinte minutos e só então existe uma linha em
+-- `anotacoes`. Três coisas dependem de ela estar aqui, e não no localStorage:
+--
+-- 1. **O duelo é cego de verdade.** Qual modelo é "A" nesta rodada nunca sai
+--    deste banco antes de a avaliação ser enviada. Se a tela soubesse, a
+--    preferência seria sobre a marca e não sobre o texto — e o dado inteiro
+--    perderia o valor.
+-- 2. **Quem respondeu fica registrado com NOME e DIGEST.** A tag (`qwen3:4b`) é
+--    reescrita quando o autor republica o modelo; o digest é o conteúdo. Sem
+--    ele, "o B era melhor" não significa nada daqui a seis meses.
+-- 3. **Trinta turnos não se perdem.** Fechar a aba, recarregar a página ou
+--    trocar de máquina não custa a conversa.
+--
+-- `ordem` é a posição do turno na conversa (0 = o primeiro do humano). Numa
+-- rodada de duelo as DUAS respostas compartilham a mesma `ordem` e se
+-- distinguem pelo `rotulo` — é isso que o UNIQUE diz.
+--
+-- `escolhida` marca a vencedora da rodada, e é ela que faz a conversa
+-- continuar: o histórico mandado ao modelo no turno seguinte leva a vencedora,
+-- nunca as duas.
+CREATE TABLE IF NOT EXISTS turnos_conversa (
+  id            INTEGER PRIMARY KEY,
+  atribuicao_id INTEGER NOT NULL REFERENCES atribuicoes(id) ON DELETE CASCADE,
+  ordem         INTEGER NOT NULL CHECK (ordem >= 0),
+  papel         TEXT NOT NULL CHECK (papel IN ({_lista(PAPEIS_TURNO)})),
+  -- '' no turno do humano e na conversa de um modelo só: eles não têm lado.
+  rotulo        TEXT NOT NULL DEFAULT '' CHECK (rotulo IN ('', {_lista(ROTULOS_DUELO)})),
+  texto         TEXT NOT NULL,
+  -- O `message.thinking` do Ollama, quando existe. Guardado, e NÃO filtrado: o
+  -- raciocínio exposto é conteúdo que o anotador pode querer avaliar, e
+  -- descartá-lo em silêncio seria decidir por ele que não conta. Fica numa
+  -- coluna à parte porque não é a resposta — a tela o mostra recolhido.
+  raciocinio    TEXT NOT NULL DEFAULT '',
+  -- NOSSO teto de tokens (`ollama_num_predict`) cortou este turno? Marcado para
+  -- que a parede cortada não pareça uma decisão do modelo.
+  truncado      INTEGER NOT NULL DEFAULT 0 CHECK (truncado IN (0,1)),
+  -- Vazios no turno do humano. NOT NULL com default '' pela regra do raw: aqui
+  -- também, ausência é string vazia, nunca NULL — um `modelo IS NULL` e um
+  -- `modelo = ''` significariam a mesma coisa e seriam consultados diferente.
+  modelo        TEXT NOT NULL DEFAULT '',
+  digest        TEXT NOT NULL DEFAULT '',
+  escolhida     INTEGER NOT NULL DEFAULT 0 CHECK (escolhida IN (0,1)),
+  -- Por que ESTA venceu ESTA rodada. É a preferência multi-turno: sem o motivo,
+  -- "o B era melhor" não treina nada — a mesma razão do `comparar_ab`.
+  justificativa TEXT,
+  duracao_ms    INTEGER NOT NULL DEFAULT 0 CHECK (duracao_ms >= 0),
+  criado_em     TEXT NOT NULL DEFAULT ({_agora()}),
+  UNIQUE (atribuicao_id, ordem, rotulo)
+);
+CREATE INDEX IF NOT EXISTS idx_turnos_conversa ON turnos_conversa(atribuicao_id, ordem, rotulo);
+
 -- PASSAGEM 1 — A TRIAGEM. Aprova ou devolve, sem escore. É a ÚNICA passagem que
 -- devolve trabalho ao anotador; o que ela aprova não volta mais para quem
 -- anotou (segue para o Rate and Review, que corrige no lugar).
@@ -696,6 +791,7 @@ TABELAS: tuple[str, ...] = (
     "tarefas",
     "atribuicoes",
     "anotacoes",
+    "turnos_conversa",
     "revisoes",
     "avaliacoes",
     "edicoes_avaliacao",
@@ -829,11 +925,14 @@ __all__ = [
     "DECISOES_ADMIN",
     "DESFECHO_AVALIACAO",
     "DESFECHO_DECISAO",
+    "ESCALA_TURNO",
     "ORIGENS_RESPOSTA",
     "ORIGENS_RUBRICA",
     "ORIGENS_TAREFA",
     "PAPEIS",
+    "PAPEIS_TURNO",
     "PREFIXO_DEMO",
+    "ROTULOS_DUELO",
     "ROTULOS_MODELO",
     "SCHEMA_VERSION_ANOTACAO",
     "STATUS_ANOTACAO",
@@ -843,6 +942,7 @@ __all__ = [
     "STATUS_QUALIFICACAO",
     "STATUS_TAREFA",
     "TABELAS",
+    "TIPOS_CONVERSA",
     "TIPOS_TAREFA",
     "TRANSICOES",
     "VEREDITOS",

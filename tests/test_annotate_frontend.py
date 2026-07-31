@@ -227,6 +227,9 @@ ROTAS_DO_FRONT: frozenset[str] = frozenset(
         "/api/avaliacao/",
         "/api/escalacao/fila",
         "/api/escalacao/",
+        # P4d: o runtime de modelos locais e a conversa ao vivo.
+        "/api/modelos",
+        "/api/conversa/",
     }
 )
 
@@ -318,6 +321,97 @@ def test_nenhum_cronometro_para_quem_anota(js: str) -> None:
 def test_os_quatro_workspaces_existem(js: str) -> None:
     for fn in ("function wsAvaliar(", "function wsEscrever(", "function wsSft(", "function wsComparar("):
         assert fn in js
+
+
+# ---------------------------------------------------------------------------
+# 3b-bis. as duas abas de inferência ao vivo (P4d)
+# ---------------------------------------------------------------------------
+
+
+def test_os_dois_workspaces_de_conversa_existem(js: str) -> None:
+    for fn in ("function wsConversa(", "function wsDuelo("):
+        assert fn in js
+
+
+def test_o_nome_do_modelo_nao_e_lido_pelo_desenho_do_duelo(js: str) -> None:
+    """A METADE DE CIMA da garantia do rótulo cego.
+
+    A outra metade é o servidor não mandar ``modelo``/``digest`` nos turnos de um
+    duelo (``conversa._dict``, provado em ``test_annotate_p4d``). Esta prova é
+    complementar e não redundante: sem ela, o dia em que alguém "só
+    acrescentasse o campo no envelope" transformaria a preferência numa
+    preferência por marca, e nenhum teste de backend pegaria.
+
+    ``blocoRevelacao`` é função à parte justamente para que esta varredura seja
+    possível — ela é a ÚNICA do caminho do duelo que lê o nome, e só é chamada
+    depois do envio.
+    """
+    for fn in ("function wsDuelo(", "function fluxoDuelo(", "function rodadaDuelo("):
+        corpo = js.split(fn, 1)[1].split("\n}", 1)[0]
+        assert ".modelo" not in corpo, f"{fn} lê o nome do modelo"
+        assert ".digest" not in corpo, f"{fn} lê o digest do modelo"
+
+
+def test_a_conversa_inteira_entra_no_rascunho(js: str) -> None:
+    """Perder trinta turnos é o pior desfecho possível nesta aba.
+
+    Os turnos moram no SERVIDOR (é o que faz o duelo ser cego de verdade), e o
+    rascunho guarda uma cópia mesmo assim: uma segunda rede não custa nada, e o
+    que está no `est.form` é o que `salvarRascunho` grava.
+    """
+    assert "c0.form.turnos = doServidor" in js
+    assert "function turnosDe(env, c0)" in js
+
+
+def test_o_unico_relogio_a_vista_e_o_da_geracao(js: str) -> None:
+    """A REGRA DO BRIEF continua valendo, e este contador não a viola.
+
+    "Nada de cronômetro para o anotador" existe porque um relógio sobre a PESSOA
+    adiciona pressão sem melhorar decisão. Este contador é sobre a MÁQUINA:
+    medido, um turno leva de 1,4 s a 17,6 s, e dezessete segundos sem indicador
+    são indistinguíveis de um travamento.
+
+    Por isso ele fica com `setTimeout` recursivo e não com `setInterval` — que
+    `test_nenhum_cronometro_para_quem_anota` continua proibindo —, e por isso ele
+    diz `decorrido`, nunca "restante": não há prazo a vencer aqui.
+    """
+    assert "function tiquetaque()" in js
+    assert 'el("span", "decorrido"' in js
+    assert "conversa.decorrido_titulo" in js
+    # E ele morre sozinho quando o indicador sai da tela.
+    corpo = js.split("function tiquetaque()", 1)[1].split("\n}", 1)[0]
+    assert "pararTique()" in corpo
+
+
+def test_o_runtime_ausente_e_estado_com_conserto(js: str) -> None:
+    """Modelo não baixado não é erro: é uma instrução com um comando ao lado."""
+    assert "function blocoRuntime()" in js
+    assert "function reconferirModelos()" in js
+    assert '"/api/modelos"' in js
+    assert "runtime.conserto" in js
+    # As chaves que o SERVIDOR escolhe ficam numa tabela com a chave INTEIRA,
+    # senão o teste de chave órfã não as enxerga (regra do P3i).
+    assert "const CHAVES_RUNTIME" in js
+    for chave in ("modelos.fora_do_ar", "modelos.faltam", "modelos.pronto", "modelos.nenhum"):
+        assert f'"{chave}"' in js
+
+
+def test_marcar_um_turno_nao_abre_modal(js: str) -> None:
+    """O mesmo padrão do motivo por edição do P3b: o editor abre ALI, embaixo do
+    turno. Um modal esconderia justamente o texto sobre o qual a nota é dada."""
+    assert "function marcacaoDeTurno(" in js
+    corpo = js.split("function marcacaoDeTurno(", 1)[1].split("\n}\n", 1)[0]
+    for proibido in ("dialog", "modal", "showModal"):
+        assert proibido not in corpo.lower()
+
+
+def test_o_raciocinio_do_modelo_nao_e_filtrado(js: str) -> None:
+    """Ele vem RECOLHIDO e com marcador, nunca descartado em silêncio: é conteúdo
+    que o anotador pode querer avaliar, e jogá-lo fora seria decidir por ele."""
+    assert "function blocoRaciocinio(turno)" in js
+    corpo = js.split("function blocoRaciocinio(turno)", 1)[1].split("\n}", 1)[0]
+    assert "details" in corpo
+    assert "turno.raciocinio" in corpo
 
 
 def test_tres_modelos_de_partida_colapsados(js: str) -> None:

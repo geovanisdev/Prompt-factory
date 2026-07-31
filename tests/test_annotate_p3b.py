@@ -1198,4 +1198,7 @@ def test_a_copia_da_v2_cobre_todas_as_tabelas(banco: Path) -> None:
         | {t for t, _ in migracao.COPIA_V2_DEPOIS}
         | {"anotacoes", "app_meta"}
     )
-    assert cobertas == set(adb.TABELAS)
+    # Menos as que ainda NÃO EXISTIAM na v2 — elas nascem vazias do DDL, e
+    # `SEM_ORIGEM` é onde essa lista mora (no código, uma vez, e não relaxada
+    # dentro de cada teste que a esbarra).
+    assert cobertas == set(adb.TABELAS) - migracao.SEM_ORIGEM[2]
