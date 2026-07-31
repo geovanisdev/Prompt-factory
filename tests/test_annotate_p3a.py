@@ -724,7 +724,9 @@ def test_a_diretriz_e_versionada_e_a_anotacao_a_carimba(cliente: TestClient) -> 
     assert r.status_code == 200
     itens = r.json()["items"]
     assert set(itens) == set(adb.TIPOS_TAREFA)
-    assert all(i["versao"] == 1 and i["linhas"] for i in itens.values())
+    # P3i: as DUAS línguas na mesma versão e na mesma resposta — a versão é do
+    # conteúdo, não da tradução.
+    assert all(i["versao"] == 1 and i["textos"]["en"] and i["textos"]["pt"] for i in itens.values())
 
     quem = perfis_por_papel(cliente)["anotador"][0]["id"]
     env = cliente.post(
@@ -745,15 +747,22 @@ def test_a_diretriz_ja_usada_nao_se_reescreve(semeado: Path) -> None:
     try:
         # Semear de novo o MESMO texto é no-op.
         assert dirmod.semear(conn) == 0
-        adulterado = {"versao": 1, "tipos": {t: ["outra regra"] for t in adb.TIPOS_TAREFA}}
+        # P3i: o pacote traz as DUAS línguas por tipo — a versão é do conteúdo.
+        def pacote(versao: int, texto: str) -> dict:
+            return {
+                "versao": versao,
+                "tipos": {t: {lang: [texto] for lang in dirmod.IDIOMAS} for t in adb.TIPOS_TAREFA},
+            }
+
         with pytest.raises(RuntimeError) as exc:
-            dirmod.semear(conn, adulterado)
+            dirmod.semear(conn, pacote(1, "outra regra"))
         assert "suba a 'versao'" in str(exc.value)
         # Uma versão NOVA, sim: a antiga fica e a vigente passa a ser a nova.
-        nova = {"versao": 2, "tipos": {t: ["regra nova"] for t in adb.TIPOS_TAREFA}}
-        assert dirmod.semear(conn, nova) == len(adb.TIPOS_TAREFA)
+        assert dirmod.semear(conn, pacote(2, "regra nova")) == len(adb.TIPOS_TAREFA)
         assert dirmod.versao_vigente(conn, "comparar_ab") == 2
-        assert dirmod.vigentes(conn)["comparar_ab"]["linhas"] == ["regra nova"]
+        assert dirmod.vigentes(conn)["comparar_ab"]["textos"] == {
+            "en": ["regra nova"], "pt": ["regra nova"]
+        }
     finally:
         conn.close()
 

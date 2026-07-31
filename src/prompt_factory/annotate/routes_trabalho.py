@@ -87,6 +87,13 @@ def proxima(corpo: ProximaIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str,
     ``motivo`` sempre vem preenchido — inclusive no caso de sucesso. É ele que a
     tela usa para montar a bifurcação do estado vazio, e uma frase honesta ali
     ("você já anotou todas") vale mais que um contador.
+
+    Ele sai em DOIS formatos, e os dois são necessários (P3i): ``motivo`` é a
+    frase em português, para que a API se explique sozinha em ``/docs`` e para
+    um cliente que não seja este ``index.html``; ``motivo_chave`` +
+    ``motivo_dados`` são o que a TELA usa, porque ela fala duas línguas e a rota
+    não. Devolver só a frase punha português no estado vazio de uma interface em
+    inglês — e o estado vazio é a primeira coisa que se vê quando a fila acaba.
     """
     _quem(anot, corpo.anotador_id)
     if corpo.projeto_id is not None and not projmod.existe(anot, corpo.projeto_id):
@@ -95,7 +102,13 @@ def proxima(corpo: ProximaIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str,
         anot, corpus, corpo.anotador_id, corpo.tipo, corpo.projeto_id
     )
     if atribuicao_id is None:
-        return {"tarefa": None, "motivo": motivo, "disponiveis": 0}
+        return {
+            "tarefa": None,
+            "motivo": motivo["texto"],
+            "motivo_chave": motivo["chave"],
+            "motivo_dados": motivo["dados"],
+            "disponiveis": 0,
+        }
     env = _envelope(anot, corpus, atribuicao_id)
     evmod.registrar(
         anot,
@@ -109,7 +122,9 @@ def proxima(corpo: ProximaIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str,
     )
     return {
         "tarefa": env,
-        "motivo": motivo,
+        "motivo": motivo["texto"],
+        "motivo_chave": motivo["chave"],
+        "motivo_dados": motivo["dados"],
         "disponiveis": tmod.contagens_por_tipo(anot, corpo.anotador_id, corpo.projeto_id)[
             corpo.tipo
         ],
@@ -478,15 +493,16 @@ def submeter(
     }
     # A OFERTA DE CONTINUAÇÃO. É o que encadeia as duas abas: quem acabou de
     # escrever a rubrica de um prompt é quem melhor sabe qual resposta ela pede.
+    #
+    # Só o QUE a continuação é — nunca como convidar para ela. O convite era
+    # texto em português dentro desta resposta até o P3i, e com a interface
+    # bilíngue isso passaria português para uma tela em inglês por um caminho
+    # que o dicionário não alcança. Frase de tela mora na tela.
     if tipo == "escrever_rubrica":
         resposta["continuacao"] = {
             "tipo": "sft_resposta",
             "prompt_uid": str(linha["prompt_uid"]),
             "origem": "continuacao",
-            "convite": "Escrever a resposta de referência deste mesmo prompt",
-            "porque": (
-                "A rubrica que você acabou de escrever aparece ao lado, como checklist."
-            ),
         }
     return resposta
 

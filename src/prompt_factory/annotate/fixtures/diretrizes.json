@@ -1,28 +1,58 @@
 {
-  "schema": "diretrizes@1",
+  "schema": "diretrizes@2",
   "sobre": "A INSTRUÇÃO sob a qual cada anotação foi feita, versionada. Até o P3a este texto era literal no index.html; a versão 1 é EXATAMENTE aquele texto, para que as anotações já gravadas possam ser carimbadas com ela sem mentira. O cenário que a versão resolve: a regra do A/B é ajustada na terça, o cliente reclama de inconsistência na quinta, e sem versão gravada por anotação a única saída é refazer o lote inteiro. Ao mudar uma diretriz, ACRESCENTE uma versão nova — nunca edite a que já foi usada para gravar trabalho.",
+  "sobre_lingua": "A VERSÃO É DO CONTEÚDO, NÃO DA TRADUÇÃO. `v1` em inglês e `v1` em português são a MESMA regra dita em duas línguas, e `anotacoes.versao_diretriz` continua apontando para a versão — nunca para o par (versão, língua). Por isso as duas línguas moram na mesma linha da tabela `diretrizes`: publicar uma sem a outra é estruturalmente impossível. O inglês é a fonte; o português é a tradução dele (aqui, historicamente, o português veio antes, e o inglês foi escrito para dizer a mesma coisa com a mesma qualidade — não para ser tradução literal).",
   "versao": 1,
   "tipos": {
-    "avaliar_rubrica": [
-      "Cada critério tem a própria escala, com as pontas descritas na rubrica — use a régua inteira, inclusive os extremos.",
-      "Julgue a resposta contra o critério, não contra o que você teria escrito.",
-      "Justificar é opcional por critério e obrigatório quando a nota destoa das outras.",
-      "Pelo teclado: ↑ e ↓ andam entre critérios, os números graduam o critério em foco, Ctrl+Enter envia."
-    ],
-    "escrever_rubrica": [
-      "De 3 a 8 critérios. Rubrica com 20 critérios não é mais rigorosa, é impossível de aplicar duas vezes igual.",
-      "Cada critério precisa de uma escala com as pontas descritas — 'clareza 1 a 5' sem descrição não mede nada.",
-      "Três modelos de partida ficam disponíveis para não começar de uma página em branco."
-    ],
-    "sft_resposta": [
-      "Responda ao prompt como o modelo deveria ter respondido — é este texto que vira exemplo de treino.",
-      "Quando a tarefa vem de uma rubrica aprovada, ela aparece ao lado como checklist.",
-      "Não invente fato para preencher espaço: resposta curta e correta vale mais que longa e plausível."
-    ],
-    "comparar_ab": [
-      "Escolha A, B ou empate — e escreva por que. A justificativa é obrigatória: o valor está no motivo, não na preferência.",
-      "As duas colunas rolam juntas para a comparação ser trecho a trecho.",
-      "Pelo teclado: ← escolhe A, → escolhe B, E marca empate, Ctrl+Enter envia."
-    ]
+    "avaliar_rubrica": {
+      "en": [
+        "Every criterion carries its own scale, with both ends described in the rubric — use the whole ruler, extremes included.",
+        "Judge the answer against the criterion, not against the answer you would have written.",
+        "A per-criterion justification is optional — and required when one score breaks away from the others.",
+        "Keyboard: ↑ and ↓ move between criteria, the number keys score the one in focus, Ctrl+Enter submits."
+      ],
+      "pt": [
+        "Cada critério tem a própria escala, com as pontas descritas na rubrica — use a régua inteira, inclusive os extremos.",
+        "Julgue a resposta contra o critério, não contra o que você teria escrito.",
+        "Justificar é opcional por critério e obrigatório quando a nota destoa das outras.",
+        "Pelo teclado: ↑ e ↓ andam entre critérios, os números graduam o critério em foco, Ctrl+Enter envia."
+      ]
+    },
+    "escrever_rubrica": {
+      "en": [
+        "Three to eight criteria. A rubric with twenty is not stricter — it is impossible to apply the same way twice.",
+        "Every criterion needs a scale with both ends described — “clarity, 1 to 5” and nothing else measures nothing.",
+        "Three starting templates are one click away, so you never begin from a blank page."
+      ],
+      "pt": [
+        "De 3 a 8 critérios. Rubrica com 20 critérios não é mais rigorosa, é impossível de aplicar duas vezes igual.",
+        "Cada critério precisa de uma escala com as pontas descritas — 'clareza 1 a 5' sem descrição não mede nada.",
+        "Três modelos de partida ficam disponíveis para não começar de uma página em branco."
+      ]
+    },
+    "sft_resposta": {
+      "en": [
+        "Answer the prompt the way the model should have — this text is what becomes a training example.",
+        "When the task comes from an approved rubric, that rubric sits beside you as a checklist.",
+        "Do not invent a fact to fill space: short and correct is worth more than long and plausible."
+      ],
+      "pt": [
+        "Responda ao prompt como o modelo deveria ter respondido — é este texto que vira exemplo de treino.",
+        "Quando a tarefa vem de uma rubrica aprovada, ela aparece ao lado como checklist.",
+        "Não invente fato para preencher espaço: resposta curta e correta vale mais que longa e plausível."
+      ]
+    },
+    "comparar_ab": {
+      "en": [
+        "Pick A, B or a tie — and write why. The justification is required: the value is in the reason, not in the preference.",
+        "The two columns scroll together, so the comparison stays passage by passage.",
+        "Keyboard: ← picks A, → picks B, E marks a tie, Ctrl+Enter submits."
+      ],
+      "pt": [
+        "Escolha A, B ou empate — e escreva por que. A justificativa é obrigatória: o valor está no motivo, não na preferência.",
+        "As duas colunas rolam juntas para a comparação ser trecho a trecho.",
+        "Pelo teclado: ← escolhe A, → escolhe B, E marca empate, Ctrl+Enter envia."
+      ]
+    }
   }
 }

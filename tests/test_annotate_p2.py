@@ -102,14 +102,14 @@ def com_banco(caminho: Path):
 
 
 def test_pacote_tem_a_forma_prometida() -> None:
-    """8 itens, 4+4 tarefas, 2 com alvo 2 e gabarito. É o contrato do P2."""
+    """11 itens (8 do P2 + os 3 em inglês do P3i), 5+6 tarefas, 3 tarefas-ouro."""
     pacote = seedmod.carregar_pacote()
-    assert len(pacote["itens"]) == 8
+    assert len(pacote["itens"]) == 11
     tipos = [t["tipo"] for t in pacote["tarefas"]]
-    assert tipos.count("avaliar_rubrica") == 4
-    assert tipos.count("comparar_ab") == 4
+    assert tipos.count("avaliar_rubrica") == 5
+    assert tipos.count("comparar_ab") == 6
     com_gabarito = [t for t in pacote["tarefas"] if t.get("gabarito")]
-    assert len(com_gabarito) == 2
+    assert len(com_gabarito) == 3
     assert all(int(t["n_anotacoes_alvo"]) == 2 for t in com_gabarito)
 
 
@@ -157,10 +157,42 @@ def test_todo_par_tem_uma_resposta_defensavel() -> None:
 
 
 def test_o_pacote_e_bilingue() -> None:
-    """1 a 2 em inglês: a plataforma serve um corpus pt+en e a demo tem de mostrar."""
+    """P3i: cinco prompts em inglês, e não os dois do P2.
+
+    O portfólio é lido por avaliadores estrangeiros, e ler a interface traduzida
+    não é a mesma coisa que conseguir FAZER o trabalho. Com cinco itens em
+    inglês, as filas de ``avaliar_rubrica`` e ``comparar_ab`` têm material em
+    inglês nas primeiras posições — as outras duas abas vêm do pool, que também
+    passou a aceitar as duas línguas.
+    """
     langs = [item["lang"] for item in seedmod.carregar_pacote()["itens"]]
-    assert langs.count("en") in (1, 2)
-    assert langs.count("pt") >= 6
+    assert langs.count("en") == 5
+    assert langs.count("pt") == 6
+
+
+def test_a_estrutura_do_pacote_e_bilingue_e_o_dado_nao() -> None:
+    """Rubrica, critério, âncora e catálogo de defeitos têm as DUAS línguas.
+
+    ``prompt`` e ``resposta.texto`` não: a língua deles é intrínseca ao dado, e
+    traduzi-los inventaria um texto que ninguém escreveu.
+    """
+    for item in seedmod.carregar_pacote()["itens"]:
+        rub = item["rubrica"]
+        assert set(rub["titulo_i18n"]) == {"en", "pt"}, item["chave"]
+        # O canônico é a IDENTIDADE, e ele tem de ser uma das duas versões —
+        # nunca um terceiro texto que não aparece na tela em língua nenhuma.
+        assert rub["titulo"] in rub["titulo_i18n"].values(), item["chave"]
+        for c in rub["criterios"]:
+            assert set(c["nome_i18n"]) == {"en", "pt"}, (item["chave"], c["nome"])
+            assert set(c["descricao_i18n"]) == {"en", "pt"}, (item["chave"], c["nome"])
+            assert c["nome"] in c["nome_i18n"].values(), (item["chave"], c["nome"])
+            for a in c["escala"]["ancoras"]:
+                assert set(a["rotulo_i18n"]) == {"en", "pt"}, (item["chave"], c["nome"])
+        for r in item["respostas"]:
+            assert set(r["meta"]["defeito_plantado_i18n"]) == {"en", "pt"}, item["chave"]
+            assert set(r["meta"]["modelo_i18n"]) == {"en", "pt"}, item["chave"]
+        assert "prompt_i18n" not in item, f"{item['chave']}: prompt não se traduz"
+        assert all("texto_i18n" not in r for r in item["respostas"]), item["chave"]
 
 
 # ---------------------------------------------------------------------------
@@ -181,10 +213,12 @@ def test_seed_e_idempotente(banco: Path, corpus: Path) -> None:
         corpo.close()
     assert primeira["personas"] == len(seedmod.PERSONAS)
     assert primeira["pacote"] == {
-        "prompts_demo": 8,
-        "rubricas": 8,
-        "respostas_modelo": 16,
-        "tarefas": 8,
+        "prompts_demo": 11,
+        "rubricas": 11,
+        "respostas_modelo": 22,
+        "tarefas": 11,
+        # Nada a traduzir: o banco nasceu com o pacote já bilíngue.
+        "traduzidas": 0,
     }
     assert primeira["pool"] == {"escrever_rubrica": 8, "sft_resposta": 8}
     assert segunda["personas"] == 0
@@ -201,7 +235,7 @@ def test_seed_sem_corpus_semeia_so_o_pacote_e_avisa(banco: Path) -> None:
         relatorio = seedmod.semear(conn, None)
     finally:
         conn.close()
-    assert relatorio["pacote"]["tarefas"] == 8
+    assert relatorio["pacote"]["tarefas"] == 11
     assert relatorio["pool"] == {"escrever_rubrica": 0, "sft_resposta": 0}
     assert any("sem corpus" in a for a in relatorio["avisos"])
 

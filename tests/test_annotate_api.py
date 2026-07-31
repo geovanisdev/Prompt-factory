@@ -238,7 +238,9 @@ def test_fallback_respeita_o_filtro_e_e_deterministico(corpus: Path) -> None:
         ).fetchall()
         assert linhas, "o corpus sintético não produziu pool nenhum"
         for linha in linhas:
-            assert linha["lang"] == cfg["lang"]
+            # `lang` é uma TUPLA desde o P3i (`["pt", "en"]` no settings.toml):
+            # o pool aceita mais de uma língua, com cota igual por língua.
+            assert linha["lang"] in cfg["lang"]
             assert cfg["min_chars"] <= int(linha["n_chars"]) <= cfg["max_chars"]
             assert int(linha["n_exact_dups"]) <= cfg["max_dups"]
             # O robô com 120 duplicatas e o NSFW explícito ficam de fora.

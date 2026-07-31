@@ -1,7 +1,7 @@
 {
   "schema": "demo_pack@1",
   "sobre": [
-    "Pacote de demonstração da Bancada. Oito itens escritos à MÃO — não são prompts",
+    "Pacote de demonstração da Bancada. ONZE itens escritos à MÃO — não são prompts",
     "de pessoas reais e por isso não moram no corpus: entram em `prompts_demo`, com",
     "uid prefixado por 'demo:'. Misturá-los ao corpus destruiria a proveniência, que",
     "é o argumento inteiro deste projeto.",
@@ -14,7 +14,25 @@
     "Ele NUNCA sai pela API do anotador — é o gabarito do exercício, e sai só no",
     "painel do admin. As quatro famílias de defeito são as que um linguista pega e um",
     "leitor apressado não: fato inventado com aparência de precisão, restrição do",
-    "pedido ignorada, registro errado e fluência boa cobrindo conteúdo vazio."
+    "pedido ignorada, registro errado e fluência boa cobrindo conteúdo vazio.",
+    "",
+    "BILÍNGUE A PARTIR DO P3i, E SÓ NA ESTRUTURA. Título de rubrica, critério,",
+    "descrição, âncora de escala e catálogo de defeitos ganharam `*_i18n` com as duas",
+    "línguas. `prompt` e `resposta.texto` NÃO são traduzidos: a língua deles é",
+    "intrínseca ao dado, e um projeto de anotação brasileiro com prompts em inglês",
+    "seria menos verossímil que o contrário.",
+    "",
+    "O campo canônico (`titulo`, `nome`, `descricao`, `rotulo`) é a IDENTIDADE: é ele",
+    "que `anotacoes.payload_json` grava em `notas[].criterio` e que a submissão casa",
+    "contra a rubrica. Nos oito itens originais ele continua em português, byte a",
+    "byte, porque mexer nele apagaria a leitura das anotações já gravadas. Nos três",
+    "itens novos (`stats-qual-teste`, `carta-mudanca-de-carreira`,",
+    "`viagem-acessibilidade-lisboa`) o canônico é inglês, que é a convenção daqui",
+    "para a frente: critério de rubrica é metadado, e metadado é o que o cliente lê.",
+    "",
+    "Os três itens em inglês existem para que um avaliador que não lê português",
+    "consiga percorrer o pacote FAZENDO trabalho de verdade — não só olhando a",
+    "interface traduzida."
   ],
   "itens": [
     {
@@ -32,10 +50,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Ignora o porquê; só lista os passos" },
-                { "valor": 3, "rotulo": "Menciona o mecanismo de passagem, sem ligá-lo a nenhum passo" },
-                { "valor": 5, "rotulo": "Explica o mecanismo e aponta em qual passo ele se decide" }
+                {
+                  "valor": 1,
+                  "rotulo": "Ignora o porquê; só lista os passos",
+                  "rotulo_i18n": {
+                    "en": "Ignores the why; just lists the steps",
+                    "pt": "Ignora o porquê; só lista os passos"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Menciona o mecanismo de passagem, sem ligá-lo a nenhum passo",
+                  "rotulo_i18n": {
+                    "en": "Mentions the mechanism in passing, without tying it to any step",
+                    "pt": "Menciona o mecanismo de passagem, sem ligá-lo a nenhum passo"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Explica o mecanismo e aponta em qual passo ele se decide",
+                  "rotulo_i18n": {
+                    "en": "Explains the mechanism and points to the step where it is decided",
+                    "pt": "Explica o mecanismo e aponta em qual passo ele se decide"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Answers the why, not just the how",
+              "pt": "Responde à pergunta do porquê"
+            },
+            "descricao_i18n": {
+              "en": "She did not only ask for the recipe: she asked what makes the creamy layer form. A response that hands over the steps without explaining why the cream separates has not solved her problem, because she will get it wrong again on the next variation.",
+              "pt": "A pessoa não pediu só a receita: pediu o mecanismo da camada cremosa. Uma resposta que entrega o passo a passo sem explicar por que o creme se separa não resolveu o problema dela, porque ela vai errar de novo na próxima variação."
             }
           },
           {
@@ -45,10 +92,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Exige ingrediente ou equipamento que a pessoa disse não ter" },
-                { "valor": 3, "rotulo": "Usa só o declarado, mas dá o forno em graus" },
-                { "valor": 5, "rotulo": "Usa só o declarado e traduz o forno para o botão de 1 a 5, com um sinal visual de conferência" }
+                {
+                  "valor": 1,
+                  "rotulo": "Exige ingrediente ou equipamento que a pessoa disse não ter",
+                  "rotulo_i18n": {
+                    "en": "Requires an ingredient or a piece of equipment the person said she does not have",
+                    "pt": "Exige ingrediente ou equipamento que a pessoa disse não ter"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Usa só o declarado, mas dá o forno em graus",
+                  "rotulo_i18n": {
+                    "en": "Uses only what was stated, but gives the oven in degrees",
+                    "pt": "Usa só o declarado, mas dá o forno em graus"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Usa só o declarado e traduz o forno para o botão de 1 a 5, com um sinal visual de conferência",
+                  "rotulo_i18n": {
+                    "en": "Uses only what was stated and translates the oven into the 1-to-5 dial, with a visual cue to check against",
+                    "pt": "Usa só o declarado e traduz o forno para o botão de 1 a 5, com um sinal visual de conferência"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Respects the stated constraints",
+              "pt": "Respeita as restrições declaradas"
+            },
+            "descricao_i18n": {
+              "en": "Ordinary coarse fubá (not the fine mimoso grind) and a gas oven with no thermostat, just a 1-to-5 dial. A response that calls for fubá mimoso or says to preheat to 180 °C is handing over a recipe this person cannot cook.",
+              "pt": "Fubá comum (não mimoso) e forno a gás sem termostato, com botão de 1 a 5. Resposta que pede fubá mimoso ou manda pré-aquecer a 180 °C está entregando uma receita que esta pessoa não pode executar."
             }
           },
           {
@@ -58,10 +134,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Afirma dado técnico inventado com casas decimais ou marca específica" },
-                { "valor": 3, "rotulo": "Números plausíveis, mas apresentados como exatos onde não são" },
-                { "valor": 5, "rotulo": "Faixas honestas e um critério de ponto (\"até dourar a borda\") em vez de só o relógio" }
+                {
+                  "valor": 1,
+                  "rotulo": "Afirma dado técnico inventado com casas decimais ou marca específica",
+                  "rotulo_i18n": {
+                    "en": "States an invented technical figure, with decimal places or a specific brand",
+                    "pt": "Afirma dado técnico inventado com casas decimais ou marca específica"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Números plausíveis, mas apresentados como exatos onde não são",
+                  "rotulo_i18n": {
+                    "en": "Plausible numbers, but presented as exact where they are not",
+                    "pt": "Números plausíveis, mas apresentados como exatos onde não são"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Faixas honestas e um critério de ponto (\"até dourar a borda\") em vez de só o relógio",
+                  "rotulo_i18n": {
+                    "en": "Honest ranges and a doneness cue (\"until the edge browns\") instead of the clock alone",
+                    "pt": "Faixas honestas e um critério de ponto (\"até dourar a borda\") em vez de só o relógio"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Numbers that hold up",
+              "pt": "Precisão verificável"
+            },
+            "descricao_i18n": {
+              "en": "Every quantity, time and temperature asserted has to be plausible and not invented. A specific false number is WORSE than an honest range: it carries confidence without delivering accuracy, and the person ends up blaming her own oven.",
+              "pt": "Toda quantidade, tempo e temperatura afirmada tem de ser plausível e não inventada. Número específico e falso é PIOR que faixa honesta: ele passa confiança sem entregar acerto, e a pessoa culpa o próprio forno."
             }
           },
           {
@@ -71,13 +176,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Passos fora de ordem ou ingrediente surgindo do nada" },
-                { "valor": 3, "rotulo": "Ordem correta, mas exige reler para entender o encadeamento" },
-                { "valor": 5, "rotulo": "Lê-se uma vez e executa" }
+                {
+                  "valor": 1,
+                  "rotulo": "Passos fora de ordem ou ingrediente surgindo do nada",
+                  "rotulo_i18n": {
+                    "en": "Steps out of order, or an ingredient appearing out of nowhere",
+                    "pt": "Passos fora de ordem ou ingrediente surgindo do nada"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Ordem correta, mas exige reler para entender o encadeamento",
+                  "rotulo_i18n": {
+                    "en": "Correct order, but you have to reread it to see how the steps connect",
+                    "pt": "Ordem correta, mas exige reler para entender o encadeamento"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Lê-se uma vez e executa",
+                  "rotulo_i18n": {
+                    "en": "One read-through and you can cook it",
+                    "pt": "Lê-se uma vez e executa"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Cookable order",
+              "pt": "Ordem executável"
+            },
+            "descricao_i18n": {
+              "en": "Can you cook this reading top to bottom, once, without going back? An ingredient that turns up mid-method without being in the list is rework at the stove.",
+              "pt": "É possível cozinhar lendo de cima para baixo, uma vez só, sem voltar? Ingrediente que aparece no meio do modo de preparo sem estar na lista é retrabalho na cozinha."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "A recipe she can actually cook with what she has",
+          "pt": "Receita executável a partir do que a pessoa tem"
+        }
       },
       "respostas": [
         {
@@ -87,7 +225,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "fato-inventado-com-precisao",
             "defeito_plantado": "Inventa um dado técnico com casa decimal ('12% mais amido no fubá mimoso') e o usa como explicação central; o mecanismo real da camada cremosa é a massa muito líquida, que decanta por densidade durante o forno, e acontece com fubá comum também. Além disso VIOLA as duas restrições declaradas: exige fubá mimoso (a pessoa disse que só tem comum) e dá o forno em 180 °C num forno sem termostato, com '42 minutos' exatos onde nem a temperatura é controlável. O efeito colateral é o pior: a pessoa conclui que o erro foi o ingrediente dela.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "Invents a precise-sounding technical figure ('12% mais amido' — 12% more starch in fubá mimoso, the finer grind) and builds the central explanation on it; the real mechanism behind the creamy layer is a very thin batter that settles by density in the oven, and it works with ordinary fubá too. On top of that it VIOLATES both stated constraints: it demands fubá mimoso (she said she only has the ordinary grind) and gives the oven as 180 °C in an oven with no thermostat, with an exact '42 minutos' where not even the temperature is controllable. The side effect is the worst part: she concludes the fault was her ingredient.",
+              "pt": "Inventa um dado técnico com casa decimal ('12% mais amido no fubá mimoso') e o usa como explicação central; o mecanismo real da camada cremosa é a massa muito líquida, que decanta por densidade durante o forno, e acontece com fubá comum também. Além disso VIOLA as duas restrições declaradas: exige fubá mimoso (a pessoa disse que só tem comum) e dá o forno em 180 °C num forno sem termostato, com '42 minutos' exatos onde nem a temperatura é controlável. O efeito colateral é o pior: a pessoa conclui que o erro foi o ingrediente dela."
+            }
           }
         },
         {
@@ -97,7 +243,15 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. É a resposta defensável do par: explica o mecanismo real (densidade da massa), usa só o que a pessoa tem, traduz o forno para o botão de 1 a 5 e substitui o relógio por um critério visual de ponto. É a que deve vencer o A/B.",
-            "correta": true
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. This is the defensible answer of the pair: it explains the real mechanism (batter density), uses only what the person has, translates the oven into the 1-to-5 dial and replaces the clock with a visual doneness cue. This is the one that should win the A/B.",
+              "pt": "Nenhum. É a resposta defensável do par: explica o mecanismo real (densidade da massa), usa só o que a pessoa tem, traduz o forno para o botão de 1 a 5 e substitui o relógio por um critério visual de ponto. É a que deve vencer o A/B."
+            }
           }
         }
       ]
@@ -117,10 +271,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Registro claramente errado para o destinatário" },
-                { "valor": 3, "rotulo": "Formal, mas engessado ou com jargão de cobrança automática" },
-                { "valor": 5, "rotulo": "Formal, direto e humano — soa como uma pessoa escrevendo para outra" }
+                {
+                  "valor": 1,
+                  "rotulo": "Registro claramente errado para o destinatário",
+                  "rotulo_i18n": {
+                    "en": "Register plainly wrong for the recipient",
+                    "pt": "Registro claramente errado para o destinatário"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Formal, mas engessado ou com jargão de cobrança automática",
+                  "rotulo_i18n": {
+                    "en": "Formal, but stiff, or written in automated-dunning jargon",
+                    "pt": "Formal, mas engessado ou com jargão de cobrança automática"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Formal, direto e humano — soa como uma pessoa escrevendo para outra",
+                  "rotulo_i18n": {
+                    "en": "Formal, direct and human — it reads as one person writing to another",
+                    "pt": "Formal, direto e humano — soa como uma pessoa escrevendo para outra"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Register and tone",
+              "pt": "Registro e tom"
+            },
+            "descricao_i18n": {
+              "en": "The ask was formal but not robotic, addressed to a director at a major account. Excessive informality ('oi, tudo certo?', 'a grana' — 'hey, all good?', 'the cash') burns the relationship; notary-letter formality reads as a legal threat.",
+              "pt": "Foi pedido formal mas não robótico, para um diretor de uma conta grande. Informalidade excessiva ('oi, tudo certo?', 'a grana') queima a relação; formalidade de carta de cartório soa como ameaça jurídica."
             }
           },
           {
@@ -130,10 +313,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Reclama do financeiro ou ignora que existe uma cadeia interna" },
-                { "valor": 3, "rotulo": "Evita a reclamação, mas não dá ao Rodrigo um papel confortável" },
-                { "valor": 5, "rotulo": "Enquadra o pedido como ajuda para destravar, protegendo o financeiro e dando ao diretor uma ação de um passo" }
+                {
+                  "valor": 1,
+                  "rotulo": "Reclama do financeiro ou ignora que existe uma cadeia interna",
+                  "rotulo_i18n": {
+                    "en": "Complains about the finance team, or ignores that an internal chain exists at all",
+                    "pt": "Reclama do financeiro ou ignora que existe uma cadeia interna"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Evita a reclamação, mas não dá ao Rodrigo um papel confortável",
+                  "rotulo_i18n": {
+                    "en": "Avoids the complaint, but leaves Rodrigo no comfortable role to play",
+                    "pt": "Evita a reclamação, mas não dá ao Rodrigo um papel confortável"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Enquadra o pedido como ajuda para destravar, protegendo o financeiro e dando ao diretor uma ação de um passo",
+                  "rotulo_i18n": {
+                    "en": "Frames the ask as help unblocking something, covers for the finance team, and leaves the director a one-step action",
+                    "pt": "Enquadra o pedido como ajuda para destravar, protegendo o financeiro e dando ao diretor uma ação de um passo"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Handles the internal politics",
+              "pt": "Resolve a política interna"
+            },
+            "descricao_i18n": {
+              "en": "The central and hardest part of the request: escalate to the director without looking like you went over his finance team's head. A response that merely chases the payment has skipped the part the person could not do on her own.",
+              "pt": "O pedido central e mais difícil: escalar para o diretor sem parecer que passou por cima do financeiro. Uma resposta que só cobra ignorou a parte que a pessoa não sabia fazer sozinha."
             }
           },
           {
@@ -143,10 +355,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Passa de 200 palavras" },
-                { "valor": 3, "rotulo": "Entre 150 e 200" },
-                { "valor": 5, "rotulo": "Dentro do limite, sem parecer amputado" }
+                {
+                  "valor": 1,
+                  "rotulo": "Passa de 200 palavras",
+                  "rotulo_i18n": {
+                    "en": "Over 200 words",
+                    "pt": "Passa de 200 palavras"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Entre 150 e 200",
+                  "rotulo_i18n": {
+                    "en": "Between 150 and 200",
+                    "pt": "Entre 150 e 200"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Dentro do limite, sem parecer amputado",
+                  "rotulo_i18n": {
+                    "en": "Inside the limit without reading as truncated",
+                    "pt": "Dentro do limite, sem parecer amputado"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "The 150-word limit",
+              "pt": "Limite de 150 palavras"
+            },
+            "descricao_i18n": {
+              "en": "An explicit, checkable constraint. Going over is not a detail: a long chase email is an email the director files away to read later.",
+              "pt": "Restrição explícita e verificável. Estourar não é detalhe: um e-mail de cobrança longo é um e-mail que o diretor arquiva para ler depois."
             }
           },
           {
@@ -156,13 +397,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Nem dados nem próximo passo" },
-                { "valor": 3, "rotulo": "Tem os dados como marcadores a preencher, mas o próximo passo é vago" },
-                { "valor": 5, "rotulo": "Marcadores claros do que preencher e um próximo passo de um clique" }
+                {
+                  "valor": 1,
+                  "rotulo": "Nem dados nem próximo passo",
+                  "rotulo_i18n": {
+                    "en": "Neither the facts nor a next step",
+                    "pt": "Nem dados nem próximo passo"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Tem os dados como marcadores a preencher, mas o próximo passo é vago",
+                  "rotulo_i18n": {
+                    "en": "Has the facts as placeholders to fill in, but the next step is vague",
+                    "pt": "Tem os dados como marcadores a preencher, mas o próximo passo é vago"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Marcadores claros do que preencher e um próximo passo de um clique",
+                  "rotulo_i18n": {
+                    "en": "Clear placeholders for what to fill in, and a one-click next step",
+                    "pt": "Marcadores claros do que preencher e um próximo passo de um clique"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Facts and a next step",
+              "pt": "Fatos e próximo passo"
+            },
+            "descricao_i18n": {
+              "en": "A chase email needs the hard facts (invoice, amount, due date, previous attempts) and ONE concrete next step. With no numbers it is not a collection; with no next step it is not an email, it is venting.",
+              "pt": "Um e-mail de cobrança precisa dos dados objetivos (nota, valor, vencimento, tentativas anteriores) e de UM próximo passo concreto. Sem número, não é cobrança; sem próximo passo, não é e-mail, é desabafo."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "Chasing an overdue invoice with the relationship at stake",
+          "pt": "E-mail de cobrança com relação em risco"
+        }
       },
       "respostas": [
         {
@@ -172,7 +446,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "registro-errado",
             "defeito_plantado": "Registro informal onde o pedido era explicitamente formal: 'e aí', 'cara', 'a grana', 'empurrãozinho', 'me chama no zap'. Pior, faz exatamente as duas coisas que a pessoa pediu para evitar: expõe o financeiro ('não tive retorno nenhum') e soa desesperado ('a gente tá meio apertado'). É o defeito mais fácil de sentir e o mais fácil de perder num skim rápido, porque o texto é fluente e simpático.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "Informal register where the request was explicitly formal: 'e aí', 'cara', 'a grana', 'empurrãozinho', 'me chama no zap' — 'hey', 'dude', 'the cash', 'a little push', 'hit me up on WhatsApp'. Worse, it does exactly the two things the person asked to avoid: it exposes the finance team ('não tive retorno nenhum' — 'I got no reply at all') and it sounds desperate ('a gente tá meio apertado' — 'things are a bit tight over here'). It is the easiest defect to feel and the easiest to miss on a fast skim, because the text is fluent and likeable.",
+              "pt": "Registro informal onde o pedido era explicitamente formal: 'e aí', 'cara', 'a grana', 'empurrãozinho', 'me chama no zap'. Pior, faz exatamente as duas coisas que a pessoa pediu para evitar: expõe o financeiro ('não tive retorno nenhum') e soa desesperado ('a gente tá meio apertado'). É o defeito mais fácil de sentir e o mais fácil de perder num skim rápido, porque o texto é fluente e simpático."
+            }
           }
         },
         {
@@ -182,7 +464,15 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. Resolve a política interna dando ao financeiro uma saída honrosa ('imagino que tenha ficado num fluxo de aprovação'), pede ao diretor uma ação de um passo, mantém registro formal e humano, fica em ~120 palavras e sinaliza continuidade da relação ('seguimos com as entregas'). É a que deve vencer.",
-            "correta": true
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. It handles the internal politics by giving the finance team an honorable way out ('imagino que tenha ficado num fluxo de aprovação' — 'I imagine it got caught in an approval flow'), asks the director for a one-step action, holds a formal but human register, lands at ~120 words, and signals that the relationship continues ('seguimos com as entregas' — 'we are carrying on with the deliverables'). This is the one that should win.",
+              "pt": "Nenhum. Resolve a política interna dando ao financeiro uma saída honrosa ('imagino que tenha ficado num fluxo de aprovação'), pede ao diretor uma ação de um passo, mantém registro formal e humano, fica em ~120 palavras e sinaliza continuidade da relação ('seguimos com as entregas'). É a que deve vencer."
+            }
           }
         }
       ]
@@ -202,10 +492,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Erra o conceito ou afirma o contrário do que vale" },
-                { "valor": 3, "rotulo": "Cita a proporcionalidade sem mostrar como se aplica ao caso" },
-                { "valor": 5, "rotulo": "Explica a proporcionalidade e a aplica aos números que a pessoa deu" }
+                {
+                  "valor": 1,
+                  "rotulo": "Erra o conceito ou afirma o contrário do que vale",
+                  "rotulo_i18n": {
+                    "en": "Gets the concept wrong, or asserts the opposite of what applies",
+                    "pt": "Erra o conceito ou afirma o contrário do que vale"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Cita a proporcionalidade sem mostrar como se aplica ao caso",
+                  "rotulo_i18n": {
+                    "en": "Mentions the proration without showing how it applies to this case",
+                    "pt": "Cita a proporcionalidade sem mostrar como se aplica ao caso"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Explica a proporcionalidade e a aplica aos números que a pessoa deu",
+                  "rotulo_i18n": {
+                    "en": "Explains the proration and applies it to the numbers the person gave",
+                    "pt": "Explica a proporcionalidade e a aplica aos números que a pessoa deu"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Gets the core concept right",
+              "pt": "Acerto do conceito central"
+            },
+            "descricao_i18n": {
+              "en": "The issue is that the penalty is prorated against the time left on the lease. A response that says 'yes, pay the full three months' rent' gets wrong the one thing the person needed to know.",
+              "pt": "A questão é a proporcionalidade da multa ao tempo restante de contrato. Uma resposta que diz 'sim, pague os três aluguéis' erra a única coisa que a pessoa precisava saber."
             }
           },
           {
@@ -215,10 +534,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Inventa dispositivo, número de artigo ou parágrafo" },
-                { "valor": 3, "rotulo": "Cita a lei correta de forma genérica, sem precisão nem erro" },
-                { "valor": 5, "rotulo": "Cita corretamente o que existe e diz explicitamente o que depende do contrato assinado" }
+                {
+                  "valor": 1,
+                  "rotulo": "Inventa dispositivo, número de artigo ou parágrafo",
+                  "rotulo_i18n": {
+                    "en": "Invents a provision, an article number or a subsection",
+                    "pt": "Inventa dispositivo, número de artigo ou parágrafo"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Cita a lei correta de forma genérica, sem precisão nem erro",
+                  "rotulo_i18n": {
+                    "en": "Cites the right statute generically — neither precise nor wrong",
+                    "pt": "Cita a lei correta de forma genérica, sem precisão nem erro"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Cita corretamente o que existe e diz explicitamente o que depende do contrato assinado",
+                  "rotulo_i18n": {
+                    "en": "Cites correctly what does exist and says explicitly what depends on the signed contract",
+                    "pt": "Cita corretamente o que existe e diz explicitamente o que depende do contrato assinado"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Honest citations",
+              "pt": "Honestidade das referências"
+            },
+            "descricao_i18n": {
+              "en": "Citing an article, statute or binding precedent that does not exist (or that does not say that) is the gravest defect a legal text can carry: it travels into a conversation with the landlord and detonates there.",
+              "pt": "Citar número de artigo, lei ou súmula que não existe (ou que não diz aquilo) é o defeito mais grave possível num texto jurídico: ele viaja para dentro de uma conversa com o locador e explode lá."
             }
           },
           {
@@ -228,10 +576,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Fala como se fosse parecer jurídico definitivo" },
-                { "valor": 3, "rotulo": "Tem o aviso, mas ele substitui a orientação em vez de acompanhá-la" },
-                { "valor": 5, "rotulo": "Orienta de verdade e delimita o papel numa linha, no lugar certo" }
+                {
+                  "valor": 1,
+                  "rotulo": "Fala como se fosse parecer jurídico definitivo",
+                  "rotulo_i18n": {
+                    "en": "Speaks as though it were a definitive legal opinion",
+                    "pt": "Fala como se fosse parecer jurídico definitivo"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Tem o aviso, mas ele substitui a orientação em vez de acompanhá-la",
+                  "rotulo_i18n": {
+                    "en": "Has the disclaimer, but it replaces the guidance instead of accompanying it",
+                    "pt": "Tem o aviso, mas ele substitui a orientação em vez de acompanhá-la"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Orienta de verdade e delimita o papel numa linha, no lugar certo",
+                  "rotulo_i18n": {
+                    "en": "Actually guides, and bounds the role in one line, in the right place",
+                    "pt": "Orienta de verdade e delimita o papel numa linha, no lugar certo"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Knows where its role ends",
+              "pt": "Limite do papel"
+            },
+            "descricao_i18n": {
+              "en": "It is not a lawyer and cannot pretend to be one. It has to say what to do next and when to get a professional — without turning into an empty disclaimer that fills half the answer and helps with nothing.",
+              "pt": "Não é advogado e não pode fingir que é. Precisa dizer o que fazer em seguida e quando procurar profissional — sem virar um aviso legal vazio que ocupa metade da resposta e não ajuda em nada."
             }
           },
           {
@@ -241,13 +618,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Responde só uma" },
-                { "valor": 3, "rotulo": "Responde as duas, uma delas de raspão" },
-                { "valor": 5, "rotulo": "Responde as duas com o mesmo cuidado" }
+                {
+                  "valor": 1,
+                  "rotulo": "Responde só uma",
+                  "rotulo_i18n": {
+                    "en": "Answers only one",
+                    "pt": "Responde só uma"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Responde as duas, uma delas de raspão",
+                  "rotulo_i18n": {
+                    "en": "Answers both, one of them only in passing",
+                    "pt": "Responde as duas, uma delas de raspão"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Responde as duas com o mesmo cuidado",
+                  "rotulo_i18n": {
+                    "en": "Answers both with the same care",
+                    "pt": "Responde as duas com o mesmo cuidado"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Answers both questions",
+              "pt": "Responde às duas perguntas"
+            },
+            "descricao_i18n": {
+              "en": "There were two: how much the penalty is, and whether the reason for moving (study) changes anything. Leaving the second one unanswered makes the answer incomplete, even if the first is perfect.",
+              "pt": "Foram duas: o valor da multa e se o motivo (estudo) muda alguma coisa. Deixar a segunda sem resposta é resposta incompleta, mesmo que a primeira esteja perfeita."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "Lay legal guidance — useful without overstepping the role",
+          "pt": "Orientação jurídica leiga — utilidade sem exceder o papel"
+        }
       },
       "respostas": [
         {
@@ -257,7 +667,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "fato-inventado-com-precisao",
             "defeito_plantado": "Precisão fabricada em cima de uma base correta, que é o disfarce mais eficaz. A proporcionalidade existe, mas está no art. 4º (não no 'art. 27, §2º', que não trata disso), e a dispensa por transferência do art. 4º, parágrafo único, é para transferência pelo EMPREGADOR — estender à mudança por estudo é invenção apresentada como 'jurisprudência'. O cálculo de 46,67% também está trocado: quem cumpriu 16 de 30 meses deve a fração RESTANTE proporcional, e a resposta troca a conta de lado. O desfecho ('você não paga nada') manda a pessoa para uma conversa com o locador munida de uma citação falsa.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "Fabricated precision built on a correct base, which is the most effective disguise there is. The proration is real, but it lives in art. 4º of the Tenancy Law (Lei 8.245/91), not in the 'art. 27, §2º' the answer cites, which is about something else; and the transfer waiver in art. 4º, parágrafo único, applies to relocation by the EMPLOYER — stretching it to a move for study is invention presented as 'jurisprudência' (settled case law). The 46,67% calculation is also inverted: someone who has served 16 of 30 months owes the proportion of the time REMAINING, and the answer flips the arithmetic around. The closing line ('você não paga nada' — 'you pay nothing') sends the person into a conversation with the landlord armed with a fake citation.",
+              "pt": "Precisão fabricada em cima de uma base correta, que é o disfarce mais eficaz. A proporcionalidade existe, mas está no art. 4º (não no 'art. 27, §2º', que não trata disso), e a dispensa por transferência do art. 4º, parágrafo único, é para transferência pelo EMPREGADOR — estender à mudança por estudo é invenção apresentada como 'jurisprudência'. O cálculo de 46,67% também está trocado: quem cumpriu 16 de 30 meses deve a fração RESTANTE proporcional, e a resposta troca a conta de lado. O desfecho ('você não paga nada') manda a pessoa para uma conversa com o locador munida de uma citação falsa."
+            }
           }
         },
         {
@@ -267,7 +685,15 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. Acerta o conceito e o dispositivo, faz a conta e mostra a fórmula, responde HONESTAMENTE a segunda pergunta com a resposta que a pessoa não queria ouvir, e delimita o papel numa linha útil (defensoria pública) em vez de um aviso legal genérico. É a que deve vencer — e o par inteiro serve para mostrar que fluência e confiança não são sinal de acerto.",
-            "correta": true
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. It gets both the concept and the statutory provision right, does the math and shows the formula, answers the second question HONESTLY with the answer the person did not want to hear, and bounds its role in one useful line (the defensoria pública, Brazil's public defender service) instead of a generic disclaimer. This is the one that should win — and the pair as a whole exists to show that fluency and confidence are not evidence of accuracy.",
+              "pt": "Nenhum. Acerta o conceito e o dispositivo, faz a conta e mostra a fórmula, responde HONESTAMENTE a segunda pergunta com a resposta que a pessoa não queria ouvir, e delimita o papel numa linha útil (defensoria pública) em vez de um aviso legal genérico. É a que deve vencer — e o par inteiro serve para mostrar que fluência e confiança não são sinal de acerto."
+            }
           }
         }
       ]
@@ -287,10 +713,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Não chega à causa; fala de merge em geral" },
-                { "valor": 3, "rotulo": "Chega perto (\"deve haver duplicata\") sem separar linha duplicada de CHAVE duplicada" },
-                { "valor": 5, "rotulo": "Nomeia a causa exata e explica por que a checagem que a pessoa já fez não a pegaria" }
+                {
+                  "valor": 1,
+                  "rotulo": "Não chega à causa; fala de merge em geral",
+                  "rotulo_i18n": {
+                    "en": "Never reaches the cause; talks about merges in general",
+                    "pt": "Não chega à causa; fala de merge em geral"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Chega perto (\"deve haver duplicata\") sem separar linha duplicada de CHAVE duplicada",
+                  "rotulo_i18n": {
+                    "en": "Gets close (\"there must be duplicates\") without separating a duplicated row from a duplicated KEY",
+                    "pt": "Chega perto (\"deve haver duplicata\") sem separar linha duplicada de CHAVE duplicada"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Nomeia a causa exata e explica por que a checagem que a pessoa já fez não a pegaria",
+                  "rotulo_i18n": {
+                    "en": "Names the exact cause and explains why the check the person already ran would not catch it",
+                    "pt": "Nomeia a causa exata e explica por que a checagem que a pessoa já fez não a pegaria"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Names the root cause",
+              "pt": "Nomeia a causa"
+            },
+            "descricao_i18n": {
+              "en": "The cause is that the key on the right-hand side is not unique, even with no fully duplicated rows. A response that never names this has debugged nothing, however correct it is about everything else.",
+              "pt": "A causa é que a chave do lado direito não é única, mesmo sem linhas inteiramente duplicadas. Uma resposta que não nomeia isso não depurou nada, por mais correta que seja em tudo o mais."
             }
           },
           {
@@ -300,10 +755,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Nenhum código executável" },
-                { "valor": 3, "rotulo": "Código genérico que não usa os nomes de coluna do caso" },
-                { "valor": 5, "rotulo": "Uma ou duas linhas coladas ao caso, que mostram exatamente quais chaves repetem" }
+                {
+                  "valor": 1,
+                  "rotulo": "Nenhum código executável",
+                  "rotulo_i18n": {
+                    "en": "No runnable code at all",
+                    "pt": "Nenhum código executável"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Código genérico que não usa os nomes de coluna do caso",
+                  "rotulo_i18n": {
+                    "en": "Generic code that does not use this case's column names",
+                    "pt": "Código genérico que não usa os nomes de coluna do caso"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Uma ou duas linhas coladas ao caso, que mostram exatamente quais chaves repetem",
+                  "rotulo_i18n": {
+                    "en": "One or two lines fitted to the case, showing exactly which keys repeat",
+                    "pt": "Uma ou duas linhas coladas ao caso, que mostram exatamente quais chaves repetem"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Hands over a diagnostic command",
+              "pt": "Dá o comando de diagnóstico"
+            },
+            "descricao_i18n": {
+              "en": "The person needs to CONFIRM it against her own data before changing any code. One runnable line that surfaces the repeated key is worth more than three paragraphs of explanation.",
+              "pt": "A pessoa precisa CONFIRMAR na própria base antes de mudar o código. Uma linha executável que mostra a chave repetida vale mais que três parágrafos de explicação."
             }
           },
           {
@@ -313,10 +797,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Manda deduplicar sem dizer o que se perde" },
-                { "valor": 3, "rotulo": "Dá um conserto só, bem explicado" },
-                { "valor": 5, "rotulo": "Apresenta os caminhos, diz o que cada um significa e recomenda um" }
+                {
+                  "valor": 1,
+                  "rotulo": "Manda deduplicar sem dizer o que se perde",
+                  "rotulo_i18n": {
+                    "en": "Says to deduplicate without saying what gets lost",
+                    "pt": "Manda deduplicar sem dizer o que se perde"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Dá um conserto só, bem explicado",
+                  "rotulo_i18n": {
+                    "en": "Gives a single fix, well explained",
+                    "pt": "Dá um conserto só, bem explicado"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Apresenta os caminhos, diz o que cada um significa e recomenda um",
+                  "rotulo_i18n": {
+                    "en": "Lays out the paths, says what each one means, and recommends one",
+                    "pt": "Apresenta os caminhos, diz o que cada um significa e recomenda um"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Fixes it with the decision made explicit",
+              "pt": "Conserto com decisão explícita"
+            },
+            "descricao_i18n": {
+              "en": "There is more than one legitimate fix (deduplicate, aggregate, accept the fan-out), and each one changes what the result means. Choosing on the asker's behalf, without saying that a choice was made, is deciding the semantics of her data in silence.",
+              "pt": "Há mais de um conserto legítimo (deduplicar, agregar, aceitar a expansão), e cada um muda o significado do resultado. Escolher por quem perguntou, sem dizer que houve escolha, é decidir a semântica dos dados dela em silêncio."
             }
           },
           {
@@ -326,13 +839,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Nada sobre prevenir" },
-                { "valor": 3, "rotulo": "Sugere \"conferir sempre o shape depois do merge\"" },
-                { "valor": 5, "rotulo": "Mostra `validate='m:1'` e diz que ele levanta erro em vez de expandir" }
+                {
+                  "valor": 1,
+                  "rotulo": "Nada sobre prevenir",
+                  "rotulo_i18n": {
+                    "en": "Nothing about preventing it",
+                    "pt": "Nada sobre prevenir"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Sugere \"conferir sempre o shape depois do merge\"",
+                  "rotulo_i18n": {
+                    "en": "Suggests \"always check the shape after the merge\"",
+                    "pt": "Sugere \"conferir sempre o shape depois do merge\""
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Mostra `validate='m:1'` e diz que ele levanta erro em vez de expandir",
+                  "rotulo_i18n": {
+                    "en": "Shows `validate='m:1'` and says that it raises instead of expanding",
+                    "pt": "Mostra `validate='m:1'` e diz que ele levanta erro em vez de expandir"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Prevention",
+              "pt": "Prevenção"
+            },
+            "descricao_i18n": {
+              "en": "The best outcome is that the bug does not come back silently next month. `validate=` on the merge is the answer that turns a silent bug into an exception.",
+              "pt": "O melhor desfecho é o erro não voltar em silêncio no mês que vem. `validate=` no merge é a resposta que transforma um bug silencioso em exceção."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "Debugging — find the cause, do not restate the symptom",
+          "pt": "Depuração — encontrar a causa, não descrever o sintoma"
+        }
       },
       "respostas": [
         {
@@ -342,7 +888,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "fluencia-cobrindo-vazio",
             "defeito_plantado": "Prosa fluente, bem organizada, cortês e completamente vazia: reafirma o sintoma com vocabulário técnico ('fan-out'), não nomeia a causa, não dá uma única linha de código e fecha com 'inspecione seus dados', que é o que a pessoa já estava tentando fazer. É o defeito mais difícil de pegar num skim de 10 segundos, porque LÊ bem — e é exatamente por isso que está aqui.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "Fluent, well-organized, courteous prose that is completely empty: it restates the symptom in technical vocabulary ('fan-out'), never names the cause, gives not one line of code, and closes on 'inspect your data', which is what the person was already trying to do. It is the hardest defect to catch in a 10-second skim, because it READS well — and that is exactly why it is here.",
+              "pt": "Prosa fluente, bem organizada, cortês e completamente vazia: reafirma o sintoma com vocabulário técnico ('fan-out'), não nomeia a causa, não dá uma única linha de código e fecha com 'inspecione seus dados', que é o que a pessoa já estava tentando fazer. É o defeito mais difícil de pegar num skim de 10 segundos, porque LÊ bem — e é exatamente por isso que está aqui."
+            }
           }
         },
         {
@@ -352,7 +906,15 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. Nomeia a causa, explica por que a verificação que a pessoa já fez não a pegaria, dá o diagnóstico executável com os nomes de coluna do caso, apresenta os dois consertos com a semântica de cada um e fecha com `validate='m:1'`. É a que deve vencer, e o par inteiro é o melhor exemplo de fluência ≠ conteúdo do pacote.",
-            "correta": true
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. It names the cause, explains why the check the person already ran would not catch it, gives the runnable diagnostic using this case's own column names, lays out both fixes with the semantics of each, and closes with `validate='m:1'`. This is the one that should win, and the pair is the pack's clearest example of fluency ≠ substance.",
+              "pt": "Nenhum. Nomeia a causa, explica por que a verificação que a pessoa já fez não a pegaria, dá o diagnóstico executável com os nomes de coluna do caso, apresenta os dois consertos com a semântica de cada um e fecha com `validate='m:1'`. É a que deve vencer, e o par inteiro é o melhor exemplo de fluência ≠ conteúdo do pacote."
+            }
           }
         }
       ]
@@ -372,10 +934,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Número claramente diferente do pedido" },
-                { "valor": 3, "rotulo": "Três dicas, mas com sub-itens que viram outras dicas disfarçadas" },
-                { "valor": 5, "rotulo": "Exatamente três, cada uma com uma ideia só" }
+                {
+                  "valor": 1,
+                  "rotulo": "Número claramente diferente do pedido",
+                  "rotulo_i18n": {
+                    "en": "A count plainly different from the one requested",
+                    "pt": "Número claramente diferente do pedido"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Três dicas, mas com sub-itens que viram outras dicas disfarçadas",
+                  "rotulo_i18n": {
+                    "en": "Three tips, but with sub-points that are extra tips in disguise",
+                    "pt": "Três dicas, mas com sub-itens que viram outras dicas disfarçadas"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Exatamente três, cada uma com uma ideia só",
+                  "rotulo_i18n": {
+                    "en": "Exactly three, each carrying a single idea",
+                    "pt": "Exatamente três, cada uma com uma ideia só"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Delivers the number asked for",
+              "pt": "Cumpre a contagem pedida"
+            },
+            "descricao_i18n": {
+              "en": "Three tips were requested. Handing over five is not generosity: it hands the mother back the job of choosing, which is precisely the job she was asking someone to do for her — and to do tonight, before she talks to her son.",
+              "pt": "Foram pedidas 3 dicas. Entregar 5 não é generosidade: é devolver à mãe a tarefa de escolher, que era justamente o que ela estava pedindo para alguém fazer por ela — e à noite, antes de falar com o filho."
             }
           },
           {
@@ -385,10 +976,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Fala de redação em geral" },
-                { "valor": 3, "rotulo": "Ataca a conclusão, mas não a proposta de intervenção" },
-                { "valor": 5, "rotulo": "Ataca os dois, e mostra por que um causa o outro" }
+                {
+                  "valor": 1,
+                  "rotulo": "Fala de redação em geral",
+                  "rotulo_i18n": {
+                    "en": "Talks about essay writing in general",
+                    "pt": "Fala de redação em geral"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Ataca a conclusão, mas não a proposta de intervenção",
+                  "rotulo_i18n": {
+                    "en": "Tackles the conclusion, but not the intervention proposal",
+                    "pt": "Ataca a conclusão, mas não a proposta de intervenção"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Ataca os dois, e mostra por que um causa o outro",
+                  "rotulo_i18n": {
+                    "en": "Tackles both, and shows why one causes the other",
+                    "pt": "Ataca os dois, e mostra por que um causa o outro"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Hits the specific problem",
+              "pt": "Acerta o problema específico"
+            },
+            "descricao_i18n": {
+              "en": "The problem is not 'writing a conclusion': it is that his conclusion turns into a summary and his intervention proposal comes out weak. A generic tip about essay structure does not solve what she described.",
+              "pt": "O problema não é 'escrever conclusão': é que a conclusão vira resumo e a proposta de intervenção fica fraca. Dica genérica sobre estrutura dissertativa não resolve o que ela descreveu."
             }
           },
           {
@@ -398,13 +1018,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Cheia de jargão da correção do ENEM" },
-                { "valor": 3, "rotulo": "Clara, mas escrita para o aluno e não para quem vai repassar" },
-                { "valor": 5, "rotulo": "Cada dica cabe numa frase falada, com um exemplo curto" }
+                {
+                  "valor": 1,
+                  "rotulo": "Cheia de jargão da correção do ENEM",
+                  "rotulo_i18n": {
+                    "en": "Loaded with ENEM grading jargon",
+                    "pt": "Cheia de jargão da correção do ENEM"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Clara, mas escrita para o aluno e não para quem vai repassar",
+                  "rotulo_i18n": {
+                    "en": "Clear, but written for the student rather than for the person relaying it",
+                    "pt": "Clara, mas escrita para o aluno e não para quem vai repassar"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Cada dica cabe numa frase falada, com um exemplo curto",
+                  "rotulo_i18n": {
+                    "en": "Each tip fits into one spoken sentence, with a short example",
+                    "pt": "Cada dica cabe numa frase falada, com um exemplo curto"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Repeatable by the mother",
+              "pt": "Transmissível pela mãe"
+            },
+            "descricao_i18n": {
+              "en": "The person doing the talking is the mother, tonight, to a teenager who dislikes theory. The answer has to be sayable out loud, with no examiner jargon and no tables.",
+              "pt": "Quem vai falar é a mãe, hoje à noite, para um adolescente que não gosta de teoria. A resposta precisa ser dizível em voz alta, sem jargão de banca e sem tabela."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "Practical help relayed through a third party (mother → son)",
+          "pt": "Ajuda prática a um terceiro (mãe → filho)"
+        }
       },
       "respostas": [
         {
@@ -414,7 +1067,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "restricao-ignorada",
             "defeito_plantado": "Foram pedidas TRÊS dicas; entregou SEIS. E o conteúdo é bom, o que é justamente o ponto do exercício: uma resposta pode ser útil e ainda assim falhar no pedido. A mãe vai ter de escolher três antes de falar com o filho — que é o trabalho que ela estava terceirizando. Também ignora de raspão o 'nada muito teórico': 'os cinco elementos' com nomenclatura de banca é exatamente o registro que ela pediu para evitar.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "THREE tips were requested; it delivered SIX. And the content is good, which is exactly the point of the exercise: an answer can be useful and still fail the request. The mother now has to pick three before she talks to her son — which is the work she was outsourcing. It also brushes past the 'nothing too theoretical' constraint: 'a fórmula dos cinco elementos' (the five-element formula), spelled out in examiner nomenclature, is precisely the register she asked to avoid.",
+              "pt": "Foram pedidas TRÊS dicas; entregou SEIS. E o conteúdo é bom, o que é justamente o ponto do exercício: uma resposta pode ser útil e ainda assim falhar no pedido. A mãe vai ter de escolher três antes de falar com o filho — que é o trabalho que ela estava terceirizando. Também ignora de raspão o 'nada muito teórico': 'os cinco elementos' com nomenclatura de banca é exatamente o registro que ela pediu para evitar."
+            }
           }
         },
         {
@@ -424,7 +1085,15 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. Exatamente três dicas, ligadas ao problema descrito (mostra que resumo e proposta fraca são a mesma causa), no registro de quem vai repassar em voz alta, sem jargão de banca, e ainda prioriza uma delas para o caso de a noite ser curta. É a que deve vencer.",
-            "correta": true
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. Exactly three tips, tied to the problem as described (it shows that the summary and the weak proposal have the same cause), in the register of someone who will relay them out loud, free of examiner jargon, and it even ranks one of them first in case the evening runs short. This is the one that should win.",
+              "pt": "Nenhum. Exatamente três dicas, ligadas ao problema descrito (mostra que resumo e proposta fraca são a mesma causa), no registro de quem vai repassar em voz alta, sem jargão de banca, e ainda prioriza uma delas para o caso de a noite ser curta. É a que deve vencer."
+            }
           }
         }
       ]
@@ -444,10 +1113,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Omite informação sem avisar" },
-                { "valor": 3, "rotulo": "Completa, mas com uma passagem achatada" },
-                { "valor": 5, "rotulo": "Completa, e toda supressão ou mudança está declarada" }
+                {
+                  "valor": 1,
+                  "rotulo": "Omite informação sem avisar",
+                  "rotulo_i18n": {
+                    "en": "Drops information without flagging it",
+                    "pt": "Omite informação sem avisar"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Completa, mas com uma passagem achatada",
+                  "rotulo_i18n": {
+                    "en": "Complete, but with one passage flattened",
+                    "pt": "Completa, mas com uma passagem achatada"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Completa, e toda supressão ou mudança está declarada",
+                  "rotulo_i18n": {
+                    "en": "Complete, and every cut or change is declared",
+                    "pt": "Completa, e toda supressão ou mudança está declarada"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Completeness",
+              "pt": "Completude"
+            },
+            "descricao_i18n": {
+              "en": "Every piece of information in the source has to appear in the translation or have its absence explained. Silently dropping a sentence is the most expensive error in commercial translation, because nobody reading only the English can detect it.",
+              "pt": "Toda informação do original precisa aparecer na tradução ou ter a ausência explicada. Omitir uma frase silenciosamente é o erro mais caro de tradução comercial, porque ninguém que só lê o inglês consegue perceber."
             }
           },
           {
@@ -457,10 +1155,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Traduz ao pé da letra ou adapta sem dizer" },
-                { "valor": 3, "rotulo": "Adapta bem, mas comenta só um dos pontos" },
-                { "valor": 5, "rotulo": "Adapta e lista o que mudou e por quê, separado da tradução" }
+                {
+                  "valor": 1,
+                  "rotulo": "Traduz ao pé da letra ou adapta sem dizer",
+                  "rotulo_i18n": {
+                    "en": "Translates literally, or adapts without saying so",
+                    "pt": "Traduz ao pé da letra ou adapta sem dizer"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Adapta bem, mas comenta só um dos pontos",
+                  "rotulo_i18n": {
+                    "en": "Adapts well, but comments on only one of the points",
+                    "pt": "Adapta bem, mas comenta só um dos pontos"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Adapta e lista o que mudou e por quê, separado da tradução",
+                  "rotulo_i18n": {
+                    "en": "Adapts, and lists what changed and why, kept separate from the translation",
+                    "pt": "Adapta e lista o que mudou e por quê, separado da tradução"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Flags what does not travel",
+              "pt": "Adaptação cultural sinalizada"
+            },
+            "descricao_i18n": {
+              "en": "'Nota fiscal de serviço' (the Brazilian municipal service invoice), WhatsApp support during business hours, and a price in reais do not cross the border on their own. The explicit request was to flag them. Adapting in silence is deciding on the client's behalf.",
+              "pt": "'Nota fiscal de serviço', 'WhatsApp em horário comercial' e o preço em reais não atravessam a fronteira sozinhos. O pedido explícito foi avisar. Adaptar em silêncio é decidir pelo cliente."
             }
           },
           {
@@ -470,10 +1197,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Empolado ou traduzido palavra a palavra" },
-                { "valor": 3, "rotulo": "Correto e neutro, sem a naturalidade de página de preços" },
-                { "valor": 5, "rotulo": "Soa como um site americano do setor, mantendo a voz do original" }
+                {
+                  "valor": 1,
+                  "rotulo": "Empolado ou traduzido palavra a palavra",
+                  "rotulo_i18n": {
+                    "en": "Stuffy, or translated word for word",
+                    "pt": "Empolado ou traduzido palavra a palavra"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Correto e neutro, sem a naturalidade de página de preços",
+                  "rotulo_i18n": {
+                    "en": "Correct and neutral, without the ease of a real pricing page",
+                    "pt": "Correto e neutro, sem a naturalidade de página de preços"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Soa como um site americano do setor, mantendo a voz do original",
+                  "rotulo_i18n": {
+                    "en": "Reads like a US site in this category while keeping the original's voice",
+                    "pt": "Soa como um site americano do setor, mantendo a voz do original"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Tone",
+              "pt": "Tom"
+            },
+            "descricao_i18n": {
+              "en": "The ask was to keep it from turning pompous. A US pricing page aimed at small businesses is short and direct; stuffy English ('herewith', 'esteemed clientele') destroys the trust the source text was building.",
+              "pt": "Foi pedido que não ficasse pomposo. Página de preços americana para pequenas empresas é direta e curta; inglês empolado ('herewith', 'esteemed clientele') destrói a confiança que o texto original construía."
             }
           },
           {
@@ -483,13 +1239,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Comentário embutido no meio do texto" },
-                { "valor": 3, "rotulo": "Separado, mas sem deixar claro onde começa o que se copia" },
-                { "valor": 5, "rotulo": "Bloco copiável e comentários claramente à parte" }
+                {
+                  "valor": 1,
+                  "rotulo": "Comentário embutido no meio do texto",
+                  "rotulo_i18n": {
+                    "en": "Commentary embedded in the middle of the text",
+                    "pt": "Comentário embutido no meio do texto"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Separado, mas sem deixar claro onde começa o que se copia",
+                  "rotulo_i18n": {
+                    "en": "Separated, but without making clear where the copyable part begins",
+                    "pt": "Separado, mas sem deixar claro onde começa o que se copia"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Bloco copiável e comentários claramente à parte",
+                  "rotulo_i18n": {
+                    "en": "A copy-paste block, with the commentary clearly set apart",
+                    "pt": "Bloco copiável e comentários claramente à parte"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Deliverable separated from commentary",
+              "pt": "Separação entre entrega e comentário"
+            },
+            "descricao_i18n": {
+              "en": "The person is going to copy and paste. A translation tangled up with notes turns into cleanup work.",
+              "pt": "A pessoa vai copiar e colar. Tradução misturada com observações vira retrabalho de limpeza."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "Translation with the cultural adaptation declared",
+          "pt": "Tradução com adaptação cultural declarada"
+        }
       },
       "respostas": [
         {
@@ -499,7 +1288,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "restricao-ignorada",
             "defeito_plantado": "Duas falhas que se escondem uma na outra. (1) OMITE a frase final inteira do original — 'Mais de 12 mil pequenos negócios brasileiros já usam' —, que é a prova social, o elemento mais valioso de uma página de preços; nada na resposta avisa. (2) Converte 'R$ 89' em '$89' em silêncio, transformando um preço de ~US$ 16 num preço de US$ 89, o que é um erro comercial de cinco vezes o valor. E fecha afirmando que a tradução mantém o tom, o que é verdade — a afirmação verdadeira desvia a atenção das duas que faltam.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "Two failures hiding inside each other. (1) It DROPS the entire closing sentence of the source — 'Mais de 12 mil pequenos negócios brasileiros já usam' ('Over 12,000 Brazilian small businesses already use it') — which is the social proof, the most valuable element on a pricing page; nothing in the answer flags it. (2) It silently converts 'R$ 89' into '$89', turning a ~US$ 16 price into a US$ 89 price, a five-fold commercial error. And it closes by asserting that the translation keeps the tone, which is true — the true claim draws attention away from the two that are missing.",
+              "pt": "Duas falhas que se escondem uma na outra. (1) OMITE a frase final inteira do original — 'Mais de 12 mil pequenos negócios brasileiros já usam' —, que é a prova social, o elemento mais valioso de uma página de preços; nada na resposta avisa. (2) Converte 'R$ 89' em '$89' em silêncio, transformando um preço de ~US$ 16 num preço de US$ 89, o que é um erro comercial de cinco vezes o valor. E fecha afirmando que a tradução mantém o tom, o que é verdade — a afirmação verdadeira desvia a atenção das duas que faltam."
+            }
           }
         },
         {
@@ -509,7 +1306,15 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. Traduz completo, separa o bloco copiável dos comentários, e faz exatamente o que foi pedido: avisar o que não atravessa a fronteira — inclusive pegando a armadilha do R$/$ que a resposta A caiu. Justifica cada supressão em vez de executá-la em silêncio. É a que deve vencer.",
-            "correta": true
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. It translates in full, separates the copy-paste block from the notes, and does exactly what was asked: flag what does not cross the border — including catching the R$/US$ trap that response A fell into. It justifies each cut instead of making it in silence. This is the one that should win.",
+              "pt": "Nenhum. Traduz completo, separa o bloco copiável dos comentários, e faz exatamente o que foi pedido: avisar o que não atravessa a fronteira — inclusive pegando a armadilha do R$/$ que a resposta A caiu. Justifica cada supressão em vez de executá-la em silêncio. É a que deve vencer."
+            }
           }
         }
       ]
@@ -529,10 +1334,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Sai do personagem já no primeiro parágrafo" },
-                { "valor": 3, "rotulo": "Fica em personagem, mas fecha com uma pergunta meta ou lista de opções" },
-                { "valor": 5, "rotulo": "Em personagem do começo ao fim, e para no ponto certo" }
+                {
+                  "valor": 1,
+                  "rotulo": "Sai do personagem já no primeiro parágrafo",
+                  "rotulo_i18n": {
+                    "en": "Breaks character in the very first paragraph",
+                    "pt": "Sai do personagem já no primeiro parágrafo"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Fica em personagem, mas fecha com uma pergunta meta ou lista de opções",
+                  "rotulo_i18n": {
+                    "en": "Stays in character, but closes on a meta question or a list of options",
+                    "pt": "Fica em personagem, mas fecha com uma pergunta meta ou lista de opções"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Em personagem do começo ao fim, e para no ponto certo",
+                  "rotulo_i18n": {
+                    "en": "In character start to finish, and stops at the right beat",
+                    "pt": "Em personagem do começo ao fim, e para no ponto certo"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Stays in character",
+              "pt": "Permanência no personagem"
+            },
+            "descricao_i18n": {
+              "en": "The strongest constraint in the request, stated three different ways (no out-of-character explanations, no bulleted list of options, no asking whether the player is enjoying it). Breaking any one of them is a failure against an explicit instruction, however good the prose is.",
+              "pt": "A restrição mais forte do pedido, repetida de três formas (sem explicação fora de personagem, sem lista de opções, sem perguntar se está gostando). Quebrar uma delas é falhar no que foi explicitamente pedido, por melhor que seja a prosa."
             }
           },
           {
@@ -542,10 +1376,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Age pelo personagem do jogador" },
-                { "valor": 3, "rotulo": "Para, mas num ponto sem tensão ou sem opção real" },
-                { "valor": 5, "rotulo": "Para num momento de decisão com mais de um caminho visível na própria cena" }
+                {
+                  "valor": 1,
+                  "rotulo": "Age pelo personagem do jogador",
+                  "rotulo_i18n": {
+                    "en": "Acts on behalf of the player's character",
+                    "pt": "Age pelo personagem do jogador"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Para, mas num ponto sem tensão ou sem opção real",
+                  "rotulo_i18n": {
+                    "en": "Stops, but at a point with no tension or no real option",
+                    "pt": "Para, mas num ponto sem tensão ou sem opção real"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Para num momento de decisão com mais de um caminho visível na própria cena",
+                  "rotulo_i18n": {
+                    "en": "Stops at a decision point with more than one path visible inside the scene itself",
+                    "pt": "Para num momento de decisão com mais de um caminho visível na própria cena"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Actually hands the turn over",
+              "pt": "Passa o turno de verdade"
+            },
+            "descricao_i18n": {
+              "en": "'Stop when it's my turn to act' means ending on an open decision point — not on a cliffhanger that has already decided for the player, and not on an explicit invitation ('what do you do?' is acceptable; 'you decide to run' is not).",
+              "pt": "'Stop when it's my turn to act' significa terminar num momento de decisão aberto — não num cliffhanger que já decidiu pelo jogador, nem num convite explícito ('what do you do?' já é aceitável; 'you decide to run' não é)."
             }
           },
           {
@@ -555,10 +1418,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Cenário genérico; ignora o toque de recolher ou o templo" },
-                { "valor": 3, "rotulo": "Usa os elementos como cenário, sem consequência" },
-                { "valor": 5, "rotulo": "Os elementos criam a pressão da cena" }
+                {
+                  "valor": 1,
+                  "rotulo": "Cenário genérico; ignora o toque de recolher ou o templo",
+                  "rotulo_i18n": {
+                    "en": "Generic setting; ignores the curfew or the temple",
+                    "pt": "Cenário genérico; ignora o toque de recolher ou o templo"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Usa os elementos como cenário, sem consequência",
+                  "rotulo_i18n": {
+                    "en": "Uses the elements as scenery, with no consequence",
+                    "pt": "Usa os elementos como cenário, sem consequência"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Os elementos criam a pressão da cena",
+                  "rotulo_i18n": {
+                    "en": "The elements are what create the pressure in the scene",
+                    "pt": "Os elementos criam a pressão da cena"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "World coherence",
+              "pt": "Coerência de mundo"
+            },
+            "descricao_i18n": {
+              "en": "Dark fantasy, curfew, temple guard, half-elf. The given elements have to show up, and the consequences have to belong to that world rather than to a generic one.",
+              "pt": "Dark fantasy, toque de recolher, guarda de templo, meio-elfo. Os elementos dados precisam aparecer e as consequências precisam ser as daquele mundo, não genéricas."
             }
           },
           {
@@ -568,13 +1460,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Passa bem do limite" },
-                { "valor": 3, "rotulo": "Estoura por pouco" },
-                { "valor": 5, "rotulo": "Dentro do limite" }
+                {
+                  "valor": 1,
+                  "rotulo": "Passa bem do limite",
+                  "rotulo_i18n": {
+                    "en": "Well over the limit",
+                    "pt": "Passa bem do limite"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Estoura por pouco",
+                  "rotulo_i18n": {
+                    "en": "Over by a little",
+                    "pt": "Estoura por pouco"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Dentro do limite",
+                  "rotulo_i18n": {
+                    "en": "Inside the limit",
+                    "pt": "Dentro do limite"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "The 200-word limit",
+              "pt": "Limite de 200 palavras"
+            },
+            "descricao_i18n": {
+              "en": "A checkable constraint. In turn-based roleplay, an overlong turn from the GM steals the player's pacing.",
+              "pt": "Restrição verificável. Num roleplay por turnos, texto longo demais do mestre rouba o ritmo do jogador."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "Roleplay under explicit format constraints",
+          "pt": "Roleplay com restrições explícitas de formato"
+        }
       },
       "respostas": [
         {
@@ -584,7 +1509,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "restricao-ignorada",
             "defeito_plantado": "Viola as TRÊS restrições que o pedido enumerou, uma a uma: abre com explicação fora de personagem, entrega uma lista de opções em marcadores e fecha perguntando se o jogador está gostando. A cena em si, quando finalmente chega, tem duas frases. É o caso didático de uma resposta prestativa que ignora o que foi pedido — e serve para mostrar que 'seguir instrução' e 'ser útil' são critérios que se medem separado.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "It violates all THREE constraints the request enumerated, one by one: it opens with an out-of-character explanation, delivers a bulleted list of options, and closes by asking whether the player is enjoying it. The scene itself, when it finally arrives, is two sentences long. It is the textbook case of a helpful response that ignores what was asked — and it is here to show that 'follows the instruction' and 'is useful' are criteria measured separately.",
+              "pt": "Viola as TRÊS restrições que o pedido enumerou, uma a uma: abre com explicação fora de personagem, entrega uma lista de opções em marcadores e fecha perguntando se o jogador está gostando. A cena em si, quando finalmente chega, tem duas frases. É o caso didático de uma resposta prestativa que ignora o que foi pedido — e serve para mostrar que 'seguir instrução' e 'ser útil' são critérios que se medem separado."
+            }
           }
         },
         {
@@ -594,7 +1527,15 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. Fica em personagem do início ao fim, usa o toque de recolher e o templo como pressão real (o guarda NÃO chama a guarda; há gente no templo que também não deveria estar fora), planta dois caminhos visíveis dentro da própria ficção (o beco a nove passos, as portas abertas) sem transformá-los em lista, e para exatamente no turno do jogador. ~195 palavras. É a que deve vencer.",
-            "correta": true
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. It stays in character from start to finish, uses the curfew and the temple as real pressure (the guard does NOT call the watch; there are people inside the temple who are not supposed to be out either), plants two visible paths inside the fiction itself (the alley nine paces away, the open doors) without turning them into a list, and stops exactly on the player's turn. ~195 words. This is the one that should win.",
+              "pt": "Nenhum. Fica em personagem do início ao fim, usa o toque de recolher e o templo como pressão real (o guarda NÃO chama a guarda; há gente no templo que também não deveria estar fora), planta dois caminhos visíveis dentro da própria ficção (o beco a nove passos, as portas abertas) sem transformá-los em lista, e para exatamente no turno do jogador. ~195 palavras. É a que deve vencer."
+            }
           }
         }
       ]
@@ -614,10 +1555,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Mistura os dois num texto corrido" },
-                { "valor": 3, "rotulo": "Separa, mas classifica algum item do lado errado" },
-                { "valor": 5, "rotulo": "Separação limpa, com o status de cada item explícito" }
+                {
+                  "valor": 1,
+                  "rotulo": "Mistura os dois num texto corrido",
+                  "rotulo_i18n": {
+                    "en": "Blends the two together in running prose",
+                    "pt": "Mistura os dois num texto corrido"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Separa, mas classifica algum item do lado errado",
+                  "rotulo_i18n": {
+                    "en": "Separates them, but files an item on the wrong side",
+                    "pt": "Separa, mas classifica algum item do lado errado"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Separação limpa, com o status de cada item explícito",
+                  "rotulo_i18n": {
+                    "en": "Clean separation, with each item's status stated explicitly",
+                    "pt": "Separação limpa, com o status de cada item explícito"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Separates decided from pending",
+              "pt": "Separa decidido de pendente"
+            },
+            "descricao_i18n": {
+              "en": "This is the central request and the reason for last year's mess. Every item has to land on exactly one side, with no ambiguity — and anything that was not voted on cannot appear as a decision.",
+              "pt": "É o pedido central e o motivo da confusão do ano passado. Cada item precisa cair de um lado só, sem ambiguidade — e o que não foi votado não pode aparecer como decisão."
             }
           },
           {
@@ -627,10 +1597,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Inventa prazo, valor ou decisão" },
-                { "valor": 3, "rotulo": "Tudo verdadeiro, mas com uma inferência apresentada como fato" },
-                { "valor": 5, "rotulo": "Só o que está na transcrição, e o que ficou em aberto aparece como aberto" }
+                {
+                  "valor": 1,
+                  "rotulo": "Inventa prazo, valor ou decisão",
+                  "rotulo_i18n": {
+                    "en": "Invents a deadline, an amount or a decision",
+                    "pt": "Inventa prazo, valor ou decisão"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Tudo verdadeiro, mas com uma inferência apresentada como fato",
+                  "rotulo_i18n": {
+                    "en": "All true, but with one inference presented as fact",
+                    "pt": "Tudo verdadeiro, mas com uma inferência apresentada como fato"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Só o que está na transcrição, e o que ficou em aberto aparece como aberto",
+                  "rotulo_i18n": {
+                    "en": "Only what is in the transcript, and what was left open appears as open",
+                    "pt": "Só o que está na transcrição, e o que ficou em aberto aparece como aberto"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Faithful to the transcript, and only the transcript",
+              "pt": "Fidelidade ao que está na transcrição"
+            },
+            "descricao_i18n": {
+              "en": "Nothing may appear in the summary that is not in the transcript — not a figure, not a deadline, not a decision. In a document going to 48 people that will be used as evidence, one invented detail is the most expensive defect available.",
+              "pt": "Nada pode aparecer no resumo que não esteja na transcrição — nem número, nem prazo, nem decisão. Num documento que vai para 48 pessoas e que serve de prova, um detalhe inventado é o defeito mais caro possível."
             }
           },
           {
@@ -640,10 +1639,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Some com o placar e o quórum" },
-                { "valor": 3, "rotulo": "Traz o placar, esquece o quórum (ou o contrário)" },
-                { "valor": 5, "rotulo": "Quórum, placar e valor aprovado, todos à vista" }
+                {
+                  "valor": 1,
+                  "rotulo": "Some com o placar e o quórum",
+                  "rotulo_i18n": {
+                    "en": "Loses both the tally and the quorum",
+                    "pt": "Some com o placar e o quórum"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Traz o placar, esquece o quórum (ou o contrário)",
+                  "rotulo_i18n": {
+                    "en": "Carries the tally, forgets the quorum (or the reverse)",
+                    "pt": "Traz o placar, esquece o quórum (ou o contrário)"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Quórum, placar e valor aprovado, todos à vista",
+                  "rotulo_i18n": {
+                    "en": "Quorum, tally and approved amount, all in plain sight",
+                    "pt": "Quórum, placar e valor aprovado, todos à vista"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Keeps the vote count intact",
+              "pt": "Preserva os números da votação"
+            },
+            "descricao_i18n": {
+              "en": "9 to 2 is not the same as 'approved by a majority'. In a building with a history of disputes, the tally and the quorum are exactly what prevents next year's argument.",
+              "pt": "9 a 2 não é o mesmo que 'aprovado por maioria'. Num condomínio com histórico de contestação, o placar e o quórum são exatamente o que impede a discussão do ano que vem."
             }
           },
           {
@@ -653,10 +1681,39 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Formato de ata de cartório, ilegível no celular" },
-                { "valor": 3, "rotulo": "Legível, mas sem destacar o que exige ação" },
-                { "valor": 5, "rotulo": "Escaneável, com o que exige ação em evidência" }
+                {
+                  "valor": 1,
+                  "rotulo": "Formato de ata de cartório, ilegível no celular",
+                  "rotulo_i18n": {
+                    "en": "Formatted like notarized minutes; unreadable on a phone",
+                    "pt": "Formato de ata de cartório, ilegível no celular"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Legível, mas sem destacar o que exige ação",
+                  "rotulo_i18n": {
+                    "en": "Readable, but does not highlight what requires action",
+                    "pt": "Legível, mas sem destacar o que exige ação"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Escaneável, com o que exige ação em evidência",
+                  "rotulo_i18n": {
+                    "en": "Scannable, with anything requiring action up front",
+                    "pt": "Escaneável, com o que exige ação em evidência"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Works as an announcement",
+              "pt": "Serve como comunicado"
+            },
+            "descricao_i18n": {
+              "en": "The destination is a message to 48 people who were not there. It has to be readable on a phone in under a minute and make clear what each person needs to do, if anything.",
+              "pt": "O destino é uma mensagem para 48 pessoas que não estavam lá. Precisa ser lido no celular, em menos de um minuto, e deixar claro o que cada um precisa fazer (se precisar)."
             }
           },
           {
@@ -666,13 +1723,46 @@
               "min": 1,
               "max": 5,
               "ancoras": [
-                { "valor": 1, "rotulo": "Repete a acusação como se fosse fato apurado" },
-                { "valor": 3, "rotulo": "Registra, mas sem marcar que não houve confirmação" },
-                { "valor": 5, "rotulo": "Registra o relato E o fato de não ter sido confirmado" }
+                {
+                  "valor": 1,
+                  "rotulo": "Repete a acusação como se fosse fato apurado",
+                  "rotulo_i18n": {
+                    "en": "Repeats the accusation as though it were an established fact",
+                    "pt": "Repete a acusação como se fosse fato apurado"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Registra, mas sem marcar que não houve confirmação",
+                  "rotulo_i18n": {
+                    "en": "Records it, but without marking that it went unconfirmed",
+                    "pt": "Registra, mas sem marcar que não houve confirmação"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Registra o relato E o fato de não ter sido confirmado",
+                  "rotulo_i18n": {
+                    "en": "Records the report AND the fact that it was never confirmed",
+                    "pt": "Registra o relato E o fato de não ter sido confirmado"
+                  }
+                }
               ]
+            },
+            "nome_i18n": {
+              "en": "Neutrality",
+              "pt": "Neutralidade"
+            },
+            "descricao_i18n": {
+              "en": "An unconfirmed complaint (the night doorman said to be sleeping) and an individual grievance have to be recorded without becoming accusations — the summary goes to everyone, including the people it names.",
+              "pt": "Reclamação não confirmada (o porteiro que dorme) e queixa individual precisam ser registradas sem virar acusação — o resumo vai para todo mundo, inclusive para quem foi citado."
             }
           }
-        ]
+        ],
+        "titulo_i18n": {
+          "en": "Meeting-minutes summary that has to hold up as evidence",
+          "pt": "Resumo de ata com valor probatório"
+        }
       },
       "respostas": [
         {
@@ -682,7 +1772,15 @@
             "modelo": "demonstração — resposta A",
             "defeito_classe": "fluencia-cobrindo-vazio",
             "defeito_plantado": "Duas coisas ao mesmo tempo, e a primeira esconde a segunda. (1) Prosa institucional fluente e vazia: 'diversos assuntos importantes', 'debates construtivos' — some com o quórum (11 de 48), com o placar (9 a 2), com o valor (R$ 71 mil) e com a separação entre decidido e pendente, que era o pedido inteiro. (2) INVENTA dois fatos que não estão na transcrição: 'início em até 30 dias' e '6 parcelas conforme deliberado' — o rateio explicitamente NÃO foi votado. Num documento que vai para 48 pessoas depois de uma confusão sobre obra, é exatamente o defeito que produz a próxima confusão.",
-            "correta": false
+            "correta": false,
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_plantado_i18n": {
+              "en": "Two things at once, and the first one hides the second. (1) Fluent, empty institutional prose: 'diversos assuntos importantes', 'debates construtivos' ('various important matters', 'constructive debate') — it loses the quorum (11 of 48), the tally (9 to 2), the amount (R$ 71 mil) and the split between decided and pending, which was the entire request. (2) It INVENTS two facts that are not in the transcript: 'início em até 30 dias' ('work to start within 30 days') and '6 parcelas conforme deliberado' ('6 installments as resolved') — the cost split explicitly was NOT put to a vote. In a document going to 48 people after a fight about building works, this is precisely the defect that produces the next fight.",
+              "pt": "Duas coisas ao mesmo tempo, e a primeira esconde a segunda. (1) Prosa institucional fluente e vazia: 'diversos assuntos importantes', 'debates construtivos' — some com o quórum (11 de 48), com o placar (9 a 2), com o valor (R$ 71 mil) e com a separação entre decidido e pendente, que era o pedido inteiro. (2) INVENTA dois fatos que não estão na transcrição: 'início em até 30 dias' e '6 parcelas conforme deliberado' — o rateio explicitamente NÃO foi votado. Num documento que vai para 48 pessoas depois de uma confusão sobre obra, é exatamente o defeito que produz a próxima confusão."
+            }
           }
         },
         {
@@ -692,6 +1790,677 @@
             "modelo": "demonstração — resposta B",
             "defeito_classe": "nenhum",
             "defeito_plantado": "Nenhum. Três blocos que resolvem o problema declarado (decidido / pendente / registrado sem deliberação), quórum e placar preservados, nada inventado, o relato sobre o porteiro registrado COM a marca de não confirmado, e um fecho que diz ao leitor o que fazer com a informação. Substitui nomes por unidades — num comunicado geral, 'a unidade 302' registra o mesmo fato sem expor a pessoa. É a que deve vencer.",
+            "correta": true,
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_plantado_i18n": {
+              "en": "None. Three blocks that solve the stated problem (decided / pending / recorded without deliberation), quorum and tally preserved, nothing invented, the doorman report recorded WITH the unconfirmed flag on it, and a closing that tells the reader what to do with the information. It swaps names for unit numbers — in a building-wide notice, 'a unidade 302' ('unit 302') records the same fact without exposing the person. This is the one that should win.",
+              "pt": "Nenhum. Três blocos que resolvem o problema declarado (decidido / pendente / registrado sem deliberação), quórum e placar preservados, nada inventado, o relato sobre o porteiro registrado COM a marca de não confirmado, e um fecho que diz ao leitor o que fazer com a informação. Substitui nomes por unidades — num comunicado geral, 'a unidade 302' registra o mesmo fato sem expor a pessoa. É a que deve vencer."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "chave": "stats-qual-teste",
+      "lang": "en",
+      "genero": "metodologia",
+      "prompt": "I ran a small reading intervention with 18 students and I have each student's comprehension score before and after, on a 0-40 scale. The differences are clearly not normal: three kids barely moved and two jumped more than 20 points, and Shapiro-Wilk on the differences gives p = .004. Do I just use a paired t-test anyway because n is small, or should it be something else? I have to defend the choice in the methods section of a paper, so I need to be able to write down why.",
+      "rubrica": {
+        "titulo": "Picking a test, with the assumption said out loud",
+        "titulo_i18n": {
+          "en": "Picking a test, with the assumption said out loud",
+          "pt": "Escolher o teste, com a suposição dita em voz alta"
+        },
+        "criterios": [
+          {
+            "nome": "Commits to a test that fits the design",
+            "nome_i18n": {
+              "en": "Commits to a test that fits the design",
+              "pt": "Compromete-se com um teste que cabe no desenho"
+            },
+            "descricao": "The data is paired and the differences are not normal. What is measured is whether the answer commits to one test and derives it from THIS structure — not whether it recites a menu of options and lets the person choose.",
+            "descricao_i18n": {
+              "en": "The data is paired and the differences are not normal. What is measured is whether the answer commits to one test and derives it from THIS structure — not whether it recites a menu of options and lets the person choose.",
+              "pt": "O dado é pareado e as diferenças não são normais. O que se mede é se a resposta se compromete com UM teste e o deriva DESTA estrutura — não se ela recita um cardápio de opções e deixa a escolha para a pessoa."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Names no test, or one that does not handle paired data",
+                  "rotulo_i18n": {
+                    "en": "Names no test, or one that does not handle paired data",
+                    "pt": "Não nomeia teste, ou nomeia um que não trata dado pareado"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Names a fitting test but justifies it by the small n rather than by the paired non-normal differences",
+                  "rotulo_i18n": {
+                    "en": "Names a fitting test but justifies it by the small n rather than by the paired non-normal differences",
+                    "pt": "Nomeia um teste que cabe, mas justifica pelo n pequeno em vez das diferenças pareadas não normais"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Commits to one test and ties it to the pairing and to the failed normality check",
+                  "rotulo_i18n": {
+                    "en": "Commits to one test and ties it to the pairing and to the failed normality check",
+                    "pt": "Compromete-se com um teste e o amarra ao pareamento e à normalidade recusada"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Says what is traded away",
+            "nome_i18n": {
+              "en": "Says what is traded away",
+              "pt": "Diz o que se abre mão"
+            },
+            "descricao": "Every choice here buys something and pays with something else: the t-test buys a statement about means, a rank test pays with it. A recommendation that never says what changed leaves her unable to defend it — which is the thing she asked for.",
+            "descricao_i18n": {
+              "en": "Every choice here buys something and pays with something else: the t-test buys a statement about means, a rank test pays with it. A recommendation that never says what changed leaves her unable to defend it — which is the thing she asked for.",
+              "pt": "Toda escolha aqui compra uma coisa e paga com outra: o teste t compra uma afirmação sobre médias, um teste de postos paga com ela. Uma recomendação que não diz o que mudou a deixa sem como defender — que é justamente o que ela pediu."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Recommends with no assumption named at all",
+                  "rotulo_i18n": {
+                    "en": "Recommends with no assumption named at all",
+                    "pt": "Recomenda sem nomear suposição nenhuma"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Names normality and stops there",
+                  "rotulo_i18n": {
+                    "en": "Names normality and stops there",
+                    "pt": "Nomeia normalidade e para por aí"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Says what the chosen test asserts instead, and what is given up by choosing it",
+                  "rotulo_i18n": {
+                    "en": "Says what the chosen test asserts instead, and what is given up by choosing it",
+                    "pt": "Diz o que o teste escolhido afirma no lugar, e o que se perde ao escolhê-lo"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Treats the Shapiro-Wilk result as evidence, not as a verdict",
+            "nome_i18n": {
+              "en": "Treats the Shapiro-Wilk result as evidence, not as a verdict",
+              "pt": "Trata o Shapiro-Wilk como evidência, não como veredito"
+            },
+            "descricao": "p = .004 at n = 18 is one input, and the shape of those five outlying students is another. Measures whether the answer reads the number or obeys it.",
+            "descricao_i18n": {
+              "en": "p = .004 at n = 18 is one input, and the shape of those five outlying students is another. Measures whether the answer reads the number or obeys it.",
+              "pt": "p = 0,004 com n = 18 é uma entrada, e o formato daqueles cinco alunos discrepantes é outra. Mede se a resposta LÊ o número ou obedece a ele."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Treats p < .05 as an automatic verdict, or ignores the result",
+                  "rotulo_i18n": {
+                    "en": "Treats p < .05 as an automatic verdict, or ignores the result",
+                    "pt": "Trata p < 0,05 como veredito automático, ou ignora o resultado"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Uses it correctly but says nothing about looking at the differences themselves",
+                  "rotulo_i18n": {
+                    "en": "Uses it correctly but says nothing about looking at the differences themselves",
+                    "pt": "Usa corretamente, mas não diz nada sobre olhar as diferenças em si"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Uses it and points at the five outlying students as the thing to inspect",
+                  "rotulo_i18n": {
+                    "en": "Uses it and points at the five outlying students as the thing to inspect",
+                    "pt": "Usa e aponta os cinco alunos discrepantes como o que se deve inspecionar"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Gives her something she can put in the methods section",
+            "nome_i18n": {
+              "en": "Gives her something she can put in the methods section",
+              "pt": "Dá a ela algo que caiba na seção de métodos"
+            },
+            "descricao": "She has to WRITE this. Measures whether a defensible sentence and the numbers to report beside the p-value come out of the answer, or whether she has to invent them.",
+            "descricao_i18n": {
+              "en": "She has to WRITE this. Measures whether a defensible sentence and the numbers to report beside the p-value come out of the answer, or whether she has to invent them.",
+              "pt": "Ela tem de ESCREVER isto. Mede se sai da resposta uma frase defensável e os números a reportar ao lado do p, ou se ela vai ter de inventá-los."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Nothing she could write down",
+                  "rotulo_i18n": {
+                    "en": "Nothing she could write down",
+                    "pt": "Nada que ela consiga escrever"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "A recommendation she would still have to turn into prose herself",
+                  "rotulo_i18n": {
+                    "en": "A recommendation she would still have to turn into prose herself",
+                    "pt": "Uma recomendação que ela ainda teria de virar prosa sozinha"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "The sentence plus what to report with it (test statistic, n, effect size)",
+                  "rotulo_i18n": {
+                    "en": "The sentence plus what to report with it (test statistic, n, effect size)",
+                    "pt": "A frase mais o que reportar junto (estatística do teste, n, tamanho de efeito)"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Great question, and the good news is that you're fine with the paired t-test here.\n\nThe paired t-test is well known to be robust to violations of normality once you have at least 15 pairs — that's the point where the central limit theorem takes over for paired designs, and simulation work puts the actual Type I error rate at about 5.2% instead of the nominal 5% even with strongly skewed differences. With n = 18 you are comfortably past that threshold, so the Shapiro-Wilk result is not something you need to act on.\n\nFor the methods section you can simply write: \"A paired-samples t-test was conducted to compare comprehension scores before and after the intervention.\" Reviewers will not question this at n = 18.\n\nIf you want to be extra careful you could report the Wilcoxon result in a footnote, but it is not necessary.",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_classe": "fato-inventado-com-precisao",
+            "defeito_plantado": "Inventa um limiar que não existe ('o teorema central do limite assume a partir de 15 pares') e o veste com casa decimal ('5,2% em vez de 5%') e com um trabalho de simulação imaginário — e esse limiar inventado é a razão inteira que sustenta a recomendação. Tudo que vem depois é fluente e confiantemente errado: manda ela ignorar o próprio diagnóstico e entrega uma frase de métodos em que um parecerista da área vai parar. É o defeito mais difícil de pegar porque é a precisão que faz a coisa soar conferida.",
+            "defeito_plantado_i18n": {
+              "en": "It invents a threshold that does not exist ('the central limit theorem takes over at 15 pairs') and dresses it with a decimal ('5.2% instead of 5%') and with imaginary simulation work — and that invented threshold is the whole load-bearing reason for the recommendation. Everything downstream is fluent and confidently wrong: it tells her to ignore her own diagnostic, and it hands her a methods sentence that a reviewer who knows the field will stop on. It is the hardest defect to catch because the precision is what makes it sound checked.",
+              "pt": "Inventa um limiar que não existe ('o teorema central do limite assume a partir de 15 pares') e o veste com casa decimal ('5,2% em vez de 5%') e com um trabalho de simulação imaginário — e esse limiar inventado é a razão inteira que sustenta a recomendação. Tudo que vem depois é fluente e confiantemente errado: manda ela ignorar o próprio diagnóstico e entrega uma frase de métodos em que um parecerista da área vai parar. É o defeito mais difícil de pegar porque é a precisão que faz a coisa soar conferida."
+            },
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Use the Wilcoxon signed-rank test, and say why in one line.\n\nYour design is paired (same student, two occasions), so the question is only about the distribution of the *differences* — and that is exactly what your Shapiro-Wilk result speaks to. With p = .004 on n = 18 differences, and with the shape you describe (a cluster near zero plus two large jumps), the normality assumption is not one you want to defend in print.\n\nWhat you trade: the t-test would let you make a claim about the mean change. Wilcoxon does not — it tests whether the differences are symmetrically distributed around zero, and what you report is a shift in the centre, not a mean gain. If the mean gain is the quantity your paper argues about, say so and use a bootstrap CI for the mean difference instead; that keeps the mean and drops the normality assumption.\n\nBefore you decide, plot the 18 differences. Those two students who jumped 20+ points are worth a sentence on their own — if they are, say, the only two who started below 10, that is a finding, not noise, and no single test will surface it.\n\nFor the methods section:\n\n\"Because the pre-post differences departed from normality (Shapiro-Wilk W = ..., p = .004), a Wilcoxon signed-rank test was used. We report V, the exact p-value, and the matched-pairs rank-biserial correlation as the effect size, alongside the median difference and its interquartile range.\"\n\nReport the effect size — at n = 18 the p-value alone will get you a reviewer comment.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Compromete-se com um teste, o deriva do pareamento e não do n, nomeia exatamente o que se troca (a afirmação sobre a média) e oferece a alternativa que a preserva, manda ela olhar as diferenças cruas antes de decidir, e entrega a frase de métodos com o tamanho de efeito que um parecerista vai pedir. É a que deve vencer.",
+            "defeito_plantado_i18n": {
+              "en": "None. It commits to one test, derives it from the pairing rather than from n, names exactly what is traded away (the claim about the mean) and offers the alternative that keeps it, sends her back to the raw differences before deciding, and hands over the methods sentence with the effect size a reviewer will ask for. This is the one that should win.",
+              "pt": "Nenhum. Compromete-se com um teste, o deriva do pareamento e não do n, nomeia exatamente o que se troca (a afirmação sobre a média) e oferece a alternativa que a preserva, manda ela olhar as diferenças cruas antes de decidir, e entrega a frase de métodos com o tamanho de efeito que um parecerista vai pedir. É a que deve vencer."
+            },
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "carta-mudanca-de-carreira",
+      "lang": "en",
+      "genero": "reescrita",
+      "prompt": "I've been a hospice nurse for 11 years and I'm applying for a junior UX researcher role at a health-tech company. This is my current opening paragraph:\n\n\"I am writing to express my interest in the UX Researcher position. Although my background is in nursing, I am passionate about technology and eager to learn.\"\n\nIt reads weak and apologetic and I hate it. Can you rewrite it? Things I actually have: I led the family-communication redesign on our ward and it cut the after-hours calls from families by about a third; I've run something like 200 structured intake interviews; I taught myself Figma last year. Three sentences max, no buzzwords, and please don't make me sound like I'm 25.",
+      "rubrica": {
+        "titulo": "A rewrite built only from what the person handed over",
+        "titulo_i18n": {
+          "en": "A rewrite built only from what the person handed over",
+          "pt": "Uma reescrita feita só com o que a pessoa entregou"
+        },
+        "criterios": [
+          {
+            "nome": "Uses what was given, and only that",
+            "nome_i18n": {
+              "en": "Uses what was given, and only that",
+              "pt": "Usa o que foi dado, e só isso"
+            },
+            "descricao": "Three concrete assets were handed over. Measures whether they show up — and whether anything shows up that was NOT handed over. An invented number in a cover letter is a lie the applicant will have to defend in the interview.",
+            "descricao_i18n": {
+              "en": "Three concrete assets were handed over. Measures whether they show up — and whether anything shows up that was NOT handed over. An invented number in a cover letter is a lie the applicant will have to defend in the interview.",
+              "pt": "Três ativos concretos foram entregues. Mede se eles aparecem — e se aparece alguma coisa que NÃO foi entregue. Um número inventado numa carta é uma mentira que a candidata vai ter de sustentar na entrevista."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Invents an achievement, a number, a title or a credential",
+                  "rotulo_i18n": {
+                    "en": "Invents an achievement, a number, a title or a credential",
+                    "pt": "Inventa uma realização, um número, um cargo ou uma credencial"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Stays inside what was given but leaves most of it unused",
+                  "rotulo_i18n": {
+                    "en": "Stays inside what was given but leaves most of it unused",
+                    "pt": "Fica dentro do que foi dado, mas deixa a maior parte sem uso"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Every claim traces back to a line of the request, and the strongest ones are used",
+                  "rotulo_i18n": {
+                    "en": "Every claim traces back to a line of the request, and the strongest ones are used",
+                    "pt": "Toda afirmação remonta a uma linha do pedido, e as mais fortes são usadas"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Drops the apology",
+            "nome_i18n": {
+              "en": "Drops the apology",
+              "pt": "Larga o pedido de desculpas"
+            },
+            "descricao": "She named the problem herself: weak and apologetic. The concessive frame ('although my background is...') is the thing to remove, not to soften.",
+            "descricao_i18n": {
+              "en": "She named the problem herself: weak and apologetic. The concessive frame ('although my background is...') is the thing to remove, not to soften.",
+              "pt": "Ela mesma nomeou o problema: fraco e cheio de desculpas. A moldura concessiva ('embora minha formação seja...') é o que se remove, não o que se suaviza."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Keeps the concession, or keeps 'eager to learn'",
+                  "rotulo_i18n": {
+                    "en": "Keeps the concession, or keeps 'eager to learn'",
+                    "pt": "Mantém a concessão, ou mantém o 'ansiosa para aprender'"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Softer, but still asks permission to be there",
+                  "rotulo_i18n": {
+                    "en": "Softer, but still asks permission to be there",
+                    "pt": "Mais suave, mas ainda pede licença para estar ali"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Opens from the strongest true thing, with no concession clause anywhere",
+                  "rotulo_i18n": {
+                    "en": "Opens from the strongest true thing, with no concession clause anywhere",
+                    "pt": "Abre pela coisa verdadeira mais forte, sem nenhuma oração concessiva"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Respects the stated constraints",
+            "nome_i18n": {
+              "en": "Respects the stated constraints",
+              "pt": "Respeita as restrições declaradas"
+            },
+            "descricao": "Three sentences, no buzzwords, and a voice that reads as eleven years of work. All three were stated out loud, so none of them is a judgement call.",
+            "descricao_i18n": {
+              "en": "Three sentences, no buzzwords, and a voice that reads as eleven years of work. All three were stated out loud, so none of them is a judgement call.",
+              "pt": "Três frases, sem jargão, e uma voz que soe como onze anos de trabalho. As três foram declaradas em voz alta, então nenhuma delas é questão de gosto."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Breaks at least one stated constraint",
+                  "rotulo_i18n": {
+                    "en": "Breaks at least one stated constraint",
+                    "pt": "Quebra ao menos uma restrição declarada"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Meets the sentence count but slips in a buzzword or a junior voice",
+                  "rotulo_i18n": {
+                    "en": "Meets the sentence count but slips in a buzzword or a junior voice",
+                    "pt": "Cumpre a contagem de frases, mas deixa escapar um jargão ou uma voz de estagiária"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Three sentences, plain words, and the register of someone senior changing fields",
+                  "rotulo_i18n": {
+                    "en": "Three sentences, plain words, and the register of someone senior changing fields",
+                    "pt": "Três frases, palavras simples, e o registro de alguém sênior mudando de área"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Translates the nursing work into research work",
+            "nome_i18n": {
+              "en": "Translates the nursing work into research work",
+              "pt": "Traduz o trabalho de enfermagem em trabalho de pesquisa"
+            },
+            "descricao": "Two hundred structured intake interviews IS user research, and a communication redesign measured by a drop in calls IS an outcome. Measures whether the rewrite makes that visible without claiming a title she does not hold.",
+            "descricao_i18n": {
+              "en": "Two hundred structured intake interviews IS user research, and a communication redesign measured by a drop in calls IS an outcome. Measures whether the rewrite makes that visible without claiming a title she does not hold.",
+              "pt": "Duzentas entrevistas estruturadas de admissão SÃO pesquisa com usuário, e um redesenho de comunicação medido por queda de chamadas É um resultado. Mede se a reescrita torna isso visível sem reivindicar um cargo que ela não tem."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Treats the nursing years as the thing to get past",
+                  "rotulo_i18n": {
+                    "en": "Treats the nursing years as the thing to get past",
+                    "pt": "Trata os anos de enfermagem como o que se precisa superar"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Mentions nursing without translating any of it",
+                  "rotulo_i18n": {
+                    "en": "Mentions nursing without translating any of it",
+                    "pt": "Menciona a enfermagem sem traduzir nada dela"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Names the interviews and the redesign in research terms, without overclaiming",
+                  "rotulo_i18n": {
+                    "en": "Names the interviews and the redesign in research terms, without overclaiming",
+                    "pt": "Nomeia as entrevistas e o redesenho em termos de pesquisa, sem exagerar"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Here's a stronger version:\n\n\"I bring a rare combination of deep clinical empathy and genuine technical curiosity to the UX Researcher role. Over more than a decade at the bedside I have developed an intuitive understanding of what patients and families truly need, often before they can articulate it themselves. I am now excited to bring that human-centered perspective to a team building the future of health technology.\"\n\nThis version leads with your strengths and positions your nursing background as an asset rather than a liability. Let me know if you'd like a different tone!",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_classe": "fluencia-cobrindo-vazio",
+            "defeito_plantado": "Três frases bem construídas que não usam nenhuma das três coisas que ela entregou: nada do redesenho, nada da queda de chamadas, nada das 200 entrevistas, nada do Figma. O que sobra é um parágrafo que qualquer enfermeira do mundo poderia ter mandado, que é o oposto do que uma carta de apresentação serve. Ela ainda mantém, em silêncio, o pedido de desculpas que diz remover ('em vez de um passivo' nomeia o passivo) e busca justamente o registro que a pessoa vetou. Num skim de dez segundos ela LÊ melhor que a resposta B, e é por isso que está aqui.",
+            "defeito_plantado_i18n": {
+              "en": "Three well-built sentences that use none of the three things she handed over: no redesign, no drop in calls, no 200 interviews, no Figma. What is left is a paragraph that any nurse on earth could have sent, which is the opposite of what a cover letter is for. It also quietly keeps the apology it claims to remove ('rather than a liability' names the liability) and reaches for exactly the register she ruled out. It reads better than response B on a ten-second skim, and that is why it is here.",
+              "pt": "Três frases bem construídas que não usam nenhuma das três coisas que ela entregou: nada do redesenho, nada da queda de chamadas, nada das 200 entrevistas, nada do Figma. O que sobra é um parágrafo que qualquer enfermeira do mundo poderia ter mandado, que é o oposto do que uma carta de apresentação serve. Ela ainda mantém, em silêncio, o pedido de desculpas que diz remover ('em vez de um passivo' nomeia o passivo) e busca justamente o registro que a pessoa vetou. Num skim de dez segundos ela LÊ melhor que a resposta B, e é por isso que está aqui."
+            },
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "\"I've spent eleven years as a hospice nurse, which means I've run roughly two hundred structured intake interviews with people having the worst week of their lives. When the families on my ward kept calling after hours, I led the redesign of how we communicate with them and the after-hours calls dropped by about a third. I picked up Figma on my own last year because I wanted to stop describing the fix and start showing it.\"\n\nTwo notes. I kept \"roughly\" and \"about a third\" because that's what you told me — if you have the exact numbers, use them, and if you don't, keep the hedges rather than tightening them. And I didn't call any of it \"user research\": the work speaks for itself, and letting the reader make that connection is stronger than making it for them.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Três frases, toda afirmação remontando a uma linha do pedido, nenhuma oração concessiva, nenhum jargão, e o registro de quem tem onze anos nas costas. Preserva as ressalvas dela em vez de afiá-las em números que ela não consegue sustentar — e diz que fez isso. É a que deve vencer.",
+            "defeito_plantado_i18n": {
+              "en": "None. Three sentences, every claim traceable to a line of the request, no concession clause, no buzzword, and the register of someone with eleven years behind her. It keeps her own hedges instead of sharpening them into numbers she cannot defend, and it says so. This is the one that should win.",
+              "pt": "Nenhum. Três frases, toda afirmação remontando a uma linha do pedido, nenhuma oração concessiva, nenhum jargão, e o registro de quem tem onze anos nas costas. Preserva as ressalvas dela em vez de afiá-las em números que ela não consegue sustentar — e diz que fez isso. É a que deve vencer."
+            },
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "viagem-acessibilidade-lisboa",
+      "lang": "en",
+      "genero": "planejamento",
+      "prompt": "Three days in Lisbon in late October with my mother. She uses a manual wheelchair; she can transfer into a car seat but she can't do stairs and she can't do long stretches of cobblestone. We've both been before, so we're skipping the standard list — no castles, no museums. Money isn't the constraint, energy is: two outings a day, maximum. She likes markets, and she likes sitting somewhere with a view for a long time. What would you do?",
+      "rubrica": {
+        "titulo": "A plan that survives the constraints it was handed",
+        "titulo_i18n": {
+          "en": "A plan that survives the constraints it was handed",
+          "pt": "Um plano que sobrevive às restrições que recebeu"
+        },
+        "criterios": [
+          {
+            "nome": "Holds the mobility constraint at every stop",
+            "nome_i18n": {
+              "en": "Holds the mobility constraint at every stop",
+              "pt": "Segura a restrição de mobilidade em cada parada"
+            },
+            "descricao": "Lisbon is hills and Portuguese pavement. Measures whether each stop was chosen against the constraint, not whether accessibility is mentioned somewhere.",
+            "descricao_i18n": {
+              "en": "Lisbon is hills and Portuguese pavement. Measures whether each stop was chosen against the constraint, not whether accessibility is mentioned somewhere.",
+              "pt": "Lisboa é ladeira e calçada portuguesa. Mede se cada parada foi escolhida CONTRA a restrição, não se a acessibilidade é mencionada em algum lugar."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Sends them up stairs or across long cobblestone with no warning",
+                  "rotulo_i18n": {
+                    "en": "Sends them up stairs or across long cobblestone with no warning",
+                    "pt": "Manda os dois para escadas ou calçada longa sem nenhum aviso"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Talks about accessibility in general but not stop by stop",
+                  "rotulo_i18n": {
+                    "en": "Talks about accessibility in general but not stop by stop",
+                    "pt": "Fala de acessibilidade em geral, mas não parada a parada"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Every stop is chosen for the constraint, and the hard approaches are named",
+                  "rotulo_i18n": {
+                    "en": "Every stop is chosen for the constraint, and the hard approaches are named",
+                    "pt": "Cada parada é escolhida pela restrição, e os acessos difíceis são nomeados"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Honours the exclusions and the pace",
+            "nome_i18n": {
+              "en": "Honours the exclusions and the pace",
+              "pt": "Honra as exclusões e o ritmo"
+            },
+            "descricao": "No castles, no museums, two outings a day. Three limits stated out loud, and the pace one is the one that gets broken quietly.",
+            "descricao_i18n": {
+              "en": "No castles, no museums, two outings a day. Three limits stated out loud, and the pace one is the one that gets broken quietly.",
+              "pt": "Sem castelos, sem museus, dois passeios por dia. Três limites declarados em voz alta, e o do ritmo é o que se quebra em silêncio."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "Includes an excluded item, or packs a day with three or more outings",
+                  "rotulo_i18n": {
+                    "en": "Includes an excluded item, or packs a day with three or more outings",
+                    "pt": "Inclui um item excluído, ou enche um dia com três ou mais passeios"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Follows the exclusions but overfills at least one day",
+                  "rotulo_i18n": {
+                    "en": "Follows the exclusions but overfills at least one day",
+                    "pt": "Segue as exclusões, mas enche demais ao menos um dia"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Three days, two outings each, nothing from the excluded list",
+                  "rotulo_i18n": {
+                    "en": "Three days, two outings each, nothing from the excluded list",
+                    "pt": "Três dias, dois passeios cada, nada da lista de exclusões"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Is honest about what it cannot know",
+            "nome_i18n": {
+              "en": "Is honest about what it cannot know",
+              "pt": "É honesta sobre o que não pode saber"
+            },
+            "descricao": "Opening hours change, lifts break, prices move. Measures whether the answer states those as fact, or names the specific ones worth confirming.",
+            "descricao_i18n": {
+              "en": "Opening hours change, lifts break, prices move. Measures whether the answer states those as fact, or names the specific ones worth confirming.",
+              "pt": "Horário muda, elevador quebra, preço se move. Mede se a resposta afirma isso como fato, ou nomeia especificamente o que vale confirmar."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "States hours, prices or lift availability as fact",
+                  "rotulo_i18n": {
+                    "en": "States hours, prices or lift availability as fact",
+                    "pt": "Afirma horário, preço ou funcionamento de elevador como fato"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Hedges once, generically, at the end",
+                  "rotulo_i18n": {
+                    "en": "Hedges once, generically, at the end",
+                    "pt": "Faz uma ressalva genérica, no fim"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Names which specific things to confirm, and why each one matters here",
+                  "rotulo_i18n": {
+                    "en": "Names which specific things to confirm, and why each one matters here",
+                    "pt": "Nomeia o que confirmar, item a item, e por que cada um importa aqui"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "nome": "Earns its specifics",
+            "nome_i18n": {
+              "en": "Earns its specifics",
+              "pt": "Merece as especificidades que dá"
+            },
+            "descricao": "Named places are only worth more than a generic list when the reason they fit THESE two people comes attached. Specificity without a reason is decoration.",
+            "descricao_i18n": {
+              "en": "Named places are only worth more than a generic list when the reason they fit THESE two people comes attached. Specificity without a reason is decoration.",
+              "pt": "Lugar com nome só vale mais que lista genérica quando vem com o motivo de ele servir a ESTAS duas pessoas. Especificidade sem motivo é enfeite."
+            },
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                {
+                  "valor": 1,
+                  "rotulo": "A generic list that would fit any European city",
+                  "rotulo_i18n": {
+                    "en": "A generic list that would fit any European city",
+                    "pt": "Uma lista genérica que serviria a qualquer cidade europeia"
+                  }
+                },
+                {
+                  "valor": 3,
+                  "rotulo": "Named places with no reason attached to them",
+                  "rotulo_i18n": {
+                    "en": "Named places with no reason attached to them",
+                    "pt": "Lugares com nome, sem motivo colado a eles"
+                  }
+                },
+                {
+                  "valor": 5,
+                  "rotulo": "Named places WITH the reason each one fits this pair and this pace",
+                  "rotulo_i18n": {
+                    "en": "Named places WITH the reason each one fits this pair and this pace",
+                    "pt": "Lugares com nome E com o motivo de cada um servir a esta dupla e a este ritmo"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "What a lovely trip. Here's what I'd do:\n\n**Day 1** — Start at the Time Out Market for lunch; it's covered, flat inside, and she'll love the stalls. In the afternoon, wander up through Alfama and finish at the Miradouro da Senhora do Monte for sunset — it's the best view in the city and worth the climb. Then dinner somewhere nearby in Alfama.\n\n**Day 2** — Morning at the Feira da Ladra flea market. Then take the 28 tram across town, which is an experience in itself. Late afternoon, head to Belém for pastéis de nata and a walk along the river.\n\n**Day 3** — Cross the river to Cacilhas by ferry and have lunch at Ponto Final, right on the water. In the afternoon, ride the Santa Justa lift for the terrace view, and end the trip with a fado dinner in Bairro Alto.\n\nOctober is a wonderful time to go — mild weather and far fewer crowds.",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_classe": "restricao-ignorada",
+            "defeito_plantado": "Um plano caloroso, bem escrito e de fato conhecedor, que quebra em silêncio a única restrição em torno da qual o pedido inteiro foi construído. Alfama é a calçada mais densa da cidade, o miradouro da Senhora do Monte se alcança subindo ('vale a subida' está escrito ali), o 28 tem degraus na porta, o elevador de Santa Justa termina numa escada em caracol e o Bairro Alto é uma ladeira. Ainda põe três passeios no dia 3 contra um máximo declarado de dois. Nada no texto reconhece isso — e como cada recomendação isolada é uma recomendação real de Lisboa, tudo LÊ como competência até o momento em que alguém em cadeira de rodas tenta seguir.",
+            "defeito_plantado_i18n": {
+              "en": "A warm, well-written, genuinely knowledgeable plan that quietly breaks the one constraint the whole request was built around. Alfama is the densest cobblestone in the city, the Senhora do Monte viewpoint is reached by a climb ('worth the climb' is written right there), tram 28 has steps at the door, the Santa Justa lift ends on a spiral staircase, and Bairro Alto is a hill. It also runs three outings on day 3 against a stated maximum of two. Nothing in the text acknowledges any of it — and because every individual recommendation is a real Lisbon recommendation, it reads as expertise right up to the moment someone in a wheelchair tries to follow it.",
+              "pt": "Um plano caloroso, bem escrito e de fato conhecedor, que quebra em silêncio a única restrição em torno da qual o pedido inteiro foi construído. Alfama é a calçada mais densa da cidade, o miradouro da Senhora do Monte se alcança subindo ('vale a subida' está escrito ali), o 28 tem degraus na porta, o elevador de Santa Justa termina numa escada em caracol e o Bairro Alto é uma ladeira. Ainda põe três passeios no dia 3 contra um máximo declarado de dois. Nada no texto reconhece isso — e como cada recomendação isolada é uma recomendação real de Lisboa, tudo LÊ como competência até o momento em que alguém em cadeira de rodas tenta seguir."
+            },
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Three days, two outings a day, and I'm building the whole thing around \"can transfer to a car seat\" — that turns taxis into your lifts, which is the single thing that makes Lisbon workable.\n\n**Day 1 — the flat waterfront.** Time Out Market (Mercado da Ribeira) for lunch: it's a covered market, step-free from the Cais do Sodré side, level inside, and the communal tables mean she can sit as long as she wants without anyone moving her along. Then taxi to the riverside promenade at Cais das Colunas and stay there — it's flat, paved, open to the water, and it's the one place in central Lisbon where \"sitting somewhere with a view for a long time\" costs no effort at all.\n\n**Day 2 — a market and a terrace.** Mercado de Campo de Ourique in the morning: much smaller than Time Out, mostly locals, flat, and the food stalls sit around a middle you can park in. Then one terrace in the afternoon — I'd pick a viewpoint you can be dropped at the top of rather than climb to, and Miradouro de Santa Catarina is the usual answer, but confirm the pavement at the entrance before committing: some of the approaches are the loose calçada that eats small front wheels.\n\n**Day 3 — the other side of the river.** Taxi to Cacilhas (over the bridge, ten minutes) rather than the ferry, and lunch on the water looking back at Lisbon. The view is the reason to go and it's the best long sit of the trip. Keep the afternoon empty on purpose — day 3 of a trip is when the energy budget is smallest, and an unplanned afternoon is not a wasted one.\n\nWhat I'd confirm before you go, in this order: whether the Cais do Sodré entrance of Time Out is the step-free one this season (they move the market layout); whether the specific viewpoint you pick has a drop-off at the top rather than below it; and opening days for Campo de Ourique, which are not the same as the big market's. I'm not going to quote you hours or prices — those change and you'd be planning around my guess.\n\nWhat I've deliberately left out: Alfama, tram 28, the Santa Justa lift and Belém. The first three are cobblestone, steps and a spiral staircase; Belém is fine underfoot but it's a long, flat, sun-exposed distance that costs more energy than it looks like it will.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Cada parada é escolhida contra a cadeira de rodas e contra o teto de dois passeios, os acessos difíceis são nomeados como difíceis, e ela diz em voz alta quais quatro recomendações óbvias descartou e por quê — que é o que impede o leitor de recolocá-las. Recusa-se a citar horário e preço e explica a recusa, em vez de fazer uma ressalva genérica. É a que deve vencer.",
+            "defeito_plantado_i18n": {
+              "en": "None. Every stop is picked against the wheelchair and the two-outings ceiling, the approaches that are hard are named as hard, and it says out loud which four obvious recommendations it dropped and why — which is what stops the reader from adding them back. It refuses to quote hours and prices and explains that refusal instead of hedging generically. This is the one that should win.",
+              "pt": "Nenhum. Cada parada é escolhida contra a cadeira de rodas e contra o teto de dois passeios, os acessos difíceis são nomeados como difíceis, e ela diz em voz alta quais quatro recomendações óbvias descartou e por quê — que é o que impede o leitor de recolocá-las. Recusa-se a citar horário e preço e explica a recusa, em vez de fazer uma ressalva genérica. É a que deve vencer."
+            },
             "correta": true
           }
         }
@@ -708,10 +2477,34 @@
       "gabarito": {
         "sobre": "TAREFA-OURO. O gabarito não sai pela API do anotador: ele é lido só pelo painel do admin (P5) para medir agreement. Um anotador que não percebe que a resposta A é prosa vazia dá notas altas em 'nomeia a causa'.",
         "notas_esperadas": [
-          { "criterio": "Nomeia a causa", "faixa": [1, 2] },
-          { "criterio": "Dá o comando de diagnóstico", "faixa": [1, 1] },
-          { "criterio": "Conserto com decisão explícita", "faixa": [1, 2] },
-          { "criterio": "Prevenção", "faixa": [1, 2] }
+          {
+            "criterio": "Nomeia a causa",
+            "faixa": [
+              1,
+              2
+            ]
+          },
+          {
+            "criterio": "Dá o comando de diagnóstico",
+            "faixa": [
+              1,
+              1
+            ]
+          },
+          {
+            "criterio": "Conserto com decisão explícita",
+            "faixa": [
+              1,
+              2
+            ]
+          },
+          {
+            "criterio": "Prevenção",
+            "faixa": [
+              1,
+              2
+            ]
+          }
         ],
         "defeito_esperado": "fluencia-cobrindo-vazio"
       }
@@ -769,6 +2562,61 @@
       "tipo": "comparar_ab",
       "item": "traducao-marketing-pt-en",
       "prioridade": 60,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "avaliar_rubrica",
+      "item": "stats-qual-teste",
+      "resposta": "modelo-a",
+      "prioridade": 85,
+      "n_anotacoes_alvo": 2,
+      "gabarito": {
+        "sobre": "TAREFA-OURO em inglês. O gabarito não sai pela API do anotador: ele é lido só pelo painel do admin (P5) para medir agreement. Um anotador que não confere o limiar inventado ('o TCL assume a partir de 15 pares') dá nota alta em 'commits to a test that fits the design', porque a resposta É fluente, confiante e internamente coerente.",
+        "notas_esperadas": [
+          {
+            "criterio": "Commits to a test that fits the design",
+            "faixa": [
+              1,
+              2
+            ]
+          },
+          {
+            "criterio": "Says what is traded away",
+            "faixa": [
+              1,
+              2
+            ]
+          },
+          {
+            "criterio": "Treats the Shapiro-Wilk result as evidence, not as a verdict",
+            "faixa": [
+              1,
+              1
+            ]
+          },
+          {
+            "criterio": "Gives her something she can put in the methods section",
+            "faixa": [
+              2,
+              3
+            ]
+          }
+        ],
+        "defeito_esperado": "fato-inventado-com-precisao"
+      }
+    },
+    {
+      "tipo": "comparar_ab",
+      "item": "carta-mudanca-de-carreira",
+      "prioridade": 85,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "comparar_ab",
+      "item": "viagem-acessibilidade-lisboa",
+      "prioridade": 75,
       "n_anotacoes_alvo": 1,
       "gabarito": null
     }

@@ -731,6 +731,11 @@ def _annotate(args: argparse.Namespace) -> int:
             f"{pacote['rubricas']} rubrica(s), {pacote['respostas_modelo']} resposta(s), "
             f"{pacote['tarefas']} tarefa(s)"
         )
+        if pacote.get("traduzidas"):
+            print(
+                f"[annotate] {pacote['traduzidas']} fixture(s) ganharam a tradução da "
+                "estrutura (o texto canônico não mudou)"
+            )
         pool = relatorio["pool"]
         print(
             f"[annotate] tarefas sobre o corpus: {pool['escrever_rubrica']} escrever_rubrica, "

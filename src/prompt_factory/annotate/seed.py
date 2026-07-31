@@ -75,7 +75,14 @@ PERSONAS: tuple[tuple[str, str], ...] = (
 
 #: Contrato do ``criterios_json`` das rubricas. Vive numa COLUNA e não no código
 #: pelo mesmo motivo do ``payload_schema``: a versão viaja com o dado.
-SCHEMA_RUBRICA = "rubrica@1"
+#:
+#: ``@2`` (P3i) acrescentou os sidecares de exibição ``titulo_i18n``,
+#: ``nome_i18n``, ``descricao_i18n`` e ``rotulo_i18n``. Eles são **opcionais**:
+#: a rubrica escrita por um anotador tem uma língua só, e é isso mesmo — ela é
+#: dado, não cromo, e a plataforma não inventa tradução de dado. O que NÃO mudou
+#: é o campo canônico (``titulo``, ``nome``, ``descricao``, ``rotulo``), que é a
+#: identidade referenciada por ``anotacoes.payload_json``.
+SCHEMA_RUBRICA = "rubrica@2"
 
 #: Prioridade base das tarefas geradas sobre o pool real. **Abaixo** das do
 #: pacote (60 a 90) de propósito: quem abre a demonstração precisa cair primeiro
@@ -145,10 +152,81 @@ def _existe(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...]) -> bool
     return conn.execute(sql, params).fetchone() is not None
 
 
+#: Os sidecares de exibição do P3i. Tudo que termina assim é TRADUÇÃO, e nada
+#: que termina assim entra na identidade de um critério.
+SUFIXO_I18N = "_i18n"
+
+#: Chaves que nomeiam a FORMA do payload, não o conteúdo dele. Ficam de fora da
+#: comparação de ``_canonico`` porque a pergunta que ela responde é "isto continua
+#: dizendo a mesma coisa?", e o nome da forma não é o que ela diz.
+CHAVES_DE_FORMA = frozenset({"schema"})
+
+
+def _canonico(valor: Any) -> Any:
+    """O mesmo objeto sem os ``*_i18n`` e sem o rótulo de schema — a IDENTIDADE.
+
+    É contra isto que ``_traduzir`` compara antes de reescrever uma fixture:
+    acrescentar tradução não muda a rubrica, mas mudar um critério muda — e
+    mudar um critério por baixo de uma anotação já gravada quebraria a ligação
+    entre ``notas[].criterio`` e a rubrica que a produziu.
+    """
+    if isinstance(valor, dict):
+        return {
+            k: _canonico(v)
+            for k, v in valor.items()
+            if not str(k).endswith(SUFIXO_I18N) and k not in CHAVES_DE_FORMA
+        }
+    if isinstance(valor, list):
+        return [_canonico(x) for x in valor]
+    return valor
+
+
+def _traduzir(
+    conn: sqlite3.Connection,
+    tabela: str,
+    linha: sqlite3.Row,
+    coluna: str,
+    novo_json: str,
+) -> bool:
+    """Acrescenta as traduções a uma fixture já semeada. ``True`` se atualizou.
+
+    O PROBLEMA REAL QUE ISTO RESOLVE (P3i)
+    ======================================
+    ``semear_pacote`` é idempotente pela chave natural — ``(prompt_uid, titulo)``
+    na rubrica, ``(prompt_uid, rotulo_modelo)`` na resposta. Ótimo enquanto o
+    pacote só cresce; inútil quando ele ganha uma DIMENSÃO. O banco do dono já
+    tem as oito rubricas semeadas na forma monolíngue, e "pular porque já
+    existe" as deixaria monolíngues para sempre — a interface abriria em inglês
+    com rubricas em português, que é exatamente o defeito que este marco existe
+    para não ter.
+
+    A regra da atualização é estreita e verificável: **só se o canônico for
+    idêntico** (``_canonico`` tira os ``*_i18n`` dos dois lados e compara) e só
+    se a linha for ``origem = 'fixture'``. Acrescentar tradução não muda a
+    rubrica; mudar um critério muda, e continuaria proibido — ele é a identidade
+    que ``anotacoes.payload_json`` referencia em ``notas[].criterio``.
+    """
+    if str(linha["origem"]) != "fixture":
+        return False
+    gravado = str(linha[coluna] or "")
+    if gravado == novo_json:
+        return False
+    try:
+        antes, depois = json.loads(gravado or "{}"), json.loads(novo_json)
+    except ValueError:  # pragma: no cover - JSON corrompido à mão
+        return False
+    if _canonico(antes) != _canonico(depois):
+        return False
+    conn.execute(f"UPDATE {tabela} SET {coluna} = ? WHERE id = ?", (novo_json, int(linha["id"])))
+    return True
+
+
 def semear_pacote(conn: sqlite3.Connection, dados: dict[str, Any] | None = None) -> dict[str, int]:
     """Prompts, rubricas, respostas e tarefas do pacote. Devolve o que ENTROU."""
     pacote = dados if dados is not None else carregar_pacote()
-    conta = dict.fromkeys(("prompts_demo", "rubricas", "respostas_modelo", "tarefas"), 0)
+    conta = dict.fromkeys(
+        ("prompts_demo", "rubricas", "respostas_modelo", "tarefas", "traduzidas"), 0
+    )
     uid_por_chave: dict[str, str] = {}
     # O pacote vai para o projeto DEMONSTRAÇÃO, não para o do trabalho real:
     # misturar fixture com autoria na mesma lista apagaria justamente a
@@ -169,45 +247,51 @@ def semear_pacote(conn: sqlite3.Connection, dados: dict[str, Any] | None = None)
         conta["prompts_demo"] += int(cur.rowcount or 0)
 
         rub = item["rubrica"]
-        if not _existe(
-            conn,
-            "SELECT 1 FROM rubricas WHERE prompt_uid = ? AND titulo = ?",
+        # `titulo_i18n` entra no JSON, e não numa coluna: o título CANÔNICO é a
+        # coluna `titulo` (chave natural da idempotência) e a tradução é
+        # exibição. Uma coluna a mais faria a chave natural virar um par.
+        conteudo: dict[str, Any] = {"schema": SCHEMA_RUBRICA}
+        # Ausente, e não `null`: uma rubrica sem tradução é uma rubrica de uma
+        # língua só (o caso das escritas por anotadores), e um `"titulo_i18n":
+        # null` gravado diria que alguém apagou a tradução dela.
+        if rub.get("titulo_i18n"):
+            conteudo["titulo_i18n"] = rub["titulo_i18n"]
+        conteudo["criterios"] = rub["criterios"]
+        criterios_json = json.dumps(conteudo, ensure_ascii=False)
+        linha = conn.execute(
+            "SELECT id, criterios_json, origem FROM rubricas "
+            "WHERE prompt_uid = ? AND titulo = ?",
             (uid, rub["titulo"]),
-        ):
+        ).fetchone()
+        if linha is None:
             conn.execute(
                 "INSERT INTO rubricas (prompt_uid, titulo, criterios_json, origem, status) "
                 "VALUES (?, ?, ?, 'fixture', 'ativa')",
-                (
-                    uid,
-                    rub["titulo"],
-                    json.dumps(
-                        {"schema": SCHEMA_RUBRICA, "criterios": rub["criterios"]},
-                        ensure_ascii=False,
-                    ),
-                ),
+                (uid, rub["titulo"], criterios_json),
             )
             conta["rubricas"] += 1
+        elif _traduzir(conn, "rubricas", linha, "criterios_json", criterios_json):
+            conta["traduzidas"] += 1
 
         for resposta in item["respostas"]:
-            if _existe(
-                conn,
-                "SELECT 1 FROM respostas_modelo WHERE prompt_uid = ? AND rotulo_modelo = ?",
+            # O defeito plantado mora AQUI, e o `meta_json` nunca sai pela API do
+            # anotador (ver `tarefas._respostas`).
+            meta_json = json.dumps(resposta["meta"], ensure_ascii=False)
+            linha = conn.execute(
+                "SELECT id, meta_json, origem FROM respostas_modelo "
+                "WHERE prompt_uid = ? AND rotulo_modelo = ?",
                 (uid, resposta["rotulo_modelo"]),
-            ):
-                continue
-            conn.execute(
-                "INSERT INTO respostas_modelo (prompt_uid, rotulo_modelo, texto, origem, meta_json) "
-                "VALUES (?, ?, ?, 'fixture', ?)",
-                (
-                    uid,
-                    resposta["rotulo_modelo"],
-                    resposta["texto"],
-                    # O defeito plantado mora AQUI, e o `meta_json` nunca sai
-                    # pela API do anotador (ver `tarefas._respostas`).
-                    json.dumps(resposta["meta"], ensure_ascii=False),
-                ),
-            )
-            conta["respostas_modelo"] += 1
+            ).fetchone()
+            if linha is None:
+                conn.execute(
+                    "INSERT INTO respostas_modelo "
+                    "(prompt_uid, rotulo_modelo, texto, origem, meta_json) "
+                    "VALUES (?, ?, ?, 'fixture', ?)",
+                    (uid, resposta["rotulo_modelo"], resposta["texto"], meta_json),
+                )
+                conta["respostas_modelo"] += 1
+            elif _traduzir(conn, "respostas_modelo", linha, "meta_json", meta_json):
+                conta["traduzidas"] += 1
 
     for tarefa in pacote["tarefas"]:
         uid = uid_por_chave[tarefa["item"]]

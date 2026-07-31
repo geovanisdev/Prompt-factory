@@ -38,6 +38,18 @@ cláusula fica (ela passa a valer no dia em que os rótulos existirem), mas a te
 e ``descrever_fallback`` dizem isso com todas as letras. Prometer uma garantia
 que o dado não sustenta é pior do que não ter a garantia.
 
+DUAS LÍNGUAS, COTA IGUAL  (P3i)
+================================
+``pool_fallback_lang`` aceita ``"pt"`` (compatível com tudo que veio antes) e
+``["pt", "en"]``. Com uma lista, o teto de ``pool_max`` é dividido em **cota
+igual por língua** e cada cota é amostrada com passo constante DENTRO da língua.
+
+Proporcional ao corpus não serviria: são 116.051 linhas em inglês contra uma
+fração disso em português, e o pool sairia praticamente monolíngue — só que na
+outra ponta. A cota igual mantém as duas presentes; o passo constante dentro de
+cada uma mantém a proporção das FONTES, que é o que a amostragem já garantia.
+Uma língua sem material para a própria cota devolve a diferença às outras.
+
 MATERIALIZADO, COM CHAVE DE INVALIDAÇÃO EXPLÍCITA
 ==================================================
 Resolver o pool no corpus a cada request custava **607 ms medidos** — e ele está
@@ -70,10 +82,31 @@ FALLBACK = "fallback"
 CHAVE_ASSINATURA = "pool_assinatura"
 CHAVE_ORIGEM = "pool_origem"
 CHAVE_MOTIVO = "pool_motivo"
+CHAVE_MOTIVO_I18N = "pool_motivo_i18n"
 CHAVE_COLECAO = "pool_colecao"
 CHAVE_EXCLUIDAS = "pool_excluidas_licenca"
 CHAVE_ATUALIZADO = "pool_atualizado_em"
 CHAVE_BUILD = "pool_db_build_id"
+
+#: Chaves do dicionário da TELA para as frases que este módulo produz (P3i).
+#:
+#: O painel do admin é onde a proveniência fica visível, e é a segunda coisa que
+#: o brief manda um avaliador procurar. Uma dessas quatro frases em português no
+#: meio de uma tela em inglês seria justamente a que ele veio ler. As frases em
+#: português continuam saindo no ``/api/health`` — a API se explica sozinha, e
+#: o ``pf annotate status`` as imprime no terminal, onde pt-BR é a convenção.
+T_MOTIVO_COLECAO = "pool.motivo_colecao"
+T_MOTIVO_COLECAO_LICENCA = "pool.motivo_colecao_licenca"
+T_MOTIVO_COLECAO_VAZIA = "pool.motivo_colecao_vazia"
+T_MOTIVO_COLECAO_SEM_LICENCA = "pool.motivo_colecao_sem_licenca"
+T_MOTIVO_SEM_COLECAO = "pool.motivo_sem_colecao"
+T_FILTRO_UMA_LINGUA = "pool.filtro_uma_lingua"
+T_FILTRO_VARIAS_LINGUAS = "pool.filtro_varias_linguas"
+T_POLITICA_ABERTA = "pool.politica_aberta"
+T_POLITICA_COMERCIAL = "pool.politica_comercial"
+T_POLITICA_REDISTRIBUIVEL = "pool.politica_redistribuivel"
+T_POLITICA_AMBAS = "pool.politica_ambas"
+T_NOTA_NSFW = "pool.nota_nsfw"
 
 #: A frase honesta sobre NSFW. Uma constante porque ela aparece em três lugares
 #: (o filtro descrito, o health e o painel do admin) e as três precisam dizer a
@@ -82,6 +115,32 @@ NOTA_NSFW = (
     "a marcação de conteúdo sensível depende da campanha de rotulagem, que ainda "
     "não rodou: hoje `nsfw` é nulo no corpus inteiro e a cláusula exclui zero linhas"
 )
+
+
+def normalizar_langs(bruto: Any) -> tuple[str, ...]:
+    """``pool_fallback_lang`` como tupla — aceita ``"pt"`` **e** ``["pt", "en"]``.
+
+    O valor único continua valendo (é o que está em todo ``settings.toml`` de
+    antes do P3i, e o que os testes de licença monkeypatcham). A lista é o que
+    permite ao dono anotar também em inglês sem trocar o arquivo de lugar.
+
+    A ORDEM É SIGNIFICATIVA: ela é a ordem de precedência das cotas quando o teto
+    não divide igual entre as línguas (ver ``_cotas``). Duplicatas saem e a ordem
+    declarada é preservada, porque ``["pt", "pt", "en"]`` não deve dar ao
+    português duas cotas.
+    """
+    if isinstance(bruto, str):
+        crus: list[Any] = [bruto]
+    elif isinstance(bruto, (list, tuple)):
+        crus = list(bruto)
+    else:  # pragma: no cover - TOML não produz outra coisa aqui
+        crus = [bruto]
+    vistos: list[str] = []
+    for item in crus:
+        lang = str(item).strip()
+        if lang and lang not in vistos:
+            vistos.append(lang)
+    return tuple(vistos) or ("pt",)
 
 
 def cfg_pool() -> dict[str, Any]:
@@ -94,7 +153,7 @@ def cfg_pool() -> dict[str, Any]:
     return {
         "colecao": str(_cfg("annotate", "pool_collection", default="anotacao")),
         "max": int(_cfg("annotate", "pool_max", default=500)),
-        "lang": str(_cfg("annotate", "pool_fallback_lang", default="pt")),
+        "lang": normalizar_langs(_cfg("annotate", "pool_fallback_lang", default="pt")),
         "min_chars": int(_cfg("annotate", "pool_fallback_min_chars", default=40)),
         "max_chars": int(_cfg("annotate", "pool_fallback_max_chars", default=2000)),
         "max_dups": int(_cfg("annotate", "pool_fallback_max_dups", default=0)),
@@ -123,6 +182,10 @@ class Pool:
     #: Quantas linhas a POLÍTICA DE LICENÇA tirou da origem ativa. É o número
     #: que prova, na tela, que a política não é decorativa.
     excluidas_licenca: int = 0
+    #: O MESMO ``motivo``, como chave do dicionário da tela + os dados dele.
+    #: Ver as constantes ``T_MOTIVO_*``.
+    motivo_chave: str = T_MOTIVO_SEM_COLECAO
+    motivo_dados: dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +201,14 @@ def politica_licenca(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         exigencias.append("commercial_ok = 1")
     if c["redistribuivel"]:
         exigencias.append("redistributable = 1")
+    if c["comercial"] and c["redistribuivel"]:
+        chave = T_POLITICA_AMBAS
+    elif c["comercial"]:
+        chave = T_POLITICA_COMERCIAL
+    elif c["redistribuivel"]:
+        chave = T_POLITICA_REDISTRIBUIVEL
+    else:
+        chave = T_POLITICA_ABERTA
     return {
         "commercial_ok": bool(c["comercial"]),
         "redistributable": bool(c["redistribuivel"]),
@@ -146,6 +217,8 @@ def politica_licenca(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             if not exigencias
             else "só entra prompt com " + " e ".join(exigencias)
         ),
+        # A mesma frase como chave da tela — ver o bloco ``T_*`` no topo.
+        "descricao_chave": chave,
         "fechada": bool(c["comercial"] and c["redistribuivel"]),
     }
 
@@ -160,31 +233,94 @@ def _clausulas_licenca(cfg: dict[str, Any]) -> str:
     return "".join(f" AND {parte}" for parte in partes)
 
 
-def _filtro_fallback(cfg: dict[str, Any], *, com_licenca: bool = True) -> str:
+def _filtro_fallback(
+    cfg: dict[str, Any], *, com_licenca: bool = True, lang: str | None = None
+) -> str:
     """O FROM/WHERE do fallback.
 
     ``com_licenca=False`` devolve o mesmo filtro **sem** a política — é como se
     conta quantas linhas ela exclui, e esse número vai para a tela.
 
+    ``lang`` restringe a UMA das línguas configuradas (é assim que a cota por
+    língua é apurada); sem ele, o filtro cobre todas as configuradas.
+
     ``nsfw IS NOT 1`` (e não ``= 0``) mantém os NULL, que hoje são o corpus
     inteiro. Ver ``NOTA_NSFW``: a cláusula é verdadeira e vazia até a campanha
     de rotulagem rodar, e a tela diz isso.
     """
+    if lang is None:
+        alvo = "p.lang IN (" + ", ".join(f":lang{i}" for i in range(len(cfg["lang"]))) + ")"
+    else:
+        alvo = "p.lang = :lang_alvo"
     base = (
         "FROM prompts p "
-        "WHERE p.lang = :lang AND p.n_chars >= :min_chars AND p.n_chars <= :max_chars "
+        f"WHERE {alvo} AND p.n_chars >= :min_chars AND p.n_chars <= :max_chars "
         "  AND p.n_exact_dups <= :max_dups AND p.nsfw IS NOT 1"
     )
     return base + (_clausulas_licenca(cfg) if com_licenca else "")
 
 
-def _params_fallback(cfg: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "lang": cfg["lang"],
+def _params_fallback(cfg: dict[str, Any], lang: str | None = None) -> dict[str, Any]:
+    par: dict[str, Any] = {
         "min_chars": cfg["min_chars"],
         "max_chars": cfg["max_chars"],
         "max_dups": cfg["max_dups"],
     }
+    if lang is None:
+        par.update({f"lang{i}": valor for i, valor in enumerate(cfg["lang"])})
+    else:
+        par["lang_alvo"] = lang
+    return par
+
+
+def _cotas(
+    langs: tuple[str, ...], teto: int, disponiveis: dict[str, int]
+) -> dict[str, int]:
+    """Quantas linhas cada língua leva do teto — **cota igual, não proporcional**.
+
+    O DEFEITO QUE ISTO IMPEDE
+    =========================
+    Com ``pool_fallback_lang = ["pt", "en"]`` e uma amostra única de passo
+    constante sobre o conjunto todo, o pool sairia com a proporção do CORPUS —
+    e o corpus tem 116.051 linhas em inglês contra uma fração disso em
+    português. A língua majoritária tomaria o pool inteiro e a demonstração
+    passaria a ser monolíngue de novo, agora na outra ponta.
+
+    A cota é igual por língua (o resto vai para as primeiras da ordem
+    declarada), e uma língua que não tem material para a própria cota **devolve
+    a diferença** para as outras — senão configurar uma língua quase vazia
+    encolheria o pool inteiro em vez de só a fatia dela.
+
+    Com UMA língua configurada o resultado é ``min(teto, disponível)``, que é
+    exatamente o que o pool fazia antes do P3i.
+    """
+    cotas = dict.fromkeys(langs, 0)
+    sobra = max(0, int(teto))
+    while sobra > 0:
+        com_espaco = [lang for lang in langs if disponiveis.get(lang, 0) > cotas[lang]]
+        if not com_espaco:
+            break
+        base, extra = divmod(sobra, len(com_espaco))
+        entregue = 0
+        for i, lang in enumerate(com_espaco):
+            quota = base + (1 if i < extra else 0)
+            if quota <= 0:
+                continue
+            cabe = min(quota, disponiveis[lang] - cotas[lang])
+            cotas[lang] += cabe
+            entregue += cabe
+        if entregue == 0:
+            break
+        sobra -= entregue
+    return cotas
+
+
+def _passo_constante(ids: list[int], quantas: int) -> list[int]:
+    """``quantas`` posições espalhadas por ``ids`` inteiro. Ver ``_uids_fallback``."""
+    if quantas >= len(ids):
+        return list(ids)
+    passo = len(ids) / quantas
+    return [ids[int(i * passo)] for i in range(quantas)]
 
 
 # ---------------------------------------------------------------------------
@@ -207,23 +343,34 @@ def _uids_fallback(conn: sqlite3.Connection, cfg: dict[str, Any]) -> list[str]:
     centenas de ms de páginas lidas para jogar 27.200 fora. O passo lê só rowids
     e hidrata 500.
 
+    UMA PASSAGEM POR LÍNGUA (P3i). O passo constante preserva a proporção das
+    FONTES dentro de cada língua; a divisão em cotas (``_cotas``) preserva a
+    presença de cada LÍNGUA no pool. Uma amostra única sobre as duas juntas daria
+    a proporção do corpus — e o corpus é dominado pelo inglês.
+
     Determinístico: mesmo corpus e mesmas chaves, mesmos 500 uids, sempre. Custa
     **~607 ms medidos** contra o corpus real, e é por isso que quem o chama é a
     materialização (uma vez por build do corpus), não o request.
     """
-    teto = int(cfg["max"])
-    ids = [
-        int(linha["id"])
-        for linha in conn.execute(
-            f"SELECT p.id {_filtro_fallback(cfg)} ORDER BY p.id", _params_fallback(cfg)
-        )
-    ]
+    por_lang = {
+        lang: [
+            int(linha["id"])
+            for linha in conn.execute(
+                f"SELECT p.id {_filtro_fallback(cfg, lang=lang)} ORDER BY p.id",
+                _params_fallback(cfg, lang),
+            )
+        ]
+        for lang in cfg["lang"]
+    }
+    cotas = _cotas(cfg["lang"], int(cfg["max"]), {k: len(v) for k, v in por_lang.items()})
+    ids: list[int] = []
+    for lang in cfg["lang"]:
+        ids.extend(_passo_constante(por_lang[lang], cotas[lang]))
     if not ids:
         return []
-    if len(ids) > teto:
-        passo = len(ids) / teto
-        ids = [ids[int(i * passo)] for i in range(teto)]
     marcas = ", ".join("?" * len(ids))
+    # ORDER BY id, e não pela língua: o pool é uma lista só, e agrupar por língua
+    # faria a fila entregar todo o português antes de qualquer inglês.
     return [
         str(linha["uid"])
         for linha in conn.execute(
@@ -239,13 +386,21 @@ def _contar_fallback(conn: sqlite3.Connection, cfg: dict[str, Any]) -> int:
     na quingentésima linha do índice e nunca varre o conjunto todo. **~14 ms
     medidos** contra o corpus real (a docstring antiga dizia 0,2 ms — errava por
     70x). E o número que sai é exatamente ``len(uids)`` da função acima: a
-    contagem que o health mostra é a mesma que o catálogo vai entregar.
+    contagem que o health mostra é a mesma que o catálogo vai entregar — por isso
+    ele passa pelas MESMAS cotas por língua, e não por um ``count`` único.
     """
-    sql = (
-        f"SELECT count(*) AS n FROM (SELECT 1 {_filtro_fallback(cfg)} "
-        f"LIMIT {int(cfg['max'])})"
-    )
-    return int(conn.execute(sql, _params_fallback(cfg)).fetchone()["n"])
+    teto = int(cfg["max"])
+    disponiveis = {
+        lang: int(
+            conn.execute(
+                f"SELECT count(*) AS n FROM (SELECT 1 {_filtro_fallback(cfg, lang=lang)} "
+                f"LIMIT {teto})",
+                _params_fallback(cfg, lang),
+            ).fetchone()["n"]
+        )
+        for lang in cfg["lang"]
+    }
+    return sum(_cotas(cfg["lang"], teto, disponiveis).values())
 
 
 def _excluidas_por_licenca_fallback(conn: sqlite3.Connection, cfg: dict[str, Any]) -> int:
@@ -257,6 +412,8 @@ def _excluidas_por_licenca_fallback(conn: sqlite3.Connection, cfg: dict[str, Any
     """
     if not (cfg["comercial"] or cfg["redistribuivel"]):
         return 0
+    # Sobre TODAS as línguas configuradas: é a política inteira que se mede, e é
+    # ela que mantém as 9.148 linhas `cc-by-nc-4.0` do inglês fora do trabalho.
     par = _params_fallback(cfg)
     total = int(
         conn.execute(
@@ -334,10 +491,13 @@ def resolver(conn_corpus: sqlite3.Connection, *, com_uids: bool = False) -> Pool
         n, uids, excluidas = _da_colecao(conn_corpus, colecao_id, cfg, com_uids=com_uids)
         if n:
             motivo = f"coleção {nome!r} curada na interface de curadoria"
+            chave, dados = T_MOTIVO_COLECAO, {"colecao": nome}
             if excluidas:
                 motivo += (
                     f"; {excluidas} item(ns) dela ficaram de fora pela política de licença"
                 )
+                chave = T_MOTIVO_COLECAO_LICENCA
+                dados = {"colecao": nome, "n": excluidas}
             return Pool(
                 origem=f"colecao:{nome}",
                 n_pool=n,
@@ -345,6 +505,8 @@ def resolver(conn_corpus: sqlite3.Connection, *, com_uids: bool = False) -> Pool
                 colecao=nome,
                 uids=uids,
                 excluidas_licenca=excluidas,
+                motivo_chave=chave,
+                motivo_dados=dados,
             )
         # Coleção existe mas está vazia (ou a política zerou): tratada como
         # ausente. Um pool de zero itens não é uma origem, é uma tela morta — e
@@ -354,27 +516,35 @@ def resolver(conn_corpus: sqlite3.Connection, *, com_uids: bool = False) -> Pool
             f"a coleção {nome!r} existe no corpus mas está vazia — "
             "filtro determinístico enquanto ninguém a preenche"
         )
+        chave, dados = T_MOTIVO_COLECAO_VAZIA, {"colecao": nome}
         if excluidas:
             motivo = (
                 f"a coleção {nome!r} existe mas nenhum item dela passa na política de "
                 f"licença ({excluidas} excluído(s)) — filtro determinístico no lugar"
             )
+            chave, dados = T_MOTIVO_COLECAO_SEM_LICENCA, {"colecao": nome, "n": excluidas}
     else:
         motivo = (
             f"não existe coleção {nome!r} no corpus (toda `pf load-db` reconstrói "
             "o banco e apaga as coleções) — filtro determinístico no lugar"
         )
+        chave, dados = T_MOTIVO_SEM_COLECAO, {"colecao": nome}
 
     excluidas = _excluidas_por_licenca_fallback(conn_corpus, cfg)
     if com_uids:
         lista = _uids_fallback(conn_corpus, cfg)
-        return Pool(FALLBACK, len(lista), motivo, nome, lista, excluidas)
+        return Pool(
+            FALLBACK, len(lista), motivo, nome, lista, excluidas,
+            motivo_chave=chave, motivo_dados=dados,
+        )
     return Pool(
         FALLBACK,
         _contar_fallback(conn_corpus, cfg),
         motivo,
         nome,
         excluidas_licenca=excluidas,
+        motivo_chave=chave,
+        motivo_dados=dados,
     )
 
 
@@ -435,6 +605,10 @@ def _gravar(conn: sqlite3.Connection, p: Pool, assin: str, build: str) -> None:
         (CHAVE_ASSINATURA, assin),
         (CHAVE_ORIGEM, p.origem),
         (CHAVE_MOTIVO, p.motivo),
+        # A chave da tela viaja junto com a frase: quem lê o pool do banco
+        # (o caminho comum de todo request) precisa das duas.
+        (CHAVE_MOTIVO_I18N, json.dumps(
+            {"chave": p.motivo_chave, "dados": p.motivo_dados}, ensure_ascii=False)),
         (CHAVE_COLECAO, p.colecao),
         (CHAVE_EXCLUIDAS, p.excluidas_licenca),
         (CHAVE_BUILD, build),
@@ -501,12 +675,24 @@ def _do_banco(conn: sqlite3.Connection) -> Pool:
     from . import db as adb
 
     n = int(conn.execute("SELECT count(*) AS n FROM pool").fetchone()["n"])
+    colecao = str(adb.get_meta(conn, CHAVE_COLECAO, "") or "")
+    try:
+        i18n = json.loads(str(adb.get_meta(conn, CHAVE_MOTIVO_I18N, "") or "{}"))
+    except ValueError:  # pragma: no cover - meta editada à mão
+        i18n = {}
+    # Um banco materializado ANTES do P3i não tem a chave gravada, e a próxima
+    # materialização só acontece quando o corpus mudar. `{colecao}` cru na tela
+    # seria pior que a frase em português: o default vem do próprio `app_meta`,
+    # e o pior caso vira "a coleção não existe" — que é o que o fallback é.
+    dados = i18n.get("dados")
     return Pool(
         origem=str(adb.get_meta(conn, CHAVE_ORIGEM, FALLBACK) or FALLBACK),
         n_pool=n,
         motivo=str(adb.get_meta(conn, CHAVE_MOTIVO, "") or ""),
-        colecao=str(adb.get_meta(conn, CHAVE_COLECAO, "") or ""),
+        colecao=colecao,
         excluidas_licenca=int(adb.get_meta(conn, CHAVE_EXCLUIDAS, "0") or 0),
+        motivo_chave=str(i18n.get("chave") or T_MOTIVO_SEM_COLECAO),
+        motivo_dados=dados if isinstance(dados, dict) and dados else {"colecao": colecao},
     )
 
 
@@ -540,11 +726,38 @@ def descrever_fallback() -> str:
     """
     cfg = cfg_pool()
     pol = politica_licenca(cfg)
+    langs = list(cfg["lang"])
+    idioma = (
+        f"idioma {langs[0]}"
+        if len(langs) == 1
+        else "idiomas " + ", ".join(langs) + " (cota igual por língua)"
+    )
     return (
-        f"idioma {cfg['lang']}, de {cfg['min_chars']} a {cfg['max_chars']} caracteres, "
+        f"{idioma}, de {cfg['min_chars']} a {cfg['max_chars']} caracteres, "
         f"até {cfg['max_dups']} duplicata(s) exata(s), {pol['descricao']}, "
         f"amostra de passo constante até {cfg['max']}"
     )
+
+
+def filtro_para_tela() -> dict[str, Any]:
+    """Os NÚMEROS do filtro, para a tela montar a mesma frase na língua dela.
+
+    A frase em português continua saindo (``descrever_fallback``) para a API e
+    para o terminal; a tela recebe os ingredientes e uma chave, porque ela fala
+    duas línguas e este módulo não.
+    """
+    cfg = cfg_pool()
+    langs = list(cfg["lang"])
+    return {
+        "chave": T_FILTRO_UMA_LINGUA if len(langs) == 1 else T_FILTRO_VARIAS_LINGUAS,
+        "dados": {
+            "langs": ", ".join(langs),
+            "min_chars": cfg["min_chars"],
+            "max_chars": cfg["max_chars"],
+            "max_dups": cfg["max_dups"],
+            "max": cfg["max"],
+        },
+    }
 
 
 __all__ = [
@@ -554,15 +767,30 @@ __all__ = [
     "CHAVE_COLECAO",
     "CHAVE_EXCLUIDAS",
     "CHAVE_MOTIVO",
+    "CHAVE_MOTIVO_I18N",
     "CHAVE_ORIGEM",
     "FALLBACK",
     "NOTA_NSFW",
+    "T_FILTRO_UMA_LINGUA",
+    "T_FILTRO_VARIAS_LINGUAS",
+    "T_MOTIVO_COLECAO",
+    "T_MOTIVO_COLECAO_LICENCA",
+    "T_MOTIVO_COLECAO_SEM_LICENCA",
+    "T_MOTIVO_COLECAO_VAZIA",
+    "T_MOTIVO_SEM_COLECAO",
+    "T_NOTA_NSFW",
+    "T_POLITICA_ABERTA",
+    "T_POLITICA_AMBAS",
+    "T_POLITICA_COMERCIAL",
+    "T_POLITICA_REDISTRIBUIVEL",
     "Pool",
     "assinatura",
     "cfg_pool",
     "descrever_fallback",
     "esta_no_pool",
+    "filtro_para_tela",
     "materializar",
+    "normalizar_langs",
     "politica_licenca",
     "resolver",
     "uids",

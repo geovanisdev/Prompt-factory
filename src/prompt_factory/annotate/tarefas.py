@@ -236,6 +236,22 @@ MOTIVO_VAZIA = (
     "ou você já anotou todas."
 )
 
+#: E a MESMA frase como chave do dicionário da tela (P3i).
+#:
+#: A rota continua devolvendo ``motivo`` em português para que a API se explique
+#: sozinha em ``/docs`` e para um cliente que não seja este ``index.html``. O que
+#: a TELA usa é a chave: ela fala duas línguas, e a rota não. Sem isso, o estado
+#: vazio — que é a primeira coisa que um avaliador vê quando a fila acaba —
+#: apareceria em português no meio de uma interface em inglês.
+CHAVE_MOTIVO_VAZIA = "fila.motivo_vazia"
+CHAVE_MOTIVO_SUMIDOS = "fila.motivo_sumidos"
+CHAVE_MOTIVO_SERVIDA = "fila.motivo_servida"
+
+
+def _motivo(chave: str, texto: str, **dados: Any) -> dict[str, Any]:
+    """O par (frase da API, chave da tela). Ver ``CHAVE_MOTIVO_VAZIA``."""
+    return {"texto": texto, "chave": chave, "dados": dados}
+
 
 def reivindicar(
     conn: sqlite3.Connection,
@@ -243,8 +259,10 @@ def reivindicar(
     anotador_id: int,
     tipo: str,
     projeto_id: int | None = None,
-) -> tuple[int | None, str]:
+) -> tuple[int | None, dict[str, Any]]:
     """Pega a próxima tarefa do tipo. Devolve ``(atribuicao_id, motivo)``.
+
+    ``motivo`` é ``{"texto", "chave", "dados"}`` — ver ``_motivo``.
 
     ``(None, motivo)`` é resposta NORMAL — a rota devolve 200 com o motivo, e
     não 404. Fila vazia não é erro: é o estado mais comum de uma plataforma de
@@ -296,12 +314,14 @@ def reivindicar(
         if escolhida is None:
             conn.execute("COMMIT")  # as marcações de indisponível ficam
             if sumidos:
-                return None, (
+                return None, _motivo(
+                    CHAVE_MOTIVO_SUMIDOS,
                     f"{sumidos} tarefa(s) deste tipo apontam para prompts que não estão "
                     "mais no corpus (ele foi recarregado) e foram pausadas. "
-                    "Peça ao administrador para gerar tarefas novas."
+                    "Peça ao administrador para gerar tarefas novas.",
+                    n=sumidos,
                 )
-            return None, MOTIVO_VAZIA
+            return None, _motivo(CHAVE_MOTIVO_VAZIA, MOTIVO_VAZIA)
 
         # O prazo é calculado pelo SQLite, e não em Python, para sair no MESMO
         # formato do `expira_em` que a expiração compara — e do mesmo relógio.
@@ -318,7 +338,7 @@ def reivindicar(
     except Exception:
         conn.execute("ROLLBACK")
         raise
-    return atribuicao_id, "tarefa atribuída"
+    return atribuicao_id, _motivo(CHAVE_MOTIVO_SERVIDA, "tarefa atribuída")
 
 
 def contagens_por_tipo(
@@ -374,12 +394,18 @@ def rubrica_ativa(conn: sqlite3.Connection, uid: str) -> dict[str, Any] | None:
     if linha is None:
         return None
     conteudo = _carregar_json(linha["criterios_json"], {})
+    if not isinstance(conteudo, dict):
+        conteudo = {}
     return {
         "id": int(linha["id"]),
+        # O título CANÔNICO vem da coluna (é ele que a idempotência do seed usa
+        # como chave natural); a tradução vem de dentro do JSON, e sai junto —
+        # sem ela a tela mostraria o título numa língua e os critérios na outra.
         "titulo": str(linha["titulo"]),
-        "criterios": conteudo.get("criterios", []) if isinstance(conteudo, dict) else [],
+        "titulo_i18n": conteudo.get("titulo_i18n"),
+        "criterios": conteudo.get("criterios", []),
         "origem": str(linha["origem"]),
-        "nota": None,
+        "nota_chave": None,
     }
 
 
@@ -413,10 +439,15 @@ def _rubrica_proposta_por_mim(
         return None
     return {
         "id": None,
-        "titulo": str(payload.get("titulo") or "Rubrica proposta"),
+        # O título é o que a PESSOA escreveu: dado, e sai como está. Vazio vira
+        # uma chave do dicionário na tela, e não uma frase em português aqui.
+        "titulo": str(payload.get("titulo") or ""),
+        "titulo_i18n": None,
         "criterios": payload["criterios"],
         "origem": "anotacao",
-        "nota": "esta é a rubrica que você propôs — ela ainda está em revisão",
+        # A NOTA é frase de tela, e a tela fala duas línguas. Ver o mesmo
+        # raciocínio em `CHAVE_MOTIVO_VAZIA`.
+        "nota_chave": "ws.guia_proposta",
     }
 
 
@@ -603,6 +634,9 @@ def hidratar_anotacao(
 __all__ = [
     "CANDIDATAS_POR_CLAIM",
     "CHAVE_INDISPONIVEL",
+    "CHAVE_MOTIVO_SERVIDA",
+    "CHAVE_MOTIVO_SUMIDOS",
+    "CHAVE_MOTIVO_VAZIA",
     "MOTIVO_VAZIA",
     "SQL_AGORA",
     "SQL_VIVA",

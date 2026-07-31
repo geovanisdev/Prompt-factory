@@ -348,8 +348,8 @@ def test_as_diretrizes_vem_do_servidor_com_versao(js: str) -> None:
     """
     assert "function carregarDiretrizes()" in js
     assert '"/api/diretrizes"' in js
-    assert "est.diretrizes[t.id]" in js
-    assert "versão " in js
+    assert "est.diretrizes[tp.id]" in js
+    assert "diretrizes.titulo_versao" in js
     # E o texto NÃO volta a morar no JS: os TIPOS não carregam mais `diretrizes`.
     tipos = js.split("const TIPOS = [", 1)[1].split("\n];", 1)[0]
     assert "diretrizes:" not in tipos
@@ -380,7 +380,7 @@ def test_o_revisor_ve_no_mesmo_layout_em_que_foi_produzido(js: str) -> None:
     revisor está julgando.
     """
     assert "function ctxLeitura(form)" in js
-    assert "desenharWorkspace(env, ctxLeitura(t.form))" in js
+    assert "desenharWorkspace(env, ctxLeitura(tri.form))" in js
     assert "function formDoPayload(env, anterior)" in js
     # E o mesmo mapa de payload → formulário serve aos dois lados.
     assert "return formDoPayload(env, env.versao_anterior && env.versao_anterior.payload)" in js

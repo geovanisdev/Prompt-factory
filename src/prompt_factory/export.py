@@ -24,6 +24,12 @@ Três decisões que não são detalhes de formato:
 
 Toda escrita sai daqui de dentro, com ``encoding`` explícito. Redirecionar no
 PowerShell grava UTF-16/BOM e quebra acentuação e JSONL.
+
+A LÍNGUA DOS ARTEFATOS DE ENTREGA  (convenção do P3i, aplicada a partir do P5b)
+===============================================================================
+Ver ``IDIOMA_DOS_ARTEFATOS``, logo abaixo. Resumo: **todo texto que a plataforma
+ENTREGA sai em inglês**; o dado que ela entrega sai na língua em que foi
+produzido.
 """
 
 from __future__ import annotations
@@ -43,6 +49,35 @@ from typing import Any, NamedTuple, Protocol
 
 from . import __version__
 from .schema import TAXONOMY_VERSION
+
+#: A língua de TODO artefato de entrega — decidida no P3i, cobrada no P5b.
+#:
+#: O QUE ISTO COBRE
+#: ================
+#: Dataset card, relatório de qualidade, export de auditoria completa de um item,
+#: e todo campo de prosa que a Bancada gerar dentro deles: nome de perfil,
+#: descrição de coluna, motivo de exclusão, nota de licença, cabeçalho de
+#: manifesto. Sai em **inglês**, sem exceção e sem versão traduzida ao lado.
+#:
+#: POR QUÊ
+#: =======
+#: É a mesma regra que a interface aplica campo a campo, pelo mesmo motivo:
+#: **quem lê um artefato de entrega é o cliente**, e o cliente deste projeto é
+#: uma plataforma de data annotation estrangeira. Um relatório de qualidade em
+#: português obriga o avaliador a traduzir a prova de QC antes de conseguir
+#: avaliá-la — e a prova de QC é o argumento inteiro do portfólio.
+#:
+#: O QUE ISTO **NÃO** COBRE
+#: ========================
+#: * O DADO. ``text``, resposta de modelo e resposta de referência saem na língua
+#:   em que foram escritos, e ``lang`` por linha diz qual é. Traduzir dado
+#:   inventaria um texto que ninguém escreveu.
+#: * Justificativa, comentário de revisão e critério de rubrica já são
+#:   produzidos em inglês pela plataforma (é a convenção de campo do P3i), então
+#:   não há nada a fazer com eles no export além de deixá-los passar.
+#: * Mensagem de CLI, comentário de código e docstring continuam em **pt-BR**:
+#:   são internos, e essa é a convenção do repo.
+IDIOMA_DOS_ARTEFATOS = "en"
 
 #: Chaves do perfil ``flat``, **nesta ordem**. A ordem é contrato: um diff entre
 #: dois exports do mesmo recorte tem de ser vazio, e chave em ordem de dict
@@ -488,6 +523,7 @@ __all__ = [
     "CAMPOS_FLAT",
     "CAMPO_ORIGINAL",
     "CHAVE_NULA",
+    "IDIOMA_DOS_ARTEFATOS",
     "LIMITE_CAMPO_CSV_PADRAO",
     "REGISTRY",
     "Escritor",

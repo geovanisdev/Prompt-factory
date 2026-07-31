@@ -106,9 +106,18 @@ def health(anot: ConAnotacao, corpus: ConCorpus, meta: Estado) -> dict[str, Any]
         "pool": {
             "origem": p.origem,
             "n_pool": p.n_pool,
+            # Cada frase deste bloco sai em DOIS formatos (P3i): a versão em
+            # português, para a API se explicar sozinha e para o `pf annotate
+            # status` imprimir no terminal; e a CHAVE + os dados, para a tela,
+            # que fala duas línguas. Este painel é onde a proveniência fica
+            # visível — deixá-lo em português numa tela em inglês tiraria do
+            # avaliador estrangeiro exatamente o que ele veio ler.
             "motivo": p.motivo,
+            "motivo_chave": p.motivo_chave,
+            "motivo_dados": p.motivo_dados,
             "colecao": p.colecao,
             "filtro_fallback": poolmod.descrever_fallback(),
+            "filtro": poolmod.filtro_para_tela(),
             # A POLÍTICA DE LICENÇA À VISTA, com o número que ela exclui. Sem o
             # número, "política ativa" é uma promessa; com ele, é uma medida —
             # e foi justamente a ausência dela que deixou 9.148 linhas
@@ -118,6 +127,7 @@ def health(anot: ConAnotacao, corpus: ConCorpus, meta: Estado) -> dict[str, Any]
             # A verdade sobre a garantia de NSFW, no mesmo lugar em que a tela
             # a mostra. Ver `pool.NOTA_NSFW`.
             "nota_nsfw": poolmod.NOTA_NSFW,
+            "nota_nsfw_chave": poolmod.T_NOTA_NSFW,
             "materializado_em": adb.get_meta(anot, poolmod.CHAVE_ATUALIZADO),
             "build_do_pool": adb.get_meta(anot, poolmod.CHAVE_BUILD),
         },

@@ -1,18 +1,13 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bancada — plataforma de anotação</title>
+<title>Bancada — annotation workbench</title>
 <!--
-  BANCADA — casca navegável (P1).
+  BANCADA — a plataforma de anotação.
 
   Um arquivo, sem build, sem framework, sem rede: CSS e JS embutidos, nenhuma
   referência a host externo. A plataforma precisa abrir offline, numa máquina
   só, e continuar abrindo daqui a dois anos sem `npm install`.
-
-  Contrato consumido no P1 (a fonte da verdade é o código; /docs é o espelho):
-    GET  /api/health    estado dos DOIS bancos + origem do pool + contagens
-    GET  /api/perfis    personas cadastradas
-    POST /api/perfis    cria uma persona (201; 409 em nome repetido)
 
   REGRA DE SEGURANÇA DESTE ARQUIVO
   Nenhum HTML nasce de string, em lugar nenhum: todo texto vai para o DOM por
@@ -22,13 +17,32 @@
   mais fácil de manter do que uma regra com uma exceção. O corpus tem <script>
   de verdade dentro dos prompts.
 
-  O QUE ESTA TELA NÃO FINGE
-  O P1 entrega a casca: entrada, os três papéis e a estrutura real das três
-  telas. A fila de tarefas, o formulário de anotação e o ciclo de revisão chegam
-  no P2/P3. Onde falta função, o controle está desabilitado e MARCADO com o
-  marco em que ele chega — não há botão que pareça funcionar e não funcione, e
-  não há "em construção" em lugar nenhum: os números que aparecem na tela são
-  todos lidos do banco, agora.
+  IDIOMA  (P3i — INVERTE o que o P1/P2 construíram)
+  O portfólio é lido por avaliadores estrangeiros: **o inglês é a língua
+  primária** e o pt-BR é um toggle. Nenhuma string de cromo mora solta neste
+  arquivo — todas passam por `TEXTOS`, um dicionário de duas línguas com chaves
+  estáveis, e por `t(chave)`.
+
+  Três regras que sustentam isso, e que os testes conferem:
+    1. `TEXTOS` é JSON ESTRITO (chaves e valores entre aspas duplas, sem
+       vírgula sobrando e sem comentário dentro). É o que permite ao pytest
+       carregá-lo com `json.loads` e provar paridade e ausência de chave órfã
+       sem um parser de JavaScript.
+    2. O texto estático do HTML não existe: cada nó carrega `data-t`
+       (textContent), `data-t-ph` (placeholder), `data-t-title` ou `data-t-aria`,
+       e `aplicarTextos()` os preenche. Um `data-t` sem chave no dicionário é
+       erro de teste, não uma tela em branco.
+    3. Trocar de idioma NÃO recarrega e NÃO refaz chamada: `est` guarda o
+       estado, `/api/diretrizes` já traz as duas línguas, e `aplicarIdioma()`
+       redesenha a partir da memória. Rascunho, seleção e tarefa aberta
+       sobrevivem porque nunca saem de `est`.
+
+  A LÍNGUA DOS DADOS é outra coisa, e a tela DIZ isso em cada campo:
+  justificativa, comentário de revisão, critério de rubrica e todo metadado saem
+  em **inglês** (é o que o cliente lê); resposta esperada (SFT) e a conversa com
+  o modelo saem em **pt-BR, ou na língua do prompt** (é o dado sendo produzido).
+  É diretriz, não validação: o envio nunca é bloqueado por causa dela, porque o
+  anotador pode ter uma razão para desviar e a plataforma não a conhece.
 -->
 <style>
 /* ==========================================================================
@@ -197,6 +211,34 @@ button,input,select,textarea{font:inherit;color:inherit}
 }
 .papel:hover{color:var(--texto)}
 .papel[aria-checked="true"]{background:var(--acento);color:#fff;font-weight:600}
+
+/* ---- seletor de idioma ----
+   Mesmo controle segmentado dos papéis, em escala menor e sem o acento: trocar
+   de língua não é uma decisão de trabalho, é uma preferência de leitura, e
+   pintá-la de azul a poria no mesmo peso visual de "qual papel eu sou". */
+.linguas{display:inline-flex;gap:2px;padding:2px;border-radius:99px;background:var(--superficie-2);border:1px solid var(--linha);flex:0 0 auto}
+.lingua{
+  border:0;background:transparent;color:var(--texto-3);cursor:pointer;
+  padding:3px 9px;border-radius:99px;font-size:.78rem;font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase;
+}
+.lingua:hover{color:var(--texto)}
+.lingua[aria-pressed="true"]{background:var(--superficie);color:var(--texto);box-shadow:var(--sombra)}
+
+/* ---- a convenção de língua POR CAMPO ----
+   Fica COLADA no campo, no lugar onde a dúvida ocorre — não numa página de
+   ajuda que ninguém abre no meio de uma tarefa. É diretriz, não validação: o
+   selo diz o que se espera e o envio não é bloqueado por causa dele. */
+.lingua-campo{
+  display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;
+  color:var(--texto-3);font-size:.79rem;margin-top:4px;
+}
+.lingua-selo{
+  border:1px solid var(--linha-forte);border-radius:99px;padding:0 7px;
+  font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--texto-2);white-space:nowrap;
+}
+.lingua-campo.dado .lingua-selo{border-color:var(--acento-medio);color:var(--acento)}
 /* A frase de cada papel some da barra (não cabe) e vira o `title` do botão,
    mais a linha de contexto abaixo da barra na primeira troca. */
 .papel-linha{color:var(--texto-2);font-size:.9rem;line-height:1.45}
@@ -334,6 +376,15 @@ main{padding:22px 18px 60px;max-width:1180px;margin:0 auto}
 .vazio-titulo{font-size:1.08rem;font-weight:600;margin-bottom:8px}
 .vazio-linha{color:var(--texto-2);max-width:620px;margin:0 auto 6px}
 .vazio-saidas{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+
+/* CONTEÚDO, NÃO CROMO.
+   `.dado` marca todo nó cujo texto vem do banco e cuja língua é a do DADO —
+   nome de projeto, nome de pessoa, nome de fonte. Ele não muda quando o idioma
+   da interface muda, e é isso que a classe declara: sem ela, a varredura que
+   procura português numa tela em inglês não teria como separar "Portfólio" (um
+   projeto que se chama assim) de uma string de cromo esquecida na tradução.
+   A classe não pinta nada — ela existe para ser lida. */
+.dado{}
 
 /* O texto do prompt tem VOZ DIFERENTE do cromo: serifa de leitura. É ele que
    está sendo julgado. */
@@ -635,41 +686,46 @@ textarea{
      ========================================================================== -->
 <div id="app">
   <header class="barra">
-    <div class="marca">Bancada <span class="fraco">demonstração</span></div>
-    <div class="papeis" id="papeis" role="radiogroup" aria-label="Papel"></div>
-    <label for="persona" class="selo-demo">como</label>
-    <select id="persona" aria-label="Quem está usando"></select>
+    <div class="marca">Bancada <span class="fraco" data-t="app.marca_sufixo"></span></div>
+    <div class="papeis" id="papeis" role="radiogroup" data-t-aria="a11y.papel"></div>
+    <label for="persona" class="selo-demo" data-t="barra.como"></label>
+    <select id="persona" data-t-aria="a11y.persona"></select>
     <details class="nova-pessoa" id="nova-pessoa">
-      <summary id="nova-pessoa-titulo">+ meu nome</summary>
+      <summary id="nova-pessoa-titulo" data-t="barra.nova_pessoa"></summary>
       <div class="nova-pessoa-corpo">
-        <span class="fraco" style="font-size:.85rem">Entra na hora, com o papel selecionado na barra. As personas da lista são fixtures da demonstração — para trabalhar de verdade, entre com o seu nome nos três papéis.</span>
+        <span class="fraco" style="font-size:.85rem" data-t="barra.nova_pessoa_ajuda"></span>
         <input id="novo-nome" type="text" maxlength="60" autocomplete="off"
-               placeholder="seu nome">
-        <button id="entrar" class="botao primaria">Criar e entrar</button>
+               data-t-ph="barra.nova_pessoa_ph">
+        <button id="entrar" class="botao primaria" data-t="barra.nova_pessoa_botao"></button>
         <p id="entrada-erro" class="erro" hidden></p>
       </div>
     </details>
-    <label for="projeto" class="selo-demo">em</label>
-    <select id="projeto" aria-label="Projeto em foco"></select>
+    <label for="projeto" class="selo-demo" data-t="barra.em"></label>
+    <select id="projeto" data-t-aria="a11y.projeto"></select>
     <div class="barra-titulo" id="barra-titulo"></div>
     <span class="crescer"></span>
-    <span class="selo-demo">Demonstração — sem login</span>
-    <button id="tema" class="botao discreta" title="Alterna entre claro e escuro">Escuro</button>
+    <span class="selo-demo" data-t="barra.sem_login"></span>
+    <!-- O IDIOMA fica na barra, ao lado do tema: as duas são preferências de
+         leitura, não decisões de trabalho, e ficam no mesmo canto. -->
+    <div class="linguas" id="linguas" role="group" data-t-aria="a11y.idioma"></div>
+    <!-- Sem `data-t`: o rótulo diz para ONDE o clique leva (claro ⇄ escuro), e
+         por isso quem o escreve é `rotularTema()`, com o tema em mãos. -->
+    <button id="tema" class="botao discreta" data-t-title="tema.title"></button>
   </header>
 
   <div class="faixa-papel" id="faixa-papel"></div>
 
   <main>
     <!-- ---------------- ANOTADOR ---------------- -->
-    <section id="tela-anotador" class="tela" hidden aria-label="Área do anotador">
-      <div class="abas" id="abas-anotador" role="tablist" aria-label="Estilos de tarefa"></div>
+    <section id="tela-anotador" class="tela" hidden data-t-aria="a11y.tela_anotador">
+      <div class="abas" id="abas-anotador" role="tablist" data-t-aria="a11y.abas_tipo"></div>
       <div class="sub-barra">
         <span class="etiqueta pendente"><span class="ponto"></span><span id="fila-conta"></span></span>
         <span class="crescer"></span>
-        <div id="vistas" role="group" aria-label="Como escolher trabalho"></div>
+        <div id="vistas" role="group" data-t-aria="a11y.vistas"></div>
       </div>
       <details class="diretrizes" id="diretrizes">
-        <summary id="diretrizes-titulo">Diretrizes</summary>
+        <summary id="diretrizes-titulo"></summary>
         <ul id="diretrizes-lista"></ul>
       </details>
       <!-- Montada inteira pelo JS: o que muda entre as quatro abas é o
@@ -680,8 +736,8 @@ textarea{
     <!-- ---------------- REVISOR ----------------
          Passagem 1 (TRIAGEM): aprova ou devolve. A passagem 2 (Rate and
          Review, com escores e correção no lugar) é outra aba, e chega no P3b. -->
-    <section id="tela-revisor" class="tela" hidden aria-label="Área do revisor">
-      <div class="abas" id="abas-revisor" role="tablist" aria-label="O que revisar"></div>
+    <section id="tela-revisor" class="tela" hidden data-t-aria="a11y.tela_revisor">
+      <div class="abas" id="abas-revisor" role="tablist" data-t-aria="a11y.abas_revisao"></div>
       <div class="revisao">
         <div class="painel">
           <div class="painel-cabeca">
@@ -693,7 +749,7 @@ textarea{
         </div>
         <div class="painel">
           <div class="painel-cabeca">
-            <h2>Detalhe</h2>
+            <h2 data-t="revisor.detalhe"></h2>
             <span class="crescer"></span>
             <span class="fraco" id="revisor-atalhos"></span>
           </div>
@@ -703,12 +759,12 @@ textarea{
     </section>
 
     <!-- ---------------- ADMIN ---------------- -->
-    <section id="tela-admin" class="tela" hidden aria-label="Painel do administrador">
+    <section id="tela-admin" class="tela" hidden data-t-aria="a11y.tela_admin">
       <div class="cards" id="admin-cards"></div>
 
       <div class="painel">
         <div class="painel-cabeca">
-          <h2>Estado do pool</h2>
+          <h2 data-t="admin.pool"></h2>
           <span class="crescer"></span>
           <span class="etiqueta" id="pool-etiqueta"></span>
         </div>
@@ -717,31 +773,38 @@ textarea{
 
       <div class="painel">
         <div class="painel-cabeca">
-          <h2>Projetos</h2>
+          <h2 data-t="admin.projetos"></h2>
           <span class="crescer"></span>
-          <span class="fraco">o que é demonstração e o que é trabalho real</span>
+          <span class="fraco" data-t="admin.projetos_nota"></span>
         </div>
         <table>
-          <thead><tr><th>Projeto</th><th>Tipo</th><th>Tarefas</th><th>Abertas</th><th>O que é</th></tr></thead>
+          <thead><tr>
+            <th data-t="admin.col_projeto"></th><th data-t="admin.col_cliente"></th>
+            <th data-t="admin.col_tarefas"></th><th data-t="admin.col_abertas"></th>
+            <th data-t="admin.col_o_que_e"></th>
+          </tr></thead>
           <tbody id="projetos-corpo"></tbody>
         </table>
       </div>
 
       <div class="painel">
         <div class="painel-cabeca">
-          <h2>Equipe</h2>
+          <h2 data-t="admin.equipe"></h2>
           <span class="crescer"></span>
           <span class="fraco num" id="equipe-conta"></span>
         </div>
         <table>
-          <thead><tr><th>Nome</th><th>Papel</th><th>Estado</th><th>Criado em</th></tr></thead>
+          <thead><tr>
+            <th data-t="admin.col_nome"></th><th data-t="admin.col_papel"></th>
+            <th data-t="admin.col_estado"></th><th data-t="admin.col_criado_em"></th>
+          </tr></thead>
           <tbody id="equipe-corpo"></tbody>
         </table>
         <div class="painel-corpo" style="border-top:1px solid var(--linha)">
           <div class="forma">
-            <input id="admin-nome" type="text" maxlength="60" autocomplete="off" placeholder="nome de quem entra">
-            <select id="admin-papel"></select>
-            <button id="admin-criar" class="botao">Adicionar à equipe</button>
+            <input id="admin-nome" type="text" maxlength="60" autocomplete="off" data-t-ph="admin.novo_ph">
+            <select id="admin-papel" data-t-aria="a11y.papel"></select>
+            <button id="admin-criar" class="botao" data-t="admin.novo_botao"></button>
             <span class="fraco" id="admin-aviso"></span>
           </div>
         </div>
@@ -749,17 +812,17 @@ textarea{
 
       <div class="painel">
         <div class="painel-cabeca">
-          <h2>Bancos</h2>
+          <h2 data-t="admin.bancos"></h2>
           <span class="crescer"></span>
-          <span class="fraco">lidos agora, não guardados na subida</span>
+          <span class="fraco" data-t="admin.bancos_nota"></span>
         </div>
         <div class="painel-corpo"><dl class="linhas" id="bancos-linhas"></dl></div>
       </div>
 
       <div class="painel">
-        <div class="painel-cabeca"><h2>O que ainda não está aqui</h2></div>
+        <div class="painel-cabeca"><h2 data-t="admin.roteiro"></h2></div>
         <div class="painel-corpo">
-          <p class="secundario" style="margin-bottom:10px">Os números acima são reais e lidos agora. O que falta está listado abaixo com o marco em que entra — nada na tela finge funcionar.</p>
+          <p class="secundario" style="margin-bottom:10px" data-t="admin.roteiro_nota"></p>
           <ol class="roteiro" id="roteiro"></ol>
         </div>
       </div>
@@ -777,7 +840,8 @@ textarea{
    texto vira HTML por concatenação: tudo entra por `textContent`, inclusive o
    que vem do banco (nomes de persona, motivo do pool, caminhos de arquivo).
    ========================================================================== */
-const NUM = new Intl.NumberFormat("pt-BR");
+/** Formatador de número — trocado junto com o idioma (1.234 vs 1,234). */
+let NUM = new Intl.NumberFormat("en-US");
 const n = (v) => NUM.format(Number(v) || 0);
 const $ = (s) => document.querySelector(s);
 
@@ -828,75 +892,908 @@ const postar = (c, corpo) =>
   api(c, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
 
 /* ==========================================================================
+   0.1 IDIOMA DA INTERFACE  (P3i)
+
+   INGLÊS É A FONTE. O portfólio é lido por avaliadores estrangeiros, e uma
+   plataforma que abre em português para quem não lê português falha no primeiro
+   dos três segundos que ela tem. O pt-BR continua inteiro, num toggle — e ele
+   AGREGA (mostra que a mesma tela existe nas duas línguas), em vez de ser o
+   default que exclui.
+
+   O dicionário abaixo é JSON ESTRITO de propósito: sem aspas simples, sem
+   vírgula sobrando, sem comentário dentro. É o que permite ao pytest carregá-lo
+   com `json.loads` e provar, sem um parser de JavaScript, que (a) as duas
+   línguas cobrem exatamente as mesmas chaves e (b) não existe chave órfã nos
+   dois sentidos — usada e inexistente, ou existente e nunca usada.
+
+   Por isso também não há chave montada por concatenação: `t("tela." + papel)`
+   seria invisível para o teste, então quem precisa de chave variável guarda a
+   chave INTEIRA numa tabela (ver `TITULO_TELA`, `TIPOS`, `ROTULO_STATUS`).
+
+   A tradução não é literal onde o português tinha microcopy melhor: "Enviar e
+   próxima" virou "Submit and next" (e não "Send and next"), "Devolvida para
+   ajuste" virou "Sent back for a fix" (e não "Rejected") — o vocabulário de
+   devolução é deliberadamente não punitivo nas duas línguas.
+   ========================================================================== */
+const IDIOMAS = ["en", "pt"];
+const IDIOMA_PADRAO = "en";
+
+const TEXTOS = {
+"en": {
+  "app.titulo": "Bancada — annotation workbench",
+  "app.marca_sufixo": "demo",
+  "a11y.papel": "Role",
+  "a11y.persona": "Who is using it",
+  "a11y.projeto": "Project in focus",
+  "a11y.idioma": "Interface language",
+  "a11y.tela_anotador": "Annotator workspace",
+  "a11y.tela_revisor": "Reviewer workspace",
+  "a11y.tela_admin": "Administrator dashboard",
+  "a11y.abas_tipo": "Task styles",
+  "a11y.abas_revisao": "What to review",
+  "a11y.vistas": "How to pick work",
+  "a11y.nota": "{criterio}: score {valor}",
+  "barra.como": "as",
+  "barra.em": "in",
+  "barra.sem_login": "Demo — no sign-in",
+  "barra.nova_pessoa": "+ my name",
+  "barra.nova_pessoa_ajuda": "You are in straight away, with the role selected in the bar. The people on the list are demo fixtures — to do real work, enter with your own name in all three roles.",
+  "barra.nova_pessoa_ph": "your name",
+  "barra.nova_pessoa_botao": "Create and enter",
+  "barra.sem_nome": "type a name",
+  "barra.erro_perfil": "could not create the profile: {erro}",
+  "barra.nome_repetido": "{erro} (or pick that person in the selector beside it)",
+  "barra.todos_projetos": "all projects",
+  "barra.ninguem_neste_papel": "nobody with this role",
+  "tema.title": "Switches between light and dark",
+  "tema.escuro": "Dark",
+  "tema.claro": "Light",
+  "idioma.en": "en",
+  "idioma.pt": "pt",
+  "idioma.en_title": "Interface in English",
+  "idioma.pt_title": "Interface in Brazilian Portuguese",
+  "papel.anotador.nome": "Annotator",
+  "papel.anotador.linha": "Takes tasks from the queue, scores answers against a rubric, compares A/B with a written reason, and writes new prompts.",
+  "papel.revisor.nome": "Reviewer",
+  "papel.revisor.linha": "Reads the annotation in the very layout it was produced in, then approves it or sends it back with a comment that reaches whoever wrote it.",
+  "papel.admin.nome": "Administrator",
+  "papel.admin.linha": "Creates tasks, looks after rubrics and model answers, and tracks agreement, time and send-back rate per annotator.",
+  "tela.anotador": "Annotation queue",
+  "tela.revisor": "Review",
+  "tela.admin": "Administration",
+  "tipo.avaliar_rubrica.nome": "Score with a rubric",
+  "tipo.avaliar_rubrica.titulo": "Score one answer against a rubric",
+  "tipo.avaliar_rubrica.vazio_titulo": "Nothing in the rubric-scoring queue.",
+  "tipo.avaliar_rubrica.vazio_linha": "When there is a task, it opens right here on its own: the prompt, the answer, and the rubric with one score field per criterion.",
+  "tipo.escrever_rubrica.nome": "Write a rubric",
+  "tipo.escrever_rubrica.titulo": "Write the rubric for a prompt",
+  "tipo.escrever_rubrica.vazio_titulo": "Nothing in the rubric-writing queue.",
+  "tipo.escrever_rubrica.vazio_linha": "Once approved, the rubric you write here becomes the instrument other people use to score this very prompt.",
+  "tipo.sft_resposta.nome": "Write the answer (SFT)",
+  "tipo.sft_resposta.titulo": "Write the reference answer",
+  "tipo.sft_resposta.vazio_titulo": "Nothing in the reference-answer queue.",
+  "tipo.sft_resposta.vazio_linha": "Finishing a rubric offers, at the end, writing the answer to that same prompt — that is how the two tabs chain together.",
+  "tipo.comparar_ab.nome": "Compare A/B",
+  "tipo.comparar_ab.titulo": "Compare two answers",
+  "tipo.comparar_ab.vazio_titulo": "Nothing in the A/B comparison queue.",
+  "tipo.comparar_ab.vazio_linha": "When there is a pair, the two answers open side by side with blind labels: you do not see which model wrote which.",
+  "vista.fila": "Queue",
+  "vista.catalogo": "Catalog",
+  "vista.minhas": "My tasks",
+  "subaba.anotacoes.nome": "Annotations",
+  "subaba.anotacoes.titulo": "Triage — waiting for review",
+  "subaba.anotacoes.vazio": "Nothing waiting for review.",
+  "subaba.anotacoes.linha": "Every submitted annotation lands here. You approve it or send it back — and sending back requires a comment, which goes to whoever annotated together with the filled-in form.",
+  "subaba.criacoes.nome": "Creations",
+  "subaba.criacoes.titulo": "Prompts written by annotators",
+  "subaba.criacoes.vazio": "No new prompt waiting.",
+  "subaba.criacoes.linha": "Prompts written in create mode arrive here before entering the corpus. Approving records the uid the pipeline will reproduce.",
+  "diretrizes.titulo": "Guidelines — {tipo}",
+  "diretrizes.titulo_versao": "Guidelines — {tipo} (version {versao})",
+  "diretrizes.sem": "No guideline published for this type — run `pf annotate seed`.",
+  "fila.conta_zero": "nothing in this queue for you",
+  "fila.conta": "{n} waiting for you",
+  "fila.puxando": "Pulling the next task…",
+  "fila.origem_livre": "picked by you",
+  "fila.origem_continuacao": "continued from the rubric",
+  "fila.origem_fila": "task from the queue",
+  "fila.erro_proxima": "could not ask for the next task: {erro}",
+  "fila.motivo_vazia": "No task of this kind is waiting for you right now. Either there are no open tasks, or the ones that exist are with someone else, or you have annotated them all.",
+  "fila.motivo_sumidos": "{n} task(s) of this kind point at prompts that are no longer in the corpus (it was reloaded) and have been paused. Ask the administrator to generate new tasks.",
+  "fila.motivo_servida": "task assigned",
+  "revisor.detalhe": "Detail",
+  "revisor.atalhos": "J/K move · A approves · R sends back",
+  "revisor.conta_zero": "nothing waiting",
+  "revisor.conta": "{n} waiting",
+  "botao.enviar_proxima": "Submit and next",
+  "botao.devolver_pegar_outra": "Return it and take another",
+  "botao.escolher_catalogo": "Pick from the catalog",
+  "botao.ver_minhas": "See my tasks",
+  "botao.entrar_admin": "Enter as administrator",
+  "botao.mostrar_inteiro": "show the whole text",
+  "botao.recolher": "collapse the text",
+  "botao.descartar_rascunho": "discard and start from scratch",
+  "botao.escrever_rubrica_deste": "Write this prompt's rubric",
+  "botao.justificar": "justify this score",
+  "botao.limpar": "clear",
+  "botao.acrescentar_criterio": "Add criterion",
+  "botao.remover": "remove",
+  "botao.usar_modelo": "Use: {nome}",
+  "botao.empate": "The two are equivalent (tie)",
+  "botao.buscar": "Search",
+  "botao.limpar_filtros": "Clear the filters",
+  "botao.voltar_fila": "Back to the queue",
+  "botao.ir_fila": "Go to the queue",
+  "botao.anotar_este": "Annotate this one",
+  "botao.ja_anotado": "Already annotated",
+  "botao.sem_material": "No material",
+  "botao.anterior": "previous",
+  "botao.proxima": "next",
+  "botao.continuar": "Continue",
+  "botao.corrigir_reenviar": "Fix and resubmit",
+  "botao.escrever_resposta_agora": "Write the answer now",
+  "botao.nao_proxima": "No, next in the queue",
+  "botao.aprovar": "Approve",
+  "botao.devolver_ajuste": "Send back for a fix",
+  "botao.cancelar": "Cancel",
+  "botao.devolver_com_comentario": "Send it back with this comment",
+  "botao.aprovar_criacao": "Approve creation",
+  "botao.recusar_criacao": "Turn creation down",
+  "ws.prompt_rotulo": "what the person actually asked for",
+  "ws.prov_demo": "demo pack",
+  "ws.prov_demo_atribuicao": "hand-written for the Bancada demo — nobody's real prompt",
+  "ws.prov_fonte": "source: {fonte}",
+  "ws.prov_licenca": "license: {licenca}",
+  "ws.prov_chars": "{n} characters",
+  "lang.pt": "Portuguese",
+  "lang.en": "English",
+  "ws.resposta_em_avaliacao": "answer under review ({rotulo})",
+  "ws.rubrica": "rubric: {titulo}",
+  "ws.sem_resposta_titulo": "This prompt has no model answer to score.",
+  "ws.sem_rubrica_titulo": "This prompt has no active rubric.",
+  "ws.sem_material_linha": "Scoring needs both: the measuring instrument and the thing being measured. Writing its rubric is the step that is missing.",
+  "ws.sem_par_titulo": "This prompt does not have two model answers.",
+  "ws.sem_par_linha": "An A/B comparison needs a pair. Writing its rubric is the step that is missing before it can be compared later.",
+  "ws.just_ph": "why this score, and not the one next to it?",
+  "ws.comentario_geral": "General comment",
+  "ws.comentario_geral_ph": "general comment (optional)",
+  "ws.rascunho_recuperado": "We brought back what you had written in this task.",
+  "ws.devolvida_versao": "Sent back for a fix — version {versao}",
+  "ws.modelos_summary": "Start from a template (3 available)",
+  "ws.modelos_nota": "The template lands as an editable draft — it exists so you do not start from a blank page, not to be submitted as it is.",
+  "modelo.instrucao": "Instruction followed",
+  "modelo.verdade": "Truth and verifiability",
+  "modelo.utilidade": "Practical usefulness",
+  "ws.titulo_rubrica": "Rubric title",
+  "ws.titulo_rubrica_ph": "what this rubric measures, in one line",
+  "ws.criterio_n": "criterion {n}",
+  "ws.criterio_nome_ph": "criterion name",
+  "ws.criterio_desc_ph": "what exactly this criterion measures (and what it does NOT)",
+  "ws.rotulo_min": "the lowest score means…",
+  "ws.rotulo_max": "the highest score means…",
+  "ws.escala": "scale",
+  "ws.escala_opcao": "1 to {max}",
+  "ws.faixa_criterios": "from {min} to {max} criteria — a rubric with 20 is not stricter, it is impossible to apply the same way twice",
+  "ws.sft_minha": "your reference answer",
+  "ws.sft_lida": "the reference answer that was written",
+  "ws.sft_ph": "answer the prompt the way the model should have — this text is what becomes a training example",
+  "ws.contador_chars": "{n} characters",
+  "ws.guia": "guiding rubric: {titulo}",
+  "ws.guia_sem_titulo": "the rubric you proposed",
+  "ws.guia_proposta": "this is the rubric you proposed — it is still under review",
+  "ws.guia_leitura": "What the person ticked came with the submission — it is their own self-check on their own answer.",
+  "ws.guia_edicao": "What you tick goes with the submission — it is the self-check on your own answer.",
+  "ws.rotulo_cego": "blind label",
+  "ws.escolhida": "picked",
+  "ws.just_ab_ph": "what does the one you picked do that the other does not? (at least {min} characters)",
+  "ws.just_ab_rotulo": "Why — required. The value of a comparison is in the reason, not in the preference.",
+  "ws.just_ab_rotulo_leitura": "Why — the reason written by whoever compared them.",
+  "ws.contador_de": "{n} of {min} characters",
+  "lingua.selo_en": "EN",
+  "lingua.selo_pt": "PT-BR",
+  "lingua.meta": "English — a justification, a comment or a criterion is metadata, and metadata is what the client reads.",
+  "lingua.rubrica": "English — the rubric and every criterion in it are metadata: they are what the client reads.",
+  "lingua.dado_pt": "Portuguese — the same language as the prompt. This is the data being produced, and it is where native expertise shows.",
+  "lingua.dado_en": "English — the same language as the prompt. This is the data being produced.",
+  "falta.nada": "Nothing to submit",
+  "falta.sem_rubrica": "This task has no rubric",
+  "falta.notas": "{n} of {total} criteria with no score",
+  "falta.titulo_rubrica": "The rubric title is missing",
+  "falta.criterio_um": "1 more criterion to go",
+  "falta.criterios_n": "{n} more criteria to go",
+  "falta.criterio_nome": "Criterion {n}: the name is missing",
+  "falta.criterio_desc": "Criterion {n}: the description is missing",
+  "falta.criterio_pontas": "Criterion {n}: describe both ends of the scale",
+  "falta.sft": "{n} more characters in the answer",
+  "falta.preferencia": "Pick A, B or a tie",
+  "falta.justificativa": "{n} more characters in the justification",
+  "falta.devolucao": "{n} more characters",
+  "catalogo.titulo": "Pick a prompt to {tipo}",
+  "catalogo.contagem": "{n} of {total} in the pool",
+  "catalogo.busca_ph": "search inside the prompt text",
+  "catalogo.todos_idiomas": "every language",
+  "catalogo.todas_fontes": "every source",
+  "catalogo.faixa_qualquer": "any length",
+  "catalogo.faixa_curto": "short",
+  "catalogo.faixa_medio": "medium",
+  "catalogo.faixa_longo": "long",
+  "catalogo.busca_vazia": "The search had nothing left after the symbols were stripped — the list below is the pool with no text filter.",
+  "catalogo.carregando": "Loading the catalog…",
+  "catalogo.vazio_titulo": "No prompt matches those filters.",
+  "catalogo.vazio_linha": "The pool holds {n} prompts. Drop a filter, or go back to the queue.",
+  "catalogo.ja_anotei": "you annotated this one already",
+  "catalogo.sem_material_selo": "no material for this type",
+  "catalogo.title_ab": "an A/B comparison needs two model answers; this prompt has {n}",
+  "catalogo.title_avaliar": "scoring with a rubric needs an active rubric and a model answer",
+  "catalogo.pagina": "page {page} of {pages}",
+  "catalogo.erro": "could not read the catalog: {erro}",
+  "minhas.titulo": "My tasks",
+  "minhas.total": "{n} in total",
+  "minhas.carregando": "Loading…",
+  "minhas.vazio_titulo": "You have not taken any task yet.",
+  "minhas.vazio_linha": "The queue hands you the next one on its own; the catalog lets you choose.",
+  "minhas.indisponivel": "this prompt left the corpus in the last reload",
+  "minhas.devolvida": "Sent back for a fix",
+  "minhas.versao": "version {n}",
+  "minhas.da_fila": "from the queue",
+  "minhas.erro": "could not read your tasks: {erro}",
+  "status.em_andamento": "in progress",
+  "status.submetida": "waiting for review",
+  "status.aprovada": "approved",
+  "status.abandonada": "returned by you",
+  "status.expirada": "deadline expired",
+  "cont.titulo": "Submitted for review",
+  "cont.convite": "Write the reference answer for this very prompt",
+  "cont.porque": "The rubric you just wrote shows up beside you, as a checklist.",
+  "triagem.nada_selecionado": "Nothing selected.",
+  "triagem.nada_selecionado_linha": "Whatever you pick in the queue opens here exactly as the annotator produced it: same rubric, same scales, same order.",
+  "triagem.abrindo": "opening…",
+  "triagem.erro_abrir": "could not open this item.",
+  "triagem.versao": "version {n}",
+  "triagem.por_voce": "by you",
+  "triagem.por": "by {nome}",
+  "triagem.diretriz": "guideline v{n}",
+  "triagem.nota_acoes": "approving moves it on to the evaluation; sending back reopens the task of whoever annotated",
+  "triagem.devolver_titulo": "Send back for a fix",
+  "triagem.devolver_microcopy": "The comment goes back to the annotator — say what to fix.",
+  "triagem.devolver_ph": "what has to change, and why (at least {min} characters)",
+  "triagem.prompt_sumiu": "(the prompt left the corpus in the last reload)",
+  "triagem.eu_sufixo": "{nome} (you)",
+  "triagem.minhas_excluidas": "{n} annotation(s) of yours are waiting for triage and do not show up here: whoever reviews is never whoever annotated. Another reviewer sees them.",
+  "triagem.criacoes_titulo": "Create mode arrives in P4.",
+  "triagem.criacoes_linha": "Once it exists, a prompt written by an annotator shows up here before entering the corpus, and approving it records the uid the pipeline will reproduce.",
+  "solo.titulo": "Solo mode",
+  "solo.linha": "you are reviewing work of your own.",
+  "solo.contagem": "{n} of {total} item(s) on this page are yours. ",
+  "solo.sem_meus": "No item on this page is yours. ",
+  "solo.nota": "One person wearing all three hats: every review is recorded as a self-review, and the admin panel counts that number separately.",
+  "recado.enviado": "submitted for review — version {versao}",
+  "recado.enviado_expirado": "submitted (the deadline had expired, but your work was saved)",
+  "recado.devolvida_fila": "task returned to the queue",
+  "recado.modelo_carregado": "template loaded — now fit the criteria to the prompt",
+  "recado.aprovada": "approved — moves on to the evaluation",
+  "recado.devolvida": "sent back for a fix — the comment went to whoever annotated",
+  "recado.admin_gera": "it is the administrator who creates tasks for the queue",
+  "recado.entrou_equipe": "{nome} joined the team as {papel}",
+  "recado.escala": "this criterion runs from {min} to {max}",
+  "recado.erro_saude": "could not read the state of the databases: {erro}",
+  "recado.erro_projetos": "could not read the projects: {erro}",
+  "recado.erro_diretrizes": "could not read the guidelines: {erro}",
+  "recado.erro_personas": "could not read the people: {erro}",
+  "recado.persona_sumiu": "the person you had saved no longer exists in this database",
+  "recado.erro_continuacao": "could not open the continuation: {erro}",
+  "recado.idioma": "interface in English",
+  "semPersona.titulo": "Nobody registered as {papel}.",
+  "semPersona.linha": "Use “+ my name” in the bar to enter with a new name, or run `pf annotate seed` to bring in the six demo people.",
+  "admin.pool": "Pool state",
+  "admin.projetos": "Projects",
+  "admin.projetos_nota": "what is demo and what is real work",
+  "admin.col_projeto": "Project",
+  "admin.col_cliente": "Client",
+  "admin.col_tarefas": "Tasks",
+  "admin.col_abertas": "Open",
+  "admin.col_o_que_e": "What it is",
+  "admin.col_nome": "Name",
+  "admin.col_papel": "Role",
+  "admin.col_estado": "State",
+  "admin.col_criado_em": "Created at",
+  "admin.equipe": "Team",
+  "admin.novo_ph": "name of whoever is joining",
+  "admin.novo_botao": "Add to the team",
+  "admin.bancos": "Databases",
+  "admin.bancos_nota": "read right now, not cached at start-up",
+  "admin.roteiro": "What is not here yet",
+  "admin.roteiro_nota": "The numbers above are real and read right now. What is missing is listed below with the milestone it arrives in — nothing on this screen pretends to work.",
+  "admin.card_anotadores": "people on the team",
+  "admin.card_anotadores_nota": "3 annotators, 2 reviewers, 1 admin in the seed",
+  "admin.card_tarefas": "tasks created",
+  "admin.card_tarefas_nota": "the demo pack, plus the ones over the real corpus",
+  "admin.card_anotacoes": "annotations submitted",
+  "admin.card_anotacoes_nota": "human work — the pipeline cannot recreate it",
+  "admin.card_revisoes": "triages done",
+  "admin.card_revisoes_nota": "approving moves it to the evaluation; sending back reopens the task",
+  "admin.card_avaliacoes": "evaluations (Rate and Review)",
+  "admin.card_avaliacoes_nota": "pass 2 arrives in P3b",
+  "admin.card_criacoes": "prompts written here",
+  "admin.card_criacoes_nota": "create mode arrives in P4",
+  "admin.pool_origem": "source",
+  "admin.pool_itens": "items in the pool",
+  "admin.pool_por_que": "why this one",
+  "admin.pool_colecao": "collection looked for",
+  "admin.pool_filtro": "fallback filter",
+  "admin.pool_politica": "license policy",
+  "admin.pool_excluidas": "excluded by license",
+  "admin.pool_nsfw": "sensitive content",
+  "admin.pool_materializado": "pool materialized at",
+  "admin.pool_build": "corpus build in the pool",
+  "admin.pool_autorrevisao": "self-review",
+  "admin.pool_autorrevisao_on": "ALLOWED — the reviewer may judge their own work, and every review is flagged as a self-review",
+  "admin.pool_autorrevisao_off": "blocked — whoever reviews is never whoever annotated",
+  "admin.pool_curada": "curated collection",
+  "admin.pool_fallback": "fallback",
+  "admin.pool_desconhecido": "unknown",
+  "admin.pool_estado": "state",
+  "admin.pool_sem_health": "/api/health could not be read",
+  "admin.banco_plataforma": "platform (read-write)",
+  "admin.banco_schema": "platform schema",
+  "admin.banco_corpus": "corpus (read-only)",
+  "admin.banco_prompts": "prompts in the corpus",
+  "admin.banco_build": "corpus build",
+  "admin.banco_construido": "built at",
+  "admin.padrao": "default",
+  "admin.sem_projetos": "No project — run `pf annotate seed`.",
+  "admin.sem_equipe": "Nobody registered — run `pf annotate seed`, or use the field below.",
+  "admin.equipe_conta": "{n} person(s)",
+  "admin.ativo": "active",
+  "admin.inativo": "inactive",
+  "pool.motivo_colecao": "collection “{colecao}”, curated in the curation tool",
+  "pool.motivo_colecao_licenca": "collection “{colecao}”, curated in the curation tool; {n} item(s) of it were left out by the license policy",
+  "pool.motivo_colecao_vazia": "the collection “{colecao}” exists in the corpus but is empty — deterministic filter while nobody fills it",
+  "pool.motivo_colecao_sem_licenca": "the collection “{colecao}” exists, but no item in it passes the license policy ({n} excluded) — deterministic filter in its place",
+  "pool.motivo_sem_colecao": "there is no collection “{colecao}” in the corpus (every `pf load-db` rebuilds the database and drops the collections) — deterministic filter in its place",
+  "pool.filtro_uma_lingua": "language {langs}, from {min_chars} to {max_chars} characters, at most {max_dups} exact duplicate(s), constant-step sample up to {max}",
+  "pool.filtro_varias_linguas": "languages {langs} (equal quota per language), from {min_chars} to {max_chars} characters, at most {max_dups} exact duplicate(s), constant-step sample up to {max}",
+  "pool.politica_aberta": "no license restriction — EVERY row of the corpus may be annotated",
+  "pool.politica_comercial": "only prompts with commercial_ok = 1 get in",
+  "pool.politica_redistribuivel": "only prompts with redistributable = 1 get in",
+  "pool.politica_ambas": "only prompts with commercial_ok = 1 and redistributable = 1 get in",
+  "pool.nota_nsfw": "the sensitive-content flag depends on the labelling campaign, which has not run yet: `nsfw` is null across the whole corpus today, and the clause excludes zero rows",
+  "roteiro.P3b": "Rate and Review: score before and after, correction with a reason per change, and escalation to the admin.",
+  "roteiro.P4": "Create mode: writing a prompt, a duplicate warning against the corpus, and review of the creation.",
+  "roteiro.P5": "Per-annotator metrics, agreement over the gold tasks, and task generation. Its reports go out in English, like every delivery artifact.",
+  "roteiro.P6": "Ingestion: the approved prompt crosses the pipeline and comes back in the corpus with a deterministic uid.",
+  "roteiro.P7": "Finish: a whole session without the mouse, final microcopy, and the hostile escaping pass."
+},
+"pt": {
+  "app.titulo": "Bancada — plataforma de anotação",
+  "app.marca_sufixo": "demonstração",
+  "a11y.papel": "Papel",
+  "a11y.persona": "Quem está usando",
+  "a11y.projeto": "Projeto em foco",
+  "a11y.idioma": "Idioma da interface",
+  "a11y.tela_anotador": "Área do anotador",
+  "a11y.tela_revisor": "Área do revisor",
+  "a11y.tela_admin": "Painel do administrador",
+  "a11y.abas_tipo": "Estilos de tarefa",
+  "a11y.abas_revisao": "O que revisar",
+  "a11y.vistas": "Como escolher trabalho",
+  "a11y.nota": "{criterio}: nota {valor}",
+  "barra.como": "como",
+  "barra.em": "em",
+  "barra.sem_login": "Demonstração — sem login",
+  "barra.nova_pessoa": "+ meu nome",
+  "barra.nova_pessoa_ajuda": "Entra na hora, com o papel selecionado na barra. As personas da lista são fixtures da demonstração — para trabalhar de verdade, entre com o seu nome nos três papéis.",
+  "barra.nova_pessoa_ph": "seu nome",
+  "barra.nova_pessoa_botao": "Criar e entrar",
+  "barra.sem_nome": "digite um nome",
+  "barra.erro_perfil": "não deu para criar o perfil: {erro}",
+  "barra.nome_repetido": "{erro} (ou escolha essa pessoa no seletor ao lado)",
+  "barra.todos_projetos": "todos os projetos",
+  "barra.ninguem_neste_papel": "ninguém com este papel",
+  "tema.title": "Alterna entre claro e escuro",
+  "tema.escuro": "Escuro",
+  "tema.claro": "Claro",
+  "idioma.en": "en",
+  "idioma.pt": "pt",
+  "idioma.en_title": "Interface em inglês",
+  "idioma.pt_title": "Interface em português do Brasil",
+  "papel.anotador.nome": "Anotador",
+  "papel.anotador.linha": "Recebe tarefas da fila, avalia respostas com rubrica, compara A/B com justificativa e escreve prompts novos.",
+  "papel.revisor.nome": "Revisor",
+  "papel.revisor.linha": "Lê o que foi anotado no mesmo layout em que foi produzido, aprova ou devolve com um comentário que volta para quem anotou.",
+  "papel.admin.nome": "Administrador",
+  "papel.admin.linha": "Gera tarefas, cuida das rubricas e das respostas de modelo, e acompanha agreement, tempo e taxa de devolução por anotador.",
+  "tela.anotador": "Fila de anotação",
+  "tela.revisor": "Revisão",
+  "tela.admin": "Administração",
+  "tipo.avaliar_rubrica.nome": "Avaliar com rubrica",
+  "tipo.avaliar_rubrica.titulo": "Avaliar uma resposta com rubrica",
+  "tipo.avaliar_rubrica.vazio_titulo": "Nada na fila de avaliação com rubrica.",
+  "tipo.avaliar_rubrica.vazio_linha": "Quando houver tarefa, ela abre aqui sozinha: prompt, resposta e a rubrica com um campo de nota por critério.",
+  "tipo.escrever_rubrica.nome": "Escrever rubrica",
+  "tipo.escrever_rubrica.titulo": "Escrever a rubrica de um prompt",
+  "tipo.escrever_rubrica.vazio_titulo": "Nada na fila de escrita de rubrica.",
+  "tipo.escrever_rubrica.vazio_linha": "A rubrica que você escrever aqui, depois de aprovada, vira o instrumento com que outras pessoas avaliam este mesmo prompt.",
+  "tipo.sft_resposta.nome": "Escrever resposta (SFT)",
+  "tipo.sft_resposta.titulo": "Escrever a resposta de referência",
+  "tipo.sft_resposta.vazio_titulo": "Nada na fila de resposta de referência.",
+  "tipo.sft_resposta.vazio_linha": "Concluir uma rubrica oferece, no fim, escrever a resposta do mesmo prompt — é assim que as duas abas se encadeiam.",
+  "tipo.comparar_ab.nome": "Comparar A/B",
+  "tipo.comparar_ab.titulo": "Comparar duas respostas",
+  "tipo.comparar_ab.vazio_titulo": "Nada na fila de comparação A/B.",
+  "tipo.comparar_ab.vazio_linha": "Quando houver par, as duas respostas abrem lado a lado, com rótulos cegos: você não vê qual modelo escreveu o quê.",
+  "vista.fila": "Fila",
+  "vista.catalogo": "Catálogo",
+  "vista.minhas": "Minhas tarefas",
+  "subaba.anotacoes.nome": "Anotações",
+  "subaba.anotacoes.titulo": "Triagem — esperando revisão",
+  "subaba.anotacoes.vazio": "Nada esperando revisão.",
+  "subaba.anotacoes.linha": "Toda anotação submetida cai aqui. Você aprova ou devolve — e a devolução exige um comentário, que volta para quem anotou junto com o formulário preenchido.",
+  "subaba.criacoes.nome": "Criações",
+  "subaba.criacoes.titulo": "Prompts escritos por anotadores",
+  "subaba.criacoes.vazio": "Nenhum prompt novo esperando.",
+  "subaba.criacoes.linha": "Prompts escritos no modo criar chegam aqui antes de entrar no corpus. Aprovar grava o uid que a pipeline vai reproduzir.",
+  "diretrizes.titulo": "Diretrizes — {tipo}",
+  "diretrizes.titulo_versao": "Diretrizes — {tipo} (versão {versao})",
+  "diretrizes.sem": "Nenhuma diretriz publicada para este tipo — rode `pf annotate seed`.",
+  "fila.conta_zero": "nada nesta fila para você",
+  "fila.conta": "{n} esperando por você",
+  "fila.puxando": "Puxando a próxima tarefa…",
+  "fila.origem_livre": "escolhida por você",
+  "fila.origem_continuacao": "continuação da rubrica",
+  "fila.origem_fila": "tarefa da fila",
+  "fila.erro_proxima": "não deu para pedir a próxima tarefa: {erro}",
+  "fila.motivo_vazia": "Nenhuma tarefa deste tipo esperando por você agora. Ou não há tarefas abertas, ou as que existem já estão com outra pessoa, ou você já anotou todas.",
+  "fila.motivo_sumidos": "{n} tarefa(s) deste tipo apontam para prompts que não estão mais no corpus (ele foi recarregado) e foram pausadas. Peça ao administrador para gerar tarefas novas.",
+  "fila.motivo_servida": "tarefa atribuída",
+  "revisor.detalhe": "Detalhe",
+  "revisor.atalhos": "J/K andam · A aprova · R devolve",
+  "revisor.conta_zero": "nada esperando",
+  "revisor.conta": "{n} esperando",
+  "botao.enviar_proxima": "Enviar e próxima",
+  "botao.devolver_pegar_outra": "Devolver e pegar outra",
+  "botao.escolher_catalogo": "Escolher no catálogo",
+  "botao.ver_minhas": "Ver minhas tarefas",
+  "botao.entrar_admin": "Entrar como administrador",
+  "botao.mostrar_inteiro": "mostrar o texto inteiro",
+  "botao.recolher": "recolher o texto",
+  "botao.descartar_rascunho": "descartar e começar do zero",
+  "botao.escrever_rubrica_deste": "Escrever a rubrica deste prompt",
+  "botao.justificar": "justificar esta nota",
+  "botao.limpar": "limpar",
+  "botao.acrescentar_criterio": "Acrescentar critério",
+  "botao.remover": "remover",
+  "botao.usar_modelo": "Usar: {nome}",
+  "botao.empate": "As duas são equivalentes (empate)",
+  "botao.buscar": "Buscar",
+  "botao.limpar_filtros": "Limpar os filtros",
+  "botao.voltar_fila": "Voltar para a fila",
+  "botao.ir_fila": "Ir para a fila",
+  "botao.anotar_este": "Anotar este",
+  "botao.ja_anotado": "Já anotado",
+  "botao.sem_material": "Sem material",
+  "botao.anterior": "anterior",
+  "botao.proxima": "próxima",
+  "botao.continuar": "Continuar",
+  "botao.corrigir_reenviar": "Corrigir e reenviar",
+  "botao.escrever_resposta_agora": "Escrever a resposta agora",
+  "botao.nao_proxima": "Não, próxima da fila",
+  "botao.aprovar": "Aprovar",
+  "botao.devolver_ajuste": "Devolver para ajuste",
+  "botao.cancelar": "Cancelar",
+  "botao.devolver_com_comentario": "Devolver com este comentário",
+  "botao.aprovar_criacao": "Aprovar criação",
+  "botao.recusar_criacao": "Recusar criação",
+  "ws.prompt_rotulo": "o pedido de quem escreveu",
+  "ws.prov_demo": "pacote de demonstração",
+  "ws.prov_demo_atribuicao": "escrito à mão para a demonstração da Bancada — não é prompt de ninguém",
+  "ws.prov_fonte": "fonte: {fonte}",
+  "ws.prov_licenca": "licença: {licenca}",
+  "ws.prov_chars": "{n} caracteres",
+  "lang.pt": "português",
+  "lang.en": "inglês",
+  "ws.resposta_em_avaliacao": "resposta em avaliação ({rotulo})",
+  "ws.rubrica": "rubrica: {titulo}",
+  "ws.sem_resposta_titulo": "Este prompt não tem resposta de modelo para avaliar.",
+  "ws.sem_rubrica_titulo": "Este prompt não tem rubrica ativa.",
+  "ws.sem_material_linha": "Avaliar precisa dos dois: o instrumento de medida e o que vai ser medido. Escrever a rubrica dele é o passo que falta.",
+  "ws.sem_par_titulo": "Este prompt não tem duas respostas de modelo.",
+  "ws.sem_par_linha": "A comparação A/B precisa de um par. Escrever a rubrica dele é o passo que falta para que ele possa ser comparado depois.",
+  "ws.just_ph": "por que esta nota, e não a vizinha?",
+  "ws.comentario_geral": "Comentário geral",
+  "ws.comentario_geral_ph": "comentário geral (opcional)",
+  "ws.rascunho_recuperado": "Recuperamos o que você tinha escrito nesta tarefa.",
+  "ws.devolvida_versao": "Devolvida para ajuste — versão {versao}",
+  "ws.modelos_summary": "Começar de um modelo (3 disponíveis)",
+  "ws.modelos_nota": "O modelo entra como rascunho editável — ele existe para você não começar de uma página em branco, não para ser enviado como está.",
+  "modelo.instrucao": "Instrução seguida",
+  "modelo.verdade": "Verdade e verificabilidade",
+  "modelo.utilidade": "Utilidade prática",
+  "ws.titulo_rubrica": "Título da rubrica",
+  "ws.titulo_rubrica_ph": "o que esta rubrica mede, em uma linha",
+  "ws.criterio_n": "critério {n}",
+  "ws.criterio_nome_ph": "nome do critério",
+  "ws.criterio_desc_ph": "o que exatamente este critério mede (e o que ele NÃO mede)",
+  "ws.rotulo_min": "a nota mais baixa significa…",
+  "ws.rotulo_max": "a nota mais alta significa…",
+  "ws.escala": "escala",
+  "ws.escala_opcao": "1 a {max}",
+  "ws.faixa_criterios": "de {min} a {max} critérios — rubrica com 20 não é mais rigorosa, é impossível de aplicar duas vezes igual",
+  "ws.sft_minha": "sua resposta de referência",
+  "ws.sft_lida": "a resposta de referência escrita",
+  "ws.sft_ph": "responda ao prompt como o modelo deveria ter respondido — é este texto que vira exemplo de treino",
+  "ws.contador_chars": "{n} caracteres",
+  "ws.guia": "rubrica-guia: {titulo}",
+  "ws.guia_sem_titulo": "a rubrica que você propôs",
+  "ws.guia_proposta": "esta é a rubrica que você propôs — ela ainda está em revisão",
+  "ws.guia_leitura": "O que a pessoa marcou veio no envio — é o autoteste dela sobre a própria resposta.",
+  "ws.guia_edicao": "O que você marcar entra no envio — é o autoteste da sua própria resposta.",
+  "ws.rotulo_cego": "rótulo cego",
+  "ws.escolhida": "escolhida",
+  "ws.just_ab_ph": "o que a escolhida faz que a outra não faz? (mínimo de {min} caracteres)",
+  "ws.just_ab_rotulo": "Por que — obrigatório. O valor da comparação está no motivo, não na preferência.",
+  "ws.just_ab_rotulo_leitura": "Por que — o motivo escrito por quem comparou.",
+  "ws.contador_de": "{n} de {min} caracteres",
+  "lingua.selo_en": "EN",
+  "lingua.selo_pt": "PT-BR",
+  "lingua.meta": "Inglês — justificativa, comentário e critério são metadado, e metadado é o que o cliente lê.",
+  "lingua.rubrica": "Inglês — a rubrica e cada critério dela são metadado: é o que o cliente lê.",
+  "lingua.dado_pt": "Português — a mesma língua do prompt. É o dado sendo produzido, e é onde a expertise nativa aparece.",
+  "lingua.dado_en": "Inglês — a mesma língua do prompt. É o dado sendo produzido.",
+  "falta.nada": "Nada para enviar",
+  "falta.sem_rubrica": "Esta tarefa está sem rubrica",
+  "falta.notas": "{n} de {total} critérios sem nota",
+  "falta.titulo_rubrica": "Falta o título da rubrica",
+  "falta.criterio_um": "Falta 1 critério",
+  "falta.criterios_n": "Faltam {n} critérios",
+  "falta.criterio_nome": "Critério {n}: falta o nome",
+  "falta.criterio_desc": "Critério {n}: falta a descrição",
+  "falta.criterio_pontas": "Critério {n}: descreva as duas pontas da escala",
+  "falta.sft": "Faltam {n} caracteres na resposta",
+  "falta.preferencia": "Escolha A, B ou empate",
+  "falta.justificativa": "Faltam {n} caracteres na justificativa",
+  "falta.devolucao": "Faltam {n} caracteres",
+  "catalogo.titulo": "Escolher um prompt para {tipo}",
+  "catalogo.contagem": "{n} de {total} no pool",
+  "catalogo.busca_ph": "buscar no texto do prompt",
+  "catalogo.todos_idiomas": "todos os idiomas",
+  "catalogo.todas_fontes": "todas as fontes",
+  "catalogo.faixa_qualquer": "qualquer tamanho",
+  "catalogo.faixa_curto": "curto",
+  "catalogo.faixa_medio": "médio",
+  "catalogo.faixa_longo": "longo",
+  "catalogo.busca_vazia": "A busca não sobrou nada depois de limpar os símbolos — a lista abaixo é o pool sem filtro de texto.",
+  "catalogo.carregando": "Carregando o catálogo…",
+  "catalogo.vazio_titulo": "Nenhum prompt com esses filtros.",
+  "catalogo.vazio_linha": "O pool tem {n} prompts. Tire um filtro ou volte para a fila.",
+  "catalogo.ja_anotei": "você já anotou este",
+  "catalogo.sem_material_selo": "sem material para este tipo",
+  "catalogo.title_ab": "a comparação A/B precisa de duas respostas de modelo; este prompt tem {n}",
+  "catalogo.title_avaliar": "avaliar com rubrica precisa de uma rubrica ativa e de uma resposta de modelo",
+  "catalogo.pagina": "página {page} de {pages}",
+  "catalogo.erro": "não deu para ler o catálogo: {erro}",
+  "minhas.titulo": "Minhas tarefas",
+  "minhas.total": "{n} no total",
+  "minhas.carregando": "Carregando…",
+  "minhas.vazio_titulo": "Você ainda não pegou nenhuma tarefa.",
+  "minhas.vazio_linha": "A fila entrega a próxima sozinha; o catálogo deixa você escolher.",
+  "minhas.indisponivel": "este prompt saiu do corpus na última recarga",
+  "minhas.devolvida": "Devolvida para ajuste",
+  "minhas.versao": "versão {n}",
+  "minhas.da_fila": "da fila",
+  "minhas.erro": "não deu para ler suas tarefas: {erro}",
+  "status.em_andamento": "em andamento",
+  "status.submetida": "esperando revisão",
+  "status.aprovada": "aprovada",
+  "status.abandonada": "devolvida por você",
+  "status.expirada": "prazo expirado",
+  "cont.titulo": "Enviado para revisão",
+  "cont.convite": "Escrever a resposta de referência deste mesmo prompt",
+  "cont.porque": "A rubrica que você acabou de escrever aparece ao lado, como checklist.",
+  "triagem.nada_selecionado": "Nada selecionado.",
+  "triagem.nada_selecionado_linha": "O item escolhido na fila abre aqui exatamente como o anotador o produziu: mesma rubrica, mesmas escalas, mesma ordem.",
+  "triagem.abrindo": "abrindo…",
+  "triagem.erro_abrir": "não deu para abrir este item.",
+  "triagem.versao": "versão {n}",
+  "triagem.por_voce": "por você",
+  "triagem.por": "por {nome}",
+  "triagem.diretriz": "diretriz v{n}",
+  "triagem.nota_acoes": "aprovar segue para a avaliação; devolver reabre a tarefa de quem anotou",
+  "triagem.devolver_titulo": "Devolver para ajuste",
+  "triagem.devolver_microcopy": "O comentário volta para o anotador — diga o que corrigir.",
+  "triagem.devolver_ph": "o que precisa mudar, e por quê (mínimo de {min} caracteres)",
+  "triagem.prompt_sumiu": "(o prompt saiu do corpus na última recarga)",
+  "triagem.eu_sufixo": "{nome} (você)",
+  "triagem.minhas_excluidas": "{n} anotação(ões) sua(s) esperam triagem e não aparecem aqui: quem revisa nunca é quem anotou. Outro revisor as vê.",
+  "triagem.criacoes_titulo": "O modo criar chega no P4.",
+  "triagem.criacoes_linha": "Quando ele existir, o prompt escrito por um anotador aparece aqui antes de entrar no corpus, e aprovar grava o uid que a pipeline vai reproduzir.",
+  "solo.titulo": "Modo solo",
+  "solo.linha": "você está revisando trabalho seu.",
+  "solo.contagem": "{n} de {total} item(ns) nesta página são seus. ",
+  "solo.sem_meus": "Nesta página não há item seu. ",
+  "solo.nota": "Uma pessoa nos três papéis: cada revisão fica gravada como autorrevisão, e o painel do admin conta esse número à parte.",
+  "recado.enviado": "enviado para revisão — versão {versao}",
+  "recado.enviado_expirado": "enviado (o prazo tinha expirado, mas seu trabalho foi salvo)",
+  "recado.devolvida_fila": "tarefa devolvida para a fila",
+  "recado.modelo_carregado": "modelo carregado — ajuste os critérios ao prompt",
+  "recado.aprovada": "aprovada — segue para a avaliação",
+  "recado.devolvida": "devolvida para ajuste — o comentário foi para quem anotou",
+  "recado.admin_gera": "é o administrador quem gera tarefas para a fila",
+  "recado.entrou_equipe": "{nome} entrou na equipe como {papel}",
+  "recado.escala": "este critério vai de {min} a {max}",
+  "recado.erro_saude": "não deu para ler o estado dos bancos: {erro}",
+  "recado.erro_projetos": "não deu para ler os projetos: {erro}",
+  "recado.erro_diretrizes": "não deu para ler as diretrizes: {erro}",
+  "recado.erro_personas": "não deu para ler as personas: {erro}",
+  "recado.persona_sumiu": "a persona guardada não existe mais neste banco",
+  "recado.erro_continuacao": "não deu para abrir a continuação: {erro}",
+  "recado.idioma": "interface em português",
+  "semPersona.titulo": "Ninguém cadastrado como {papel}.",
+  "semPersona.linha": "Use o “+ meu nome” na barra para entrar com um nome novo, ou rode `pf annotate seed` para trazer as seis personas da demonstração.",
+  "admin.pool": "Estado do pool",
+  "admin.projetos": "Projetos",
+  "admin.projetos_nota": "o que é demonstração e o que é trabalho real",
+  "admin.col_projeto": "Projeto",
+  "admin.col_cliente": "Cliente",
+  "admin.col_tarefas": "Tarefas",
+  "admin.col_abertas": "Abertas",
+  "admin.col_o_que_e": "O que é",
+  "admin.col_nome": "Nome",
+  "admin.col_papel": "Papel",
+  "admin.col_estado": "Estado",
+  "admin.col_criado_em": "Criado em",
+  "admin.equipe": "Equipe",
+  "admin.novo_ph": "nome de quem entra",
+  "admin.novo_botao": "Adicionar à equipe",
+  "admin.bancos": "Bancos",
+  "admin.bancos_nota": "lidos agora, não guardados na subida",
+  "admin.roteiro": "O que ainda não está aqui",
+  "admin.roteiro_nota": "Os números acima são reais e lidos agora. O que falta está listado abaixo com o marco em que entra — nada na tela finge funcionar.",
+  "admin.card_anotadores": "pessoas na equipe",
+  "admin.card_anotadores_nota": "3 anotadores, 2 revisores, 1 admin no seed",
+  "admin.card_tarefas": "tarefas criadas",
+  "admin.card_tarefas_nota": "o pacote de demonstração, mais as do corpus real",
+  "admin.card_anotacoes": "anotações submetidas",
+  "admin.card_anotacoes_nota": "trabalho humano — não se recria pela pipeline",
+  "admin.card_revisoes": "triagens feitas",
+  "admin.card_revisoes_nota": "aprovar segue para a avaliação; devolver reabre a tarefa",
+  "admin.card_avaliacoes": "avaliações (Rate and Review)",
+  "admin.card_avaliacoes_nota": "a passagem 2 chega no P3b",
+  "admin.card_criacoes": "prompts escritos aqui",
+  "admin.card_criacoes_nota": "o modo criar chega no P4",
+  "admin.pool_origem": "origem",
+  "admin.pool_itens": "itens no pool",
+  "admin.pool_por_que": "por quê",
+  "admin.pool_colecao": "coleção procurada",
+  "admin.pool_filtro": "filtro do fallback",
+  "admin.pool_politica": "política de licença",
+  "admin.pool_excluidas": "excluídas pela licença",
+  "admin.pool_nsfw": "conteúdo sensível",
+  "admin.pool_materializado": "pool materializado em",
+  "admin.pool_build": "build do corpus no pool",
+  "admin.pool_autorrevisao": "autorrevisão",
+  "admin.pool_autorrevisao_on": "PERMITIDA — o revisor pode julgar o próprio trabalho, e cada revisão fica marcada como autorrevisão",
+  "admin.pool_autorrevisao_off": "bloqueada — quem revisa nunca é quem anotou",
+  "admin.pool_curada": "coleção curada",
+  "admin.pool_fallback": "fallback",
+  "admin.pool_desconhecido": "desconhecido",
+  "admin.pool_estado": "estado",
+  "admin.pool_sem_health": "não foi possível ler /api/health",
+  "admin.banco_plataforma": "plataforma (escrita)",
+  "admin.banco_schema": "schema da plataforma",
+  "admin.banco_corpus": "corpus (só leitura)",
+  "admin.banco_prompts": "prompts no corpus",
+  "admin.banco_build": "build do corpus",
+  "admin.banco_construido": "construído em",
+  "admin.padrao": "padrão",
+  "admin.sem_projetos": "Nenhum projeto — rode `pf annotate seed`.",
+  "admin.sem_equipe": "Ninguém cadastrado — rode `pf annotate seed` ou use o campo abaixo.",
+  "admin.equipe_conta": "{n} pessoa(s)",
+  "admin.ativo": "ativo",
+  "admin.inativo": "inativo",
+  "pool.motivo_colecao": "coleção “{colecao}” curada na interface de curadoria",
+  "pool.motivo_colecao_licenca": "coleção “{colecao}” curada na interface de curadoria; {n} item(ns) dela ficaram de fora pela política de licença",
+  "pool.motivo_colecao_vazia": "a coleção “{colecao}” existe no corpus mas está vazia — filtro determinístico enquanto ninguém a preenche",
+  "pool.motivo_colecao_sem_licenca": "a coleção “{colecao}” existe mas nenhum item dela passa na política de licença ({n} excluído(s)) — filtro determinístico no lugar",
+  "pool.motivo_sem_colecao": "não existe coleção “{colecao}” no corpus (toda `pf load-db` reconstrói o banco e apaga as coleções) — filtro determinístico no lugar",
+  "pool.filtro_uma_lingua": "idioma {langs}, de {min_chars} a {max_chars} caracteres, até {max_dups} duplicata(s) exata(s), amostra de passo constante até {max}",
+  "pool.filtro_varias_linguas": "idiomas {langs} (cota igual por língua), de {min_chars} a {max_chars} caracteres, até {max_dups} duplicata(s) exata(s), amostra de passo constante até {max}",
+  "pool.politica_aberta": "sem restrição de licença — TODA linha do corpus pode ser anotada",
+  "pool.politica_comercial": "só entra prompt com commercial_ok = 1",
+  "pool.politica_redistribuivel": "só entra prompt com redistributable = 1",
+  "pool.politica_ambas": "só entra prompt com commercial_ok = 1 e redistributable = 1",
+  "pool.nota_nsfw": "a marcação de conteúdo sensível depende da campanha de rotulagem, que ainda não rodou: hoje `nsfw` é nulo no corpus inteiro e a cláusula exclui zero linhas",
+  "roteiro.P3b": "Rate and Review: escore antes e depois, correção com justificativa por mudança e escalação para o admin.",
+  "roteiro.P4": "Modo criar: escrever um prompt, aviso de duplicata contra o corpus e revisão da criação.",
+  "roteiro.P5": "Métricas por anotador, agreement das tarefas-ouro e geração de tarefas. Os relatórios dele saem em inglês, como todo artefato de entrega.",
+  "roteiro.P6": "Ingestão: o prompt aprovado atravessa a pipeline e reaparece no corpus com uid determinístico.",
+  "roteiro.P7": "Acabamento: sessão inteira sem mouse, microcopy final e a passagem hostil de escape."
+}
+};
+
+/** O texto da chave, na língua de agora. `vars` preenche os `{marcadores}`.
+
+    Uma chave que não existe volta como ELA MESMA, e não como string vazia: um
+    buraco silencioso na tela é indistinguível de um campo legitimamente vazio,
+    enquanto `botao.enviar_proxima` escrito num botão é impossível de ignorar.
+    (O teste de chave órfã impede que isso chegue ao navegador.) */
+function t(chave, vars) {
+  const dicionario = TEXTOS[est.idioma] || TEXTOS[IDIOMA_PADRAO];
+  let texto = dicionario[chave];
+  if (texto === undefined) texto = TEXTOS[IDIOMA_PADRAO][chave];
+  if (texto === undefined) return chave;
+  if (!vars) return texto;
+  return texto.replace(/\{(\w+)\}/g, (bruto, nome) =>
+    Object.prototype.hasOwnProperty.call(vars, nome) ? String(vars[nome]) : bruto);
+}
+
+/** Um texto que veio do BANCO em duas línguas (rubrica de fixture, diretriz).
+
+    Cai no canônico quando a tradução não existe — uma rubrica escrita por um
+    anotador tem só a língua em que ela foi escrita, e é isso mesmo: ela é DADO,
+    não cromo, e a plataforma não inventa tradução de dado. */
+function bi(mapa, padrao) {
+  if (mapa && typeof mapa === "object") {
+    const v = mapa[est.idioma];
+    if (typeof v === "string" && v) return v;
+  }
+  return padrao === undefined || padrao === null ? "" : String(padrao);
+}
+
+/** A língua inicial. Preferência salva > navegador > inglês.
+
+    Só o português desvia do padrão, e de propósito: um avaliador estrangeiro
+    nunca deve ver esta plataforma em português, enquanto um navegador em pt-BR
+    quase certamente pertence a alguém que prefere ler em português. */
+function idiomaInicial() {
+  try {
+    const salvo = localStorage.getItem(CHAVE + "idioma");
+    if (salvo && IDIOMAS.indexOf(salvo) >= 0) return salvo;
+  } catch (_) { /* modo privado: abre no padrão, e funciona igual */ }
+  const nav = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+  return String(nav).toLowerCase().indexOf("pt") === 0 ? "pt" : IDIOMA_PADRAO;
+}
+
+/** Preenche todo texto ESTÁTICO do HTML. Ver os `data-t*` no corpo da página. */
+function aplicarTextos() {
+  document.documentElement.lang = est.idioma === "pt" ? "pt-BR" : "en";
+  document.title = t("app.titulo");
+  for (const no of document.querySelectorAll("[data-t]")) no.textContent = t(no.dataset.t);
+  for (const no of document.querySelectorAll("[data-t-ph]")) no.placeholder = t(no.dataset.tPh);
+  for (const no of document.querySelectorAll("[data-t-title]")) no.title = t(no.dataset.tTitle);
+  for (const no of document.querySelectorAll("[data-t-aria]")) {
+    no.setAttribute("aria-label", t(no.dataset.tAria));
+  }
+  rotularTema();
+}
+
+function desenharIdiomas() {
+  const caixa = $("#linguas");
+  limpar(caixa);
+  for (const lang of IDIOMAS) {
+    const b = el("button", "lingua", TEXTOS[lang][lang === "pt" ? "idioma.pt" : "idioma.en"]);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(est.idioma === lang));
+    // O `title` na PRÓPRIA língua do botão: quem procura o português não lê a
+    // explicação em inglês para encontrá-lo.
+    b.title = TEXTOS[lang][lang === "pt" ? "idioma.pt_title" : "idioma.en_title"];
+    b.addEventListener("click", () => escolherIdioma(lang));
+    caixa.appendChild(b);
+  }
+}
+
+/** TROCAR DE LÍNGUA NÃO RECARREGA E NÃO REFAZ CHAMADA.
+
+    Tudo que está na tela sai de `est` (rascunho, tarefa em mãos, seleção da
+    triagem, página do catálogo) e as diretrizes já vieram nas duas línguas numa
+    chamada só. Redesenhar é, literalmente, desenhar o mesmo estado com outro
+    dicionário — e é por isso que nada se perde. */
+function escolherIdioma(lang) {
+  if (lang === est.idioma || IDIOMAS.indexOf(lang) < 0) return;
+  est.idioma = lang;
+  try { localStorage.setItem(CHAVE + "idioma", lang); } catch (_) {}
+  NUM = new Intl.NumberFormat(lang === "pt" ? "pt-BR" : "en-US");
+  aplicarTextos();
+  desenharIdiomas();
+  desenharPapeis();
+  desenharPersonas();
+  desenharProjetos();
+  redesenharTela();
+  recado(t("recado.idioma"));
+}
+
+/** Redesenha a tela do papel atual A PARTIR DA MEMÓRIA — sem tocar na rede. */
+function redesenharTela() {
+  const papel = est.papelEscolhido || (est.persona && est.persona.papel);
+  $("#barra-titulo").textContent = TITULO_TELA[papel] ? t(TITULO_TELA[papel]) : "";
+  if (!est.persona) { semPersona(papel); return; }
+  if (papel === "anotador") desenharAnotador({ manterDiretrizes: true });
+  if (papel === "revisor") desenharRevisor();
+  if (papel === "admin") desenharAdmin();
+}
+
+/* ==========================================================================
    1. VOCABULÁRIO DA PLATAFORMA
    Os papéis e os quatro estilos de tarefa vêm do mesmo lugar do backend
    (annotate/db.py). Aqui eles ganham a frase que explica o ofício — e é essa
    frase que faz a tela se explicar sozinha, sem tour e sem tooltip.
    ========================================================================== */
 const PAPEIS = [
-  { id: "anotador", nome: "Anotador",
-    linha: "Recebe tarefas da fila, avalia respostas com rubrica, compara A/B com justificativa e escreve prompts novos." },
-  { id: "revisor", nome: "Revisor",
-    linha: "Lê o que foi anotado no mesmo layout em que foi produzido, aprova ou devolve com um comentário que volta para quem anotou." },
-  { id: "admin", nome: "Administrador",
-    linha: "Gera tarefas, cuida das rubricas e das respostas de modelo, e acompanha agreement, tempo e taxa de devolução por anotador." },
+  { id: "anotador", nome: "papel.anotador.nome", linha: "papel.anotador.linha" },
+  { id: "revisor", nome: "papel.revisor.nome", linha: "papel.revisor.linha" },
+  { id: "admin", nome: "papel.admin.nome", linha: "papel.admin.linha" },
 ];
-const NOME_PAPEL = Object.fromEntries(PAPEIS.map((p) => [p.id, p.nome]));
+const PAPEL_POR_ID = Object.fromEntries(PAPEIS.map((p) => [p.id, p]));
+
+/** O nome do papel na língua de agora. Um papel desconhecido volta como o
+    próprio id — nunca em branco: id na tela é diagnóstico, branco é bug mudo. */
+function nomePapel(id) {
+  const p = PAPEL_POR_ID[id];
+  return p ? t(p.nome) : String(id || "");
+}
 
 /* As DIRETRIZES não moram mais aqui. Elas vêm de `/api/diretrizes`, com número
    de versão, e o servidor grava essa versão em cada anotação
    (`anotacoes.versao_diretriz`). O cenário que isso resolve: a regra do A/B é
    ajustada numa terça, o cliente reclama de inconsistência na quinta — sem a
    versão gravada, a única saída é refazer o lote inteiro. */
+/* As tabelas abaixo guardam CHAVES do dicionário, não texto. É o que permite ao
+   teste de chave órfã enxergá-las (um `t("tipo." + id + ".nome")` seria
+   invisível para ele) e o que faz a troca de idioma ser um redesenho, e não uma
+   segunda tabela de strings a manter em dia. */
 const TIPOS = [
   {
     id: "avaliar_rubrica",
-    nome: "Avaliar com rubrica",
-    titulo: "Avaliar uma resposta com rubrica",
-    vazioTitulo: "Nada na fila de avaliação com rubrica.",
-    vazioLinha: "Quando houver tarefa, ela abre aqui sozinha: prompt, resposta e a rubrica com um campo de nota por critério.",
+    nome: "tipo.avaliar_rubrica.nome",
+    titulo: "tipo.avaliar_rubrica.titulo",
+    vazioTitulo: "tipo.avaliar_rubrica.vazio_titulo",
+    vazioLinha: "tipo.avaliar_rubrica.vazio_linha",
   },
   {
     id: "escrever_rubrica",
-    nome: "Escrever rubrica",
-    titulo: "Escrever a rubrica de um prompt",
-    vazioTitulo: "Nada na fila de escrita de rubrica.",
-    vazioLinha: "A rubrica que você escrever aqui, depois de aprovada, vira o instrumento com que outras pessoas avaliam este mesmo prompt.",
+    nome: "tipo.escrever_rubrica.nome",
+    titulo: "tipo.escrever_rubrica.titulo",
+    vazioTitulo: "tipo.escrever_rubrica.vazio_titulo",
+    vazioLinha: "tipo.escrever_rubrica.vazio_linha",
   },
   {
     id: "sft_resposta",
-    nome: "Escrever resposta (SFT)",
-    titulo: "Escrever a resposta de referência",
-    vazioTitulo: "Nada na fila de resposta de referência.",
-    vazioLinha: "Concluir uma rubrica oferece, no fim, escrever a resposta do mesmo prompt — é assim que as duas abas se encadeiam.",
+    nome: "tipo.sft_resposta.nome",
+    titulo: "tipo.sft_resposta.titulo",
+    vazioTitulo: "tipo.sft_resposta.vazio_titulo",
+    vazioLinha: "tipo.sft_resposta.vazio_linha",
   },
   {
     id: "comparar_ab",
-    nome: "Comparar A/B",
-    titulo: "Comparar duas respostas",
-    vazioTitulo: "Nada na fila de comparação A/B.",
-    vazioLinha: "Quando houver par, as duas respostas abrem lado a lado, com rótulos cegos: você não vê qual modelo escreveu o quê.",
+    nome: "tipo.comparar_ab.nome",
+    titulo: "tipo.comparar_ab.titulo",
+    vazioTitulo: "tipo.comparar_ab.vazio_titulo",
+    vazioLinha: "tipo.comparar_ab.vazio_linha",
   },
 ];
-const TIPO_POR_ID = Object.fromEntries(TIPOS.map((t) => [t.id, t]));
+const TIPO_POR_ID = Object.fromEntries(TIPOS.map((x) => [x.id, x]));
+
+/** O nome do estilo de tarefa na língua de agora, com o id como último recurso. */
+function nomeTipo(id) {
+  const x = TIPO_POR_ID[id];
+  return x ? t(x.nome) : String(id || "");
+}
 
 const SUBABAS_REVISOR = [
-  { id: "anotacoes", nome: "Anotações", titulo: "Triagem — esperando revisão",
-    vazio: "Nada esperando revisão.",
-    linha: "Toda anotação submetida cai aqui. Você aprova ou devolve — e a devolução exige um comentário, que volta para quem anotou junto com o formulário preenchido." },
-  { id: "criacoes", nome: "Criações", titulo: "Prompts escritos por anotadores",
-    vazio: "Nenhum prompt novo esperando.",
-    linha: "Prompts escritos no modo criar chegam aqui antes de entrar no corpus. Aprovar grava o uid que a pipeline vai reproduzir." },
+  { id: "anotacoes", nome: "subaba.anotacoes.nome", titulo: "subaba.anotacoes.titulo",
+    vazio: "subaba.anotacoes.vazio", linha: "subaba.anotacoes.linha" },
+  { id: "criacoes", nome: "subaba.criacoes.nome", titulo: "subaba.criacoes.titulo",
+    vazio: "subaba.criacoes.vazio", linha: "subaba.criacoes.linha" },
 ];
 
 /** O que falta, com o marco. Fica no painel do admin, à vista, em vez de
     virar surpresa em cada botão desabilitado. */
 const ROTEIRO = [
-  ["P3b", "Rate and Review: escore antes e depois, correção com justificativa por mudança e escalação para o admin."],
-  ["P4", "Modo criar: escrever um prompt, aviso de duplicata contra o corpus e revisão da criação."],
-  ["P5", "Métricas por anotador, agreement das tarefas-ouro e geração de tarefas."],
-  ["P6", "Ingestão: o prompt aprovado atravessa a pipeline e reaparece no corpus com uid determinístico."],
-  ["P7", "Acabamento: sessão inteira sem mouse, microcopy final e a passagem hostil de escape."],
+  ["P3b", "roteiro.P3b"],
+  ["P4", "roteiro.P4"],
+  ["P5", "roteiro.P5"],
+  ["P6", "roteiro.P6"],
+  ["P7", "roteiro.P7"],
 ];
 
 /* ==========================================================================
@@ -906,17 +1803,23 @@ const CHAVE = "bancada.";
 
 /** As três vistas do anotador. A FILA é o caminho principal e vem primeiro. */
 const VISTAS = [
-  { id: "fila", nome: "Fila" },
-  { id: "catalogo", nome: "Catálogo" },
-  { id: "minhas", nome: "Minhas tarefas" },
+  { id: "fila", nome: "vista.fila" },
+  { id: "catalogo", nome: "vista.catalogo" },
+  { id: "minhas", nome: "vista.minhas" },
 ];
 
 const est = {
+  // A língua da INTERFACE (nunca a do dado). Resolvida antes do primeiro
+  // desenho, em `iniciar()`, porque não existe quadro nenhum em que a tela
+  // possa aparecer na língua errada.
+  idioma: IDIOMA_PADRAO,
   persona: null,      // {id, nome, papel} — quem está usando agora
   papelEscolhido: null,
   perfis: [],
   saude: null,
-  // As diretrizes VERSIONADAS, vindas de /api/diretrizes: {tipo: {versao, linhas}}.
+  // As diretrizes VERSIONADAS, vindas de /api/diretrizes, nas DUAS línguas:
+  // {tipo: {versao, textos: {en: [...], pt: [...]}}}. Vêm juntas de propósito —
+  // é o que permite ao botão de idioma trocar o texto sem outra ida ao servidor.
   diretrizes: {},
   // Os projetos e o que está em foco. `projeto: null` = todos.
   projetos: [],
@@ -932,7 +1835,13 @@ const est = {
   /* ---- P2 ---- */
   vista: "fila",
   envelope: null,     // a tarefa hidratada em mãos (ou null)
-  motivo: "",         // por que a fila está vazia — vira a frase do estado vazio
+  // Por que a fila está vazia. `motivoChave` (+ `motivoDados`) é o que o
+  // SERVIDOR disse, guardado como CHAVE para ser traduzido no desenho — trocar
+  // de idioma com a fila vazia tem de trocar essa frase também. `motivo` é o
+  // erro de rede, que nasce já traduzido porque não vem do servidor.
+  motivo: "",
+  motivoChave: null,
+  motivoDados: null,
   form: null,         // o estado do formulário do tipo em foco
   rascunhoRecuperado: false,
   carregando: false,
@@ -946,7 +1855,10 @@ const est = {
   minhas: null,
 
   /* ---- P3a: a triagem ---- */
-  // {itens, total, minhas_excluidas, sel, detalhe, form, devolvendo, carregando}
+  // {itens, total, minhas_excluidas, sel, detalhe, form, devolvendo, comentario,
+  //  carregando}. `comentario` guarda o texto da devolução em ANDAMENTO: ele
+  // mora no estado, e não só no <textarea>, para que trocar de idioma no meio
+  // de uma devolução não apague o que o revisor já escreveu.
   triagem: null,
 };
 
@@ -961,14 +1873,19 @@ function lerPersona() {
     const bruto = localStorage.getItem(CHAVE + "persona");
     if (!bruto) return null;
     const p = JSON.parse(bruto);
-    return p && p.nome && NOME_PAPEL[p.papel] ? p : null;
+    return p && p.nome && PAPEL_POR_ID[p.papel] ? p : null;
   } catch (_) { return null; }
 }
 
 /* ---- tema ---- */
+/** O rótulo do botão diz para ONDE o clique leva, não onde se está. */
+function rotularTema() {
+  const escuro = document.documentElement.getAttribute("data-tema") === "escuro";
+  $("#tema").textContent = escuro ? t("tema.claro") : t("tema.escuro");
+}
 function aplicarTema(tema) {
   document.documentElement.setAttribute("data-tema", tema);
-  $("#tema").textContent = tema === "escuro" ? "Claro" : "Escuro";
+  rotularTema();
   try { localStorage.setItem(CHAVE + "tema", tema); } catch (_) {}
 }
 function alternarTema() {
@@ -986,19 +1903,19 @@ function desenharPapeis() {
   const caixa = $("#papeis");
   limpar(caixa);
   for (const p of PAPEIS) {
-    const b = el("button", "papel", p.nome);
+    const b = el("button", "papel", t(p.nome));
     b.type = "button";
     b.setAttribute("role", "radio");
     b.setAttribute("aria-checked", String(est.papelEscolhido === p.id));
-    b.title = p.linha;
+    b.title = t(p.linha);
     b.dataset.papel = p.id;
     b.addEventListener("click", () => escolherPapel(p.id));
     caixa.appendChild(b);
   }
   const faixa = $("#faixa-papel");
   limpar(faixa);
-  const atual = PAPEIS.find((p) => p.id === est.papelEscolhido);
-  if (atual) juntar(faixa, el("span", "papel-linha", atual.linha));
+  const atual = PAPEL_POR_ID[est.papelEscolhido];
+  if (atual) juntar(faixa, el("span", "papel-linha", t(atual.linha)));
 }
 
 /** `true` quando a plataforma está em modo solo (uma pessoa, os três chapéus).
@@ -1044,13 +1961,13 @@ function desenharPersonas() {
     ? est.perfis.filter((p) => p.ativo)
     : est.perfis.filter((p) => p.papel === est.papelEscolhido && p.ativo);
   if (!candidatos.length) {
-    sel.appendChild(el("option", null, "ninguém com este papel"));
+    sel.appendChild(el("option", null, t("barra.ninguem_neste_papel")));
     sel.disabled = true;
     return;
   }
   sel.disabled = false;
   for (const p of candidatos) {
-    const o = el("option", null, modoSolo() ? p.nome + " · " + (NOME_PAPEL[p.papel] || p.papel) : p.nome);
+    const o = el("option", null, modoSolo() ? p.nome + " · " + nomePapel(p.papel) : p.nome);
     o.value = String(p.id);
     sel.appendChild(o);
   }
@@ -1086,7 +2003,7 @@ async function carregarProjetos() {
     est.projetos = r.items || [];
   } catch (e) {
     est.projetos = [];
-    recado("não deu para ler os projetos: " + e.message, true);
+    recado(t("recado.erro_projetos", { erro: e.message }), true);
   }
   if (est.projeto !== null && !est.projetos.some((p) => p.id === est.projeto)) {
     est.projeto = null;
@@ -1097,7 +2014,7 @@ async function carregarProjetos() {
 function desenharProjetos() {
   const sel = $("#projeto");
   limpar(sel);
-  const todos = el("option", null, "todos os projetos");
+  const todos = el("option", null, t("barra.todos_projetos"));
   todos.value = "";
   sel.appendChild(todos);
   for (const p of est.projetos) {
@@ -1143,7 +2060,7 @@ async function entrar() {
   const erro = $("#entrada-erro");
   erro.hidden = true;
   const novo = $("#novo-nome").value.trim();
-  if (!novo) { erro.textContent = "digite um nome"; erro.hidden = false; return; }
+  if (!novo) { erro.textContent = t("barra.sem_nome"); erro.hidden = false; return; }
   try {
     const criado = await postar("/api/perfis", { nome: novo, papel: est.papelEscolhido });
     est.perfis.push(criado);
@@ -1151,8 +2068,8 @@ async function entrar() {
     est.persona = { id: criado.id, nome: criado.nome, papel: criado.papel };
   } catch (e) {
     erro.textContent = e.status === 409
-      ? e.message + " (ou escolha essa pessoa no seletor ao lado)"
-      : "não deu para criar o perfil: " + e.message;
+      ? t("barra.nome_repetido", { erro: e.message })
+      : t("barra.erro_perfil", { erro: e.message });
     erro.hidden = false;
     return;
   }
@@ -1168,9 +2085,9 @@ async function entrar() {
    4. APLICAÇÃO: barra + roteamento por papel
    ========================================================================== */
 const TITULO_TELA = {
-  anotador: "Fila de anotação",
-  revisor: "Revisão",
-  admin: "Administração",
+  anotador: "tela.anotador",
+  revisor: "tela.revisor",
+  admin: "tela.admin",
 };
 
 async function abrirApp() {
@@ -1178,7 +2095,7 @@ async function abrirApp() {
   // o da persona (trocar de papel troca de pessoa); no modo solo a mesma
   // pessoa atravessa os três, e é a barra quem manda.
   const papel = est.papelEscolhido || (est.persona && est.persona.papel);
-  $("#barra-titulo").textContent = TITULO_TELA[papel] || "";
+  $("#barra-titulo").textContent = TITULO_TELA[papel] ? t(TITULO_TELA[papel]) : "";
 
   for (const [id, no] of [["anotador", "#tela-anotador"], ["revisor", "#tela-revisor"], ["admin", "#tela-admin"]]) {
     $(no).hidden = papel !== id;
@@ -1196,6 +2113,7 @@ async function abrirApp() {
     est.vista = "fila";
     est.envelope = null;
     est.motivo = "";
+    est.motivoChave = null;
     await carregarDiretrizes();
     await recarregarContagens();
     desenharAnotador();
@@ -1212,10 +2130,8 @@ function semPersona(papel) {
   limpar(no);
   const caixa = el("div", "vazio");
   juntar(caixa,
-    el("div", "vazio-titulo", "Ninguém cadastrado como " + (NOME_PAPEL[papel] || papel).toLowerCase() + "."),
-    el("p", "vazio-linha",
-      "Use o “+ pessoa” na barra para entrar com um nome novo, ou rode `pf annotate seed` "
-      + "para trazer as seis personas da demonstração."));
+    el("div", "vazio-titulo", t("semPersona.titulo", { papel: nomePapel(papel).toLowerCase() })),
+    el("p", "vazio-linha", t("semPersona.linha")));
   no.appendChild(caixa);
 }
 
@@ -1224,7 +2140,7 @@ async function recarregarSaude() {
     est.saude = await api("/api/health");
   } catch (e) {
     est.saude = null;
-    recado("não deu para ler o estado dos bancos: " + e.message, true);
+    recado(t("recado.erro_saude", { erro: e.message }), true);
   }
   atualizarContagens();
 }
@@ -1239,7 +2155,7 @@ async function carregarDiretrizes() {
     est.diretrizes = r.items || {};
   } catch (e) {
     est.diretrizes = {};
-    recado("não deu para ler as diretrizes: " + e.message, true);
+    recado(t("recado.erro_diretrizes", { erro: e.message }), true);
   }
 }
 
@@ -1251,13 +2167,13 @@ function atualizarContagens() {
     const minhas = est.contagens[est.aba];
     fila.textContent = minhas === undefined
       ? "…"
-      : minhas === 0 ? "nada nesta fila para você" : n(minhas) + " esperando por você";
+      : minhas === 0 ? t("fila.conta_zero") : t("fila.conta", { n: n(minhas) });
   }
   const rev = $("#revisor-conta");
   if (rev) {
-    const t = est.triagem;
-    rev.textContent = !t ? "…"
-      : t.total === 0 ? "nada esperando" : n(t.total) + " esperando";
+    const tri = est.triagem;
+    rev.textContent = !tri ? "…"
+      : tri.total === 0 ? t("revisor.conta_zero") : t("revisor.conta", { n: n(tri.total) });
   }
 }
 
@@ -1275,42 +2191,50 @@ function lim(chave, padrao) {
   return Number.isFinite(v) && v > 0 ? v : padrao;
 }
 
-function desenharAnotador() {
+/** `opcoes.manterDiretrizes` preserva o aberto/fechado do painel de diretrizes.
+
+    Existe por causa da troca de idioma: redesenhar a tela reavaliaria a
+    "primeira visita" e fecharia um painel que a pessoa tinha acabado de abrir —
+    trocar de língua não pode mexer em nada que não seja língua. */
+function desenharAnotador(opcoes) {
+  const manter = !!(opcoes && opcoes.manterDiretrizes);
   const barra = $("#abas-anotador");
   limpar(barra);
-  for (const t of TIPOS) {
-    const b = el("button", "aba", t.nome);
+  for (const x of TIPOS) {
+    const b = el("button", "aba", t(x.nome));
     b.type = "button";
     b.setAttribute("role", "tab");
-    b.setAttribute("aria-selected", String(est.aba === t.id));
-    b.dataset.tipo = t.id;
-    const conta = est.contagens[t.id];
+    b.setAttribute("aria-selected", String(est.aba === x.id));
+    b.dataset.tipo = x.id;
+    const conta = est.contagens[x.id];
     b.appendChild(el("span", "conta", conta === undefined ? "" : n(conta)));
-    b.addEventListener("click", () => trocarAba(t.id));
+    b.addEventListener("click", () => trocarAba(x.id));
     b.addEventListener("keydown", (ev) => andarNasAbas(ev, TIPOS, trocarAba, est.aba));
     barra.appendChild(b);
   }
 
-  const t = TIPO_POR_ID[est.aba];
+  const tp = TIPO_POR_ID[est.aba];
+  const det = $("#diretrizes");
 
   // Divulgação progressiva: aberta na primeira visita desta aba na sessão.
-  const primeiraVez = !est.diretrizesVistas.has(t.id);
-  est.diretrizesVistas.add(t.id);
-  const det = $("#diretrizes");
-  det.open = primeiraVez;
+  if (!manter) {
+    const primeiraVez = !est.diretrizesVistas.has(tp.id);
+    est.diretrizesVistas.add(tp.id);
+    det.open = primeiraVez;
+  }
   // A VERSÃO fica à vista, e não como detalhe de implementação: é ela que
   // o servidor grava em cada anotação, e é o que responde "sob qual regra
-  // isto foi anotado?" sem arqueologia de git.
-  const dir = est.diretrizes[t.id] || { versao: null, linhas: [] };
-  $("#diretrizes-titulo").textContent =
-    "Diretrizes — " + t.nome + (dir.versao ? " (versão " + dir.versao + ")" : "");
+  // isto foi anotado?" sem arqueologia de git. Ela é do CONTEÚDO, não da
+  // tradução: `v1` em inglês e `v1` em português são a mesma regra.
+  const dir = est.diretrizes[tp.id] || { versao: null, textos: {} };
+  const linhas = (dir.textos && dir.textos[est.idioma]) || [];
+  $("#diretrizes-titulo").textContent = dir.versao
+    ? t("diretrizes.titulo_versao", { tipo: t(tp.nome), versao: dir.versao })
+    : t("diretrizes.titulo", { tipo: t(tp.nome) });
   const lista = $("#diretrizes-lista");
   limpar(lista);
-  for (const linha of dir.linhas) lista.appendChild(el("li", null, linha));
-  if (!dir.linhas.length) {
-    lista.appendChild(el("li", null,
-      "Nenhuma diretriz publicada para este tipo — rode `pf annotate seed`."));
-  }
+  for (const linha of linhas) lista.appendChild(el("li", null, linha));
+  if (!linhas.length) lista.appendChild(el("li", null, t("diretrizes.sem")));
 
   desenharVistas();
   atualizarContagens();
@@ -1321,7 +2245,7 @@ function desenharVistas() {
   const caixa = $("#vistas");
   limpar(caixa);
   for (const v of VISTAS) {
-    const b = el("button", "vista", v.nome);
+    const b = el("button", "vista", t(v.nome));
     b.type = "button";
     b.setAttribute("aria-current", String(est.vista === v.id));
     b.addEventListener("click", () => irPara(v.id));
@@ -1363,7 +2287,7 @@ function desenharArea() {
   desenharFila(area);
   // A FILA PUXA SOZINHA: não existe botão "buscar tarefa". Fechar o laço antes
   // de pedir a próxima coisa é o que impede a tela de perguntar "e agora?".
-  if (!est.envelope && !est.carregando && !est.motivo) carregarFila();
+  if (!est.envelope && !est.carregando && !est.motivo && !est.motivoChave) carregarFila();
 }
 
 /* ==========================================================================
@@ -1376,10 +2300,14 @@ async function carregarFila() {
   try {
     const r = await postar("/api/tarefas/proxima",
       paramsProjeto({ anotador_id: est.persona.id, tipo: est.aba }));
-    aceitarEnvelope(r.tarefa, r.motivo);
+    // O motivo entra como CHAVE + dados, e não como a frase que a rota devolve
+    // em `motivo`: ela está em português, e o estado vazio é a primeira coisa
+    // que se vê quando a fila acaba.
+    aceitarEnvelope(r.tarefa, r.motivo_chave, r.motivo_dados);
   } catch (e) {
     est.envelope = null;
-    est.motivo = "não deu para pedir a próxima tarefa: " + e.message;
+    est.motivoChave = null;
+    est.motivo = t("fila.erro_proxima", { erro: e.message });
   } finally {
     est.carregando = false;
   }
@@ -1389,9 +2317,14 @@ async function carregarFila() {
 
 /** Recebe (ou não) uma tarefa e prepara o formulário — restaurando o rascunho
     se houver um guardado para esta atribuição. */
-function aceitarEnvelope(envelope, motivo) {
+function aceitarEnvelope(envelope, motivoChave, motivoDados) {
   est.envelope = envelope || null;
-  est.motivo = envelope ? "" : (motivo || "");
+  // A chave fica GUARDADA (e não a frase já traduzida): trocar de idioma com a
+  // fila vazia tem de redesenhar o estado vazio na língua nova, e uma frase
+  // congelada em `est` ficaria na língua em que a fila esvaziou.
+  est.motivoChave = envelope ? null : (motivoChave || null);
+  est.motivoDados = motivoDados || null;
+  est.motivo = "";
   est.foco = 0;
   est.rascunhoRecuperado = false;
   est.abertoEm = Date.now();
@@ -1406,24 +2339,24 @@ function aceitarEnvelope(envelope, motivo) {
 }
 
 function desenharFila(area) {
-  const t = TIPO_POR_ID[est.aba];
+  const tp = TIPO_POR_ID[est.aba];
   const painel = el("div", "painel");
   const cabeca = el("div", "painel-cabeca");
-  juntar(cabeca, el("h2", null, t.titulo), el("span", "crescer"));
+  juntar(cabeca, el("h2", null, t(tp.titulo)), el("span", "crescer"));
   if (est.envelope) {
     const origem = est.envelope.tarefa.origem;
-    cabeca.appendChild(el("span", "fraco", origem === "livre" ? "escolhida por você"
-      : origem === "continuacao" ? "continuação da rubrica" : "tarefa da fila"));
+    cabeca.appendChild(el("span", "fraco", origem === "livre" ? t("fila.origem_livre")
+      : origem === "continuacao" ? t("fila.origem_continuacao") : t("fila.origem_fila")));
   }
   painel.appendChild(cabeca);
 
   if (est.carregando) {
-    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", "Puxando a próxima tarefa…")));
+    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", t("fila.puxando"))));
     area.appendChild(painel);
     return;
   }
   if (!est.envelope) {
-    painel.appendChild(vazioComSaida(t));
+    painel.appendChild(vazioComSaida(tp));
     area.appendChild(painel);
     return;
   }
@@ -1433,28 +2366,32 @@ function desenharFila(area) {
 
 /** ESTADO VAZIO COMO BIFURCAÇÃO, nunca um beco: título honesto, o motivo que o
     servidor deu, e as saídas que existem DE VERDADE. */
-function vazioComSaida(t) {
+function vazioComSaida(tp) {
+  // O motivo que o servidor deu, traduzido AGORA a partir da chave — nunca a
+  // frase pronta que ele mandou junto (ela é a versão em português, e existe
+  // para que a API se explique sozinha em /docs).
+  const motivo = est.motivo || (est.motivoChave ? t(est.motivoChave, est.motivoDados) : "");
   const caixa = el("div", "vazio");
   juntar(caixa,
-    el("div", "vazio-titulo", t.vazioTitulo),
-    el("p", "vazio-linha", est.motivo || t.vazioLinha));
-  if (est.motivo) caixa.appendChild(el("p", "vazio-linha fraco", t.vazioLinha));
+    el("div", "vazio-titulo", t(tp.vazioTitulo)),
+    el("p", "vazio-linha", motivo || t(tp.vazioLinha)));
+  if (motivo) caixa.appendChild(el("p", "vazio-linha fraco", t(tp.vazioLinha)));
 
   const saidas = el("div", "vazio-saidas");
-  const catalogo = el("button", "botao primaria", "Escolher no catálogo");
+  const catalogo = el("button", "botao primaria", t("botao.escolher_catalogo"));
   catalogo.type = "button";
   catalogo.addEventListener("click", () => irPara("catalogo"));
-  const minhas = el("button", "botao", "Ver minhas tarefas");
+  const minhas = el("button", "botao", t("botao.ver_minhas"));
   minhas.type = "button";
   minhas.addEventListener("click", () => irPara("minhas"));
-  const virarAdmin = el("button", "botao", "Entrar como administrador");
+  const virarAdmin = el("button", "botao", t("botao.entrar_admin"));
   virarAdmin.type = "button";
   virarAdmin.addEventListener("click", () => {
     // Com o seletor na barra isto virou UM salto, e não uma volta ao
     // vestíbulo seguida de duas escolhas. O estado vazio deixou de custar
     // três cliques para custar um.
     escolherPapel("admin");
-    recado("é o administrador quem gera tarefas para a fila");
+    recado(t("recado.admin_gera"));
   });
   juntar(saidas, catalogo, minhas, virarAdmin);
   caixa.appendChild(saidas);
@@ -1469,31 +2406,74 @@ function vazioComSaida(t) {
     recortado e expande no clique — o corpus tem prompts de ~1 MB. */
 function blocoPrompt(env) {
   const bloco = el("div", "painel-corpo");
-  juntar(bloco, el("div", "rotulo-bloco", "o pedido de quem escreveu"));
+  juntar(bloco, el("div", "rotulo-bloco", t("ws.prompt_rotulo")));
   const caixa = el("div", "leitura-caixa");
   caixa.appendChild(el("div", "leitura", env.prompt.text));
   bloco.appendChild(caixa);
 
   if (env.prompt.n_chars > 1200) {
-    const abrir = el("button", "botao discreta", "mostrar o texto inteiro");
+    const abrir = el("button", "botao discreta", t("botao.mostrar_inteiro"));
     abrir.type = "button";
     abrir.addEventListener("click", () => {
       caixa.classList.toggle("aberta");
-      abrir.textContent = caixa.classList.contains("aberta") ? "recolher o texto" : "mostrar o texto inteiro";
+      abrir.textContent = caixa.classList.contains("aberta")
+        ? t("botao.recolher") : t("botao.mostrar_inteiro");
     });
     bloco.appendChild(abrir);
   }
 
   const prov = el("div", "proveniencia");
   const selo = el("span", "selo" + (env.prompt.demo ? " demo" : ""),
-    env.prompt.demo ? "pacote de demonstração" : "fonte: " + env.prompt.fonte);
+    env.prompt.demo ? t("ws.prov_demo") : t("ws.prov_fonte", { fonte: env.prompt.fonte }));
   juntar(prov, selo,
-    el("span", "selo", "licença: " + env.prompt.licenca),
-    el("span", "selo", n(env.prompt.n_chars) + " caracteres"),
-    el("span", "selo", env.prompt.lang === "pt" ? "português" : "inglês"));
-  if (env.prompt.atribuicao) prov.appendChild(el("span", null, env.prompt.atribuicao));
+    el("span", "selo", t("ws.prov_licenca", { licenca: env.prompt.licenca })),
+    el("span", "selo", t("ws.prov_chars", { n: n(env.prompt.n_chars) })),
+    el("span", "selo", nomeLingua(env.prompt.lang)));
+  // A ATRIBUIÇÃO de um prompt do corpus é DADO: ela vem do `sources.toml`, é
+  // exigência da licença (ODC-BY, CC-BY, CC-BY-SA) e sai exatamente como está.
+  // A de uma fixture não é atribuição nenhuma — é a tela dizendo que aquilo não
+  // é prompt de pessoa nenhuma —, e por isso ela passa pelo dicionário.
+  if (env.prompt.demo) prov.appendChild(el("span", null, t("ws.prov_demo_atribuicao")));
+  else if (env.prompt.atribuicao) prov.appendChild(el("span", null, env.prompt.atribuicao));
   bloco.appendChild(prov);
   return bloco;
+}
+
+/** O nome da língua de um DADO ("português"/"Portuguese"), na língua da tela. */
+function nomeLingua(lang) {
+  return lang === "pt" ? t("lang.pt") : t("lang.en");
+}
+
+/** `modelo-a` → `A`. O rótulo é cego, e o identificador da coluna não é rótulo. */
+function rotuloCego(rotulo) { return rotulo === "modelo-a" ? "A" : "B"; }
+
+/* A CONVENÇÃO DE LÍNGUA, POR CAMPO E NA TELA  (P3i)
+
+   O padrão de mercado é assimétrico e não se adivinha: **justificativa,
+   comentário de revisão, critério de rubrica e todo metadado saem em inglês**
+   (é o que o cliente lê), enquanto **a resposta esperada e a conversa com o
+   modelo saem na língua do prompt** (é o dado sendo produzido, e é onde a
+   expertise nativa aparece).
+
+   Ela é dita ONDE A DÚVIDA OCORRE — colada ao campo, não numa página de ajuda
+   que ninguém abre no meio de uma tarefa —, e é DIRETRIZ, NÃO VALIDAÇÃO: nada
+   aqui bloqueia o envio. O anotador pode ter um motivo para desviar (citar um
+   trecho do prompt dentro da justificativa, por exemplo) e a plataforma não
+   conhece esse motivo. Uma validação aqui produziria um bloqueio que só o
+   humano sabe que está errado. */
+function dicaLinguaMeta(chave) {
+  const caixa = el("div", "lingua-campo");
+  juntar(caixa, el("span", "lingua-selo", t("lingua.selo_en")), el("span", null, t(chave)));
+  return caixa;
+}
+
+/** A dica do campo de DADO: a língua é a do prompt, e o selo mostra qual é. */
+function dicaLinguaDado(lang) {
+  const caixa = el("div", "lingua-campo dado");
+  juntar(caixa,
+    el("span", "lingua-selo", lang === "pt" ? t("lingua.selo_pt") : t("lingua.selo_en")),
+    el("span", null, lang === "pt" ? t("lingua.dado_pt") : t("lingua.dado_en")));
+  return caixa;
 }
 
 function blocoResposta(rotulo, texto) {
@@ -1515,7 +2495,7 @@ function separador(no) {
 function barraAcoes() {
   const barra = el("div", "acoes");
   const falta = oQueFalta();
-  const enviarBtn = el("button", "botao primaria", falta ? falta : "Enviar e próxima");
+  const enviarBtn = el("button", "botao primaria", falta ? falta : t("botao.enviar_proxima"));
   enviarBtn.type = "button";
   enviarBtn.id = "enviar";
   enviarBtn.disabled = !!falta || est.carregando;
@@ -1523,7 +2503,7 @@ function barraAcoes() {
   juntar(barra, enviarBtn, el("span", "atalho", "Ctrl+Enter"));
 
   barra.appendChild(el("span", "crescer"));
-  const pular = el("button", "botao discreta", "Devolver e pegar outra");
+  const pular = el("button", "botao discreta", t("botao.devolver_pegar_outra"));
   pular.type = "button";
   pular.addEventListener("click", abandonar);
   barra.appendChild(pular);
@@ -1533,8 +2513,8 @@ function barraAcoes() {
 function avisoRascunho() {
   if (!est.rascunhoRecuperado) return null;
   const aviso = el("div", "aviso-rascunho");
-  juntar(aviso, el("span", null, "Recuperamos o que você tinha escrito nesta tarefa."));
-  const descartar = el("button", "botao discreta", "descartar e começar do zero");
+  juntar(aviso, el("span", null, t("ws.rascunho_recuperado")));
+  const descartar = el("button", "botao discreta", t("botao.descartar_rascunho"));
   descartar.type = "button";
   descartar.addEventListener("click", () => {
     limparRascunho(est.envelope.atribuicao_id);
@@ -1552,7 +2532,7 @@ function semMaterial(titulo, linha) {
   const caixa = el("div", "vazio");
   juntar(caixa, el("div", "vazio-titulo", titulo), el("p", "vazio-linha", linha));
   const saidas = el("div", "vazio-saidas");
-  const rubrica = el("button", "botao primaria", "Escrever a rubrica deste prompt");
+  const rubrica = el("button", "botao primaria", t("botao.escrever_rubrica_deste"));
   rubrica.type = "button";
   rubrica.addEventListener("click", async () => {
     const uid = est.envelope.prompt.uid;
@@ -1561,7 +2541,7 @@ function semMaterial(titulo, linha) {
     await devolver();
     await pegarLivreEm("escrever_rubrica", uid);
   });
-  const devolver = el("button", "botao", "Devolver e pegar outra");
+  const devolver = el("button", "botao", t("botao.devolver_pegar_outra"));
   devolver.type = "button";
   devolver.addEventListener("click", abandonar);
   juntar(saidas, rubrica, devolver);
@@ -1576,7 +2556,7 @@ function blocoDevolucao(env) {
   if (!anterior || anterior.veredito !== "devolvida") return null;
   const caixa = el("div", "devolucao");
   juntar(caixa,
-    el("div", "devolucao-titulo", "Devolvida para ajuste — versão " + anterior.versao),
+    el("div", "devolucao-titulo", t("ws.devolvida_versao", { versao: anterior.versao })),
     el("p", null, anterior.comentario_revisor || ""));
   return caixa;
 }
@@ -1623,39 +2603,49 @@ function wsAvaliar(env, ctx) {
   const form = c0.form;
   const caixa = el("div");
   const resposta = env.respostas[0];
-  if (resposta) caixa.appendChild(separador(blocoResposta("resposta em avaliação (" + resposta.rotulo + ")", resposta.texto)));
+  if (resposta) {
+    // "A"/"B", e não `modelo-a`: o rótulo é CEGO, e o identificador da coluna
+    // não diz nada a quem avalia — só vaza o formato interno para a tela.
+    caixa.appendChild(separador(blocoResposta(
+      t("ws.resposta_em_avaliacao", { rotulo: rotuloCego(resposta.rotulo) }), resposta.texto)));
+  }
 
   const bloco = separador(el("div", "painel-corpo"));
   if (!env.rubrica || !resposta) {
     bloco.appendChild(semMaterial(
-      !resposta ? "Este prompt não tem resposta de modelo para avaliar."
-        : "Este prompt não tem rubrica ativa.",
-      "Avaliar precisa dos dois: o instrumento de medida e o que vai ser medido. Escrever a rubrica dele é o passo que falta."));
+      !resposta ? t("ws.sem_resposta_titulo") : t("ws.sem_rubrica_titulo"),
+      t("ws.sem_material_linha")));
     caixa.appendChild(bloco);
     return caixa;
   }
-  juntar(bloco, el("div", "rotulo-bloco", "rubrica: " + env.rubrica.titulo));
+  // A rubrica de fixture vem com as duas línguas (`titulo_i18n`); a escrita por
+  // um anotador vem com uma só, e é isso mesmo — ela é dado, não cromo.
+  juntar(bloco, el("div", "rotulo-bloco",
+    t("ws.rubrica", { titulo: bi(env.rubrica.titulo_i18n, env.rubrica.titulo) })));
   const lista = el("div", "criterios");
   lista.style.marginTop = "10px";
 
   env.rubrica.criterios.forEach((c, i) => {
     const escala = c.escala || { min: 1, max: 5, ancoras: [] };
+    const nomeC = bi(c.nome_i18n, c.nome);
     const cartao = el("div", "criterio");
     cartao.dataset.foco = String(!c0.leitura && est.foco === i);
-    juntar(cartao, el("div", "criterio-nome", c.nome), el("div", "criterio-desc", c.descricao));
+    juntar(cartao,
+      el("div", "criterio-nome", nomeC),
+      el("div", "criterio-desc", bi(c.descricao_i18n, c.descricao)));
 
     const botoes = el("div", "notas");
     for (let v = escala.min; v <= escala.max; v++) {
       const b = el("button", "nota", String(v));
       b.type = "button";
       b.setAttribute("aria-pressed", String(form.notas[i] === v));
-      b.setAttribute("aria-label", c.nome + ": nota " + v);
+      b.setAttribute("aria-label", t("a11y.nota", { criterio: nomeC, valor: v }));
       if (c0.leitura) b.tabIndex = -1;
       else b.addEventListener("click", () => { est.foco = i; graduar(i, v); });
       botoes.appendChild(b);
     }
     if (!c0.leitura) {
-      const limpa = el("button", "botao discreta", "limpar");
+      const limpa = el("button", "botao discreta", t("botao.limpar"));
       limpa.type = "button";
       limpa.addEventListener("click", () => graduar(i, null));
       botoes.appendChild(limpa);
@@ -1664,10 +2654,11 @@ function wsAvaliar(env, ctx) {
 
     const ancoras = (escala.ancoras || []).slice().sort((a, b) => a.valor - b.valor);
     if (ancoras.length) {
+      const ponta = (a) => a.valor + " — " + bi(a.rotulo_i18n, a.rotulo);
       const linha = el("div", "ancoras");
       juntar(linha,
-        el("span", null, ancoras[0].valor + " — " + ancoras[0].rotulo),
-        el("span", null, ancoras[ancoras.length - 1].valor + " — " + ancoras[ancoras.length - 1].rotulo));
+        el("span", null, ponta(ancoras[0])),
+        el("span", null, ponta(ancoras[ancoras.length - 1])));
       cartao.appendChild(linha);
     }
 
@@ -1677,7 +2668,7 @@ function wsAvaliar(env, ctx) {
     const linhaJust = el("div", "linha-just");
     if (form.justificativas[i] === null || form.justificativas[i] === undefined) {
       if (!c0.leitura) {
-        const pedir = el("button", "botao discreta", "justificar esta nota");
+        const pedir = el("button", "botao discreta", t("botao.justificar"));
         pedir.type = "button";
         pedir.addEventListener("click", () => { form.justificativas[i] = ""; salvarEDesenhar(); });
         linhaJust.appendChild(pedir);
@@ -1686,11 +2677,12 @@ function wsAvaliar(env, ctx) {
       const campo = el("textarea");
       campo.rows = 2;
       campo.className = "largo";
-      campo.placeholder = "por que esta nota, e não a vizinha?";
+      campo.placeholder = t("ws.just_ph");
       campo.value = form.justificativas[i];
       if (c0.leitura) campo.readOnly = true;
       else campo.addEventListener("input", () => { form.justificativas[i] = campo.value; salvarRascunho(); });
       linhaJust.appendChild(campo);
+      if (!c0.leitura) linhaJust.appendChild(dicaLinguaMeta("lingua.meta"));
       linhaJust.style.display = "block";
     }
     cartao.appendChild(linhaJust);
@@ -1703,11 +2695,12 @@ function wsAvaliar(env, ctx) {
     geral.style.marginTop = "14px";
     const areaGeral = el("textarea");
     areaGeral.rows = 3;
-    areaGeral.placeholder = "comentário geral (opcional)";
+    areaGeral.placeholder = t("ws.comentario_geral_ph");
     areaGeral.value = form.comentario_geral;
     if (c0.leitura) areaGeral.readOnly = true;
     else areaGeral.addEventListener("input", () => { form.comentario_geral = areaGeral.value; salvarRascunho(); });
-    juntar(geral, el("span", null, "Comentário geral"), areaGeral);
+    juntar(geral, el("span", null, t("ws.comentario_geral")), areaGeral);
+    if (!c0.leitura) geral.appendChild(dicaLinguaMeta("lingua.meta"));
     bloco.appendChild(geral);
   }
 
@@ -1727,32 +2720,38 @@ function graduar(i, valor) {
    rubrica de todo mundo.
    ========================================================================== */
 
+/* O CONTEÚDO dos modelos é INGLÊS nas duas línguas da interface, e isso não é
+   um esquecimento de tradução: um critério de rubrica é METADADO, e a convenção
+   de língua deste projeto manda metadado em inglês, porque é o que o cliente lê.
+   Oferecer um modelo em português produziria, a cada clique, uma rubrica que
+   nasce violando a própria convenção que a tela acabou de declarar ao lado do
+   campo. O que É cromo — o rótulo do botão e a explicação — está no dicionário. */
 const MODELOS_RUBRICA = [
   {
-    nome: "Instrução seguida",
-    titulo: "A resposta faz o que foi pedido",
+    nome: "modelo.instrucao",
+    titulo: "The answer does what was asked",
     criterios: [
-      ["Cumpre as restrições", "Contagem, formato, tom e limites que o pedido declarou explicitamente.", "ignora ao menos uma restrição declarada", "cumpre todas, inclusive as implícitas"],
-      ["Responde à pergunta certa", "Ataca o problema que a pessoa tem, e não um problema parecido.", "responde outra coisa", "responde exatamente o que foi perguntado"],
-      ["Completude", "Todas as partes do pedido aparecem; nada foi silenciosamente omitido.", "deixa parte do pedido sem resposta", "cobre tudo e sinaliza o que não deu para cobrir"],
+      ["Respects the stated constraints", "Counts, format, tone and limits the request declared out loud.", "ignores at least one stated constraint", "meets them all, including the implied ones"],
+      ["Answers the right question", "Goes at the problem the person has, not at a similar-looking one.", "answers something else", "answers exactly what was asked"],
+      ["Completeness", "Every part of the request shows up; nothing was quietly dropped.", "leaves part of the request unanswered", "covers everything and flags what it could not cover"],
     ],
   },
   {
-    nome: "Verdade e verificabilidade",
-    titulo: "A resposta é confiável",
+    nome: "modelo.verdade",
+    titulo: "The answer can be trusted",
     criterios: [
-      ["Fatos", "Nomes, números, datas e citações são verdadeiros e verificáveis.", "afirma dado inventado com aparência de precisão", "só afirma o que é verificável"],
-      ["Incerteza declarada", "O que é estimativa aparece como estimativa; o que depende de contexto, também.", "apresenta suposição como certeza", "separa o certo do provável na própria frase"],
-      ["Limite do papel", "Reconhece quando o assunto exige profissional, e ainda assim orienta.", "finge autoridade que não tem", "orienta de verdade e delimita numa linha"],
+      ["Facts", "Names, numbers, dates and quotes are true and checkable.", "states an invented figure with the look of precision", "states only what can be checked"],
+      ["Uncertainty declared", "An estimate reads as an estimate; so does anything that depends on context.", "presents a guess as a certainty", "separates the certain from the likely in the sentence itself"],
+      ["Knows where its role ends", "Recognises when the matter needs a professional, and still helps.", "fakes authority it does not have", "genuinely helps and draws the line in one sentence"],
     ],
   },
   {
-    nome: "Utilidade prática",
-    titulo: "A resposta serve para agir",
+    nome: "modelo.utilidade",
+    titulo: "The answer is something you can act on",
     criterios: [
-      ["Executável", "Dá para agir lendo uma vez, com o que a pessoa declarou ter.", "exige recurso que a pessoa disse não ter", "executável de ponta a ponta com o declarado"],
-      ["Registro adequado", "O tom cabe no destinatário e na situação que foi descrita.", "registro claramente errado", "soa como uma pessoa escrevendo para outra"],
-      ["Densidade", "Cada parágrafo acrescenta; nada é preenchimento fluente.", "prosa fluente e vazia", "nenhuma linha sobra"],
+      ["Actionable", "You can act after one read, with what the person said they have.", "requires a resource the person said they lack", "actionable end to end with what was declared"],
+      ["Right register", "The tone fits the recipient and the situation as described.", "clearly wrong register", "sounds like one person writing to another"],
+      ["Density", "Every paragraph adds something; nothing is fluent filler.", "fluent and empty prose", "not one line to spare"],
     ],
   },
 ];
@@ -1764,12 +2763,11 @@ function wsEscrever(env, ctx) {
 
   if (!c0.leitura) {
     const modelos = el("details", "modelos");
-    modelos.appendChild(el("summary", null, "Começar de um modelo (3 disponíveis)"));
+    modelos.appendChild(el("summary", null, t("ws.modelos_summary")));
     const corpoModelos = el("div", "modelos-corpo");
-    corpoModelos.appendChild(el("p", "secundario",
-      "O modelo entra como rascunho editável — ele existe para você não começar de uma página em branco, não para ser enviado como está."));
+    corpoModelos.appendChild(el("p", "secundario", t("ws.modelos_nota")));
     for (const m of MODELOS_RUBRICA) {
-      const b = el("button", "botao", "Usar: " + m.nome);
+      const b = el("button", "botao", t("botao.usar_modelo", { nome: t(m.nome) }));
       b.type = "button";
       b.addEventListener("click", () => {
         form.titulo = m.titulo;
@@ -1778,7 +2776,7 @@ function wsEscrever(env, ctx) {
         }));
         modelos.open = false;
         salvarEDesenhar();
-        recado("modelo carregado — ajuste os critérios ao prompt");
+        recado(t("recado.modelo_carregado"));
       });
       corpoModelos.appendChild(b);
     }
@@ -1792,11 +2790,15 @@ function wsEscrever(env, ctx) {
   entrada.type = "text";
   entrada.className = "largo";
   entrada.maxLength = 200;
-  entrada.placeholder = "o que esta rubrica mede, em uma linha";
+  entrada.placeholder = t("ws.titulo_rubrica_ph");
   entrada.value = form.titulo;
   if (c0.leitura) entrada.readOnly = true;
   else entrada.addEventListener("input", () => { form.titulo = entrada.value; salvarRascunho(); atualizarBotaoEnviar(); });
-  juntar(tituloCampo, el("span", null, "Título da rubrica"), entrada);
+  juntar(tituloCampo, el("span", null, t("ws.titulo_rubrica")), entrada);
+  // UMA dica de língua para a rubrica inteira, no primeiro campo de texto dela:
+  // repeti-la em cada um dos até oito critérios viraria ruído, e o texto já diz
+  // que ela vale para a rubrica e para os critérios.
+  if (!c0.leitura) tituloCampo.appendChild(dicaLinguaMeta("lingua.rubrica"));
   caixa.appendChild(tituloCampo);
 
   const lista = el("div", "criterios");
@@ -1806,16 +2808,16 @@ function wsEscrever(env, ctx) {
   if (!c0.leitura) {
     const rodape = el("div", "forma");
     rodape.style.marginTop = "12px";
-    const mais = el("button", "botao", "Acrescentar critério");
+    const mais = el("button", "botao", t("botao.acrescentar_criterio"));
     mais.type = "button";
     mais.disabled = form.criterios.length >= lim("max_criterios_rubrica", 8);
     mais.addEventListener("click", () => {
       form.criterios.push({ nome: "", descricao: "", escala_min: 1, escala_max: 5, rotulo_min: "", rotulo_max: "" });
       salvarEDesenhar();
     });
-    juntar(rodape, mais, el("span", "fraco",
-      "de " + lim("min_criterios_rubrica", 3) + " a " + lim("max_criterios_rubrica", 8)
-      + " critérios — rubrica com 20 não é mais rigorosa, é impossível de aplicar duas vezes igual"));
+    juntar(rodape, mais, el("span", "fraco", t("ws.faixa_criterios", {
+      min: lim("min_criterios_rubrica", 3), max: lim("max_criterios_rubrica", 8),
+    })));
     caixa.appendChild(rodape);
   }
   return caixa;
@@ -1825,9 +2827,9 @@ function editorCriterio(c, i, ctx) {
   const c0 = ctx || ctxEdicao();
   const cartao = el("div", "editor-criterio");
   const cabeca = el("div", "forma");
-  juntar(cabeca, el("span", "rotulo-bloco", "critério " + (i + 1)), el("span", "crescer"));
+  juntar(cabeca, el("span", "rotulo-bloco", t("ws.criterio_n", { n: i + 1 })), el("span", "crescer"));
   if (!c0.leitura) {
-    const tirar = el("button", "botao discreta", "remover");
+    const tirar = el("button", "botao discreta", t("botao.remover"));
     tirar.type = "button";
     tirar.addEventListener("click", () => { c0.form.criterios.splice(i, 1); salvarEDesenhar(); });
     cabeca.appendChild(tirar);
@@ -1837,7 +2839,7 @@ function editorCriterio(c, i, ctx) {
   const nome = el("input");
   nome.type = "text";
   nome.className = "largo";
-  nome.placeholder = "nome do critério";
+  nome.placeholder = t("ws.criterio_nome_ph");
   nome.value = c.nome;
   if (c0.leitura) nome.readOnly = true;
   else nome.addEventListener("input", () => { c.nome = nome.value; salvarRascunho(); atualizarBotaoEnviar(); });
@@ -1845,7 +2847,7 @@ function editorCriterio(c, i, ctx) {
 
   const desc = el("textarea");
   desc.rows = 2;
-  desc.placeholder = "o que exatamente este critério mede (e o que ele NÃO mede)";
+  desc.placeholder = t("ws.criterio_desc_ph");
   desc.value = c.descricao;
   if (c0.leitura) desc.readOnly = true;
   else desc.addEventListener("input", () => { c.descricao = desc.value; salvarRascunho(); atualizarBotaoEnviar(); });
@@ -1853,8 +2855,8 @@ function editorCriterio(c, i, ctx) {
 
   const campos = el("div", "campos");
   const pontas = [
-    ["rotulo_min", "a nota mais baixa significa…"],
-    ["rotulo_max", "a nota mais alta significa…"],
+    ["rotulo_min", "ws.rotulo_min"],
+    ["rotulo_max", "ws.rotulo_max"],
   ];
   for (const [chave, rotulo] of pontas) {
     const campo = el("div", "campo");
@@ -1864,20 +2866,20 @@ function editorCriterio(c, i, ctx) {
     entrada.value = c[chave];
     if (c0.leitura) entrada.readOnly = true;
     else entrada.addEventListener("input", () => { c[chave] = entrada.value; salvarRascunho(); atualizarBotaoEnviar(); });
-    juntar(campo, el("span", null, rotulo), entrada);
+    juntar(campo, el("span", null, t(rotulo)), entrada);
     campos.appendChild(campo);
   }
   const escala = el("div", "campo");
   const sel = el("select");
   for (const max of [3, 4, 5, 7]) {
-    const o = el("option", null, "1 a " + max);
+    const o = el("option", null, t("ws.escala_opcao", { max: max }));
     o.value = String(max);
     sel.appendChild(o);
   }
   sel.value = String(c.escala_max);
   if (c0.leitura) sel.disabled = true;
   else sel.addEventListener("change", () => { c.escala_max = Number(sel.value); salvarRascunho(); });
-  juntar(escala, el("span", null, "escala"), sel);
+  juntar(escala, el("span", null, t("ws.escala")), sel);
   campos.appendChild(escala);
   cartao.appendChild(campos);
   return cartao;
@@ -1895,27 +2897,32 @@ function wsSft(env, ctx) {
   const grade = el("div", guia ? "com-guia" : null);
 
   const coluna = el("div");
-  juntar(coluna, el("div", "rotulo-bloco",
-    c0.leitura ? "a resposta de referência escrita" : "sua resposta de referência"));
+  juntar(coluna, el("div", "rotulo-bloco", c0.leitura ? t("ws.sft_lida") : t("ws.sft_minha")));
   const campo = el("textarea", "textarea-sft");
-  campo.placeholder = "responda ao prompt como o modelo deveria ter respondido — é este texto que vira exemplo de treino";
+  campo.placeholder = t("ws.sft_ph");
   campo.value = form.resposta;
   if (c0.leitura) campo.readOnly = true;
   else campo.addEventListener("input", () => {
     form.resposta = campo.value;
-    contadorSft.textContent = n(campo.value.trim().length) + " caracteres";
+    contadorSft.textContent = t("ws.contador_chars", { n: n(campo.value.trim().length) });
     salvarRascunho();
     atualizarBotaoEnviar();
   });
   coluna.appendChild(campo);
-  const contadorSft = el("div", "contador", n(form.resposta.trim().length) + " caracteres");
+  const contadorSft = el("div", "contador",
+    t("ws.contador_chars", { n: n(form.resposta.trim().length) }));
   coluna.appendChild(contadorSft);
+  // O ÚNICO campo de DADO desta tela: a resposta de referência sai na língua do
+  // prompt, não na da interface. É o inverso de tudo o que está em volta dela, e
+  // por isso a dica não é opcional aqui.
+  if (!c0.leitura) coluna.appendChild(dicaLinguaDado(env.prompt.lang));
   grade.appendChild(coluna);
 
   if (guia) {
     const lado = el("div");
-    juntar(lado, el("div", "rotulo-bloco", "rubrica-guia: " + guia.titulo));
-    if (guia.nota) lado.appendChild(el("p", "fraco", guia.nota));
+    juntar(lado, el("div", "rotulo-bloco",
+      t("ws.guia", { titulo: bi(guia.titulo_i18n, guia.titulo) || t("ws.guia_sem_titulo") })));
+    if (guia.nota_chave) lado.appendChild(el("p", "fraco", t(guia.nota_chave)));
     const marcaveis = el("div", "guia");
     marcaveis.style.marginTop = "10px";
     guia.criterios.forEach((c, i) => {
@@ -1926,14 +2933,14 @@ function wsSft(env, ctx) {
       if (c0.leitura) caixinha.disabled = true;
       else caixinha.addEventListener("change", () => { form.checklist[i] = caixinha.checked; salvarRascunho(); });
       const texto = el("span");
-      juntar(texto, el("div", "criterio-nome", c.nome), el("div", "criterio-desc", c.descricao));
+      juntar(texto,
+        el("div", "criterio-nome", bi(c.nome_i18n, c.nome)),
+        el("div", "criterio-desc", bi(c.descricao_i18n, c.descricao)));
       juntar(rotulo, caixinha, texto);
       marcaveis.appendChild(rotulo);
     });
     lado.appendChild(marcaveis);
-    lado.appendChild(el("p", "fraco", c0.leitura
-      ? "O que a pessoa marcou veio no envio — é o autoteste dela sobre a própria resposta."
-      : "O que você marcar entra no envio — é o autoteste da sua própria resposta."));
+    lado.appendChild(el("p", "fraco", c0.leitura ? t("ws.guia_leitura") : t("ws.guia_edicao")));
     grade.appendChild(lado);
   }
   caixa.appendChild(grade);
@@ -1953,9 +2960,7 @@ function wsComparar(env, ctx) {
   // Sem par não há comparação. Estado honesto com saídas reais, nunca duas
   // colunas vazias esperando um material que não existe.
   if (env.respostas.length < 2) {
-    caixa.appendChild(semMaterial(
-      "Este prompt não tem duas respostas de modelo.",
-      "A comparação A/B precisa de um par. Escrever a rubrica dele é o passo que falta para que ele possa ser comparado depois."));
+    caixa.appendChild(semMaterial(t("ws.sem_par_titulo"), t("ws.sem_par_linha")));
     return caixa;
   }
   const grade = el("div", "ab");
@@ -1967,10 +2972,12 @@ function wsComparar(env, ctx) {
     coluna.setAttribute("aria-pressed", String(form.preferencia === r.rotulo));
     const cabeca = el("div", "ab-cabeca");
     juntar(cabeca,
-      el("strong", null, r.rotulo === "modelo-a" ? "A" : "B"),
-      el("span", "fraco", "rótulo cego"),
+      el("strong", null, rotuloCego(r.rotulo)),
+      el("span", "fraco", t("ws.rotulo_cego")),
       el("span", "crescer"),
-      el("span", "atalho", c0.leitura ? (form.preferencia === r.rotulo ? "escolhida" : "") : (i === 0 ? "←" : "→")));
+      el("span", "atalho", c0.leitura
+        ? (form.preferencia === r.rotulo ? t("ws.escolhida") : "")
+        : (i === 0 ? "←" : "→")));
     const texto = el("div", "ab-texto");
     texto.appendChild(el("div", "leitura", r.texto));
     juntar(coluna, cabeca, texto);
@@ -1983,7 +2990,7 @@ function wsComparar(env, ctx) {
   sincronizarRolagem(areas);
 
   const empate = el("div", "ab-empate");
-  const bEmpate = el("button", "botao", "As duas são equivalentes (empate)");
+  const bEmpate = el("button", "botao", t("botao.empate"));
   bEmpate.type = "button";
   bEmpate.setAttribute("aria-pressed", String(form.preferencia === "empate"));
   if (form.preferencia === "empate") bEmpate.classList.add("primaria");
@@ -1997,22 +3004,23 @@ function wsComparar(env, ctx) {
   campo.style.marginTop = "16px";
   const area = el("textarea");
   area.rows = 4;
-  area.placeholder = "o que a escolhida faz que a outra não faz? (mínimo de " + minimo + " caracteres)";
+  area.placeholder = t("ws.just_ab_ph", { min: minimo });
   area.value = form.justificativa;
   if (c0.leitura) area.readOnly = true;
   else area.addEventListener("input", () => {
     form.justificativa = area.value;
-    contador.textContent = n(area.value.trim().length) + " de " + minimo + " caracteres";
+    contador.textContent = t("ws.contador_de", { n: n(area.value.trim().length), min: minimo });
     salvarRascunho();
     atualizarBotaoEnviar();
   });
   juntar(campo,
-    el("span", null, c0.leitura
-      ? "Por que — o motivo escrito por quem comparou."
-      : "Por que — obrigatório. O valor da comparação está no motivo, não na preferência."),
+    el("span", null, c0.leitura ? t("ws.just_ab_rotulo_leitura") : t("ws.just_ab_rotulo")),
     area);
-  const contador = el("div", "contador", n(form.justificativa.trim().length) + (c0.leitura ? " caracteres" : " de " + minimo + " caracteres"));
+  const contador = el("div", "contador", c0.leitura
+    ? t("ws.contador_chars", { n: n(form.justificativa.trim().length) })
+    : t("ws.contador_de", { n: n(form.justificativa.trim().length), min: minimo }));
   campo.appendChild(contador);
+  if (!c0.leitura) campo.appendChild(dicaLinguaMeta("lingua.meta"));
   caixa.appendChild(campo);
   return caixa;
 }
@@ -2103,29 +3111,32 @@ function formDoPayload(env, anterior) {
     servidor (lidos do /api/health), então o botão e o 422 nunca discordam. */
 function oQueFalta() {
   const env = est.envelope;
-  if (!env || !est.form) return "Nada para enviar";
+  if (!env || !est.form) return t("falta.nada");
   const tipo = env.tarefa.tipo;
 
   if (tipo === "avaliar_rubrica") {
-    if (!env.rubrica) return "Esta tarefa está sem rubrica";
+    if (!env.rubrica) return t("falta.sem_rubrica");
     const total = est.form.notas.length;
     const semNota = est.form.notas.filter((v) => v === null || v === undefined).length;
-    if (semNota) return semNota + " de " + total + " critérios sem nota";
+    if (semNota) return t("falta.notas", { n: semNota, total: total });
     return null;
   }
   if (tipo === "escrever_rubrica") {
     const piso = lim("min_criterios_rubrica", 3);
-    if (est.form.titulo.trim().length < 5) return "Falta o título da rubrica";
+    if (est.form.titulo.trim().length < 5) return t("falta.titulo_rubrica");
     if (est.form.criterios.length < piso) {
       const faltam = piso - est.form.criterios.length;
-      return "Faltam " + faltam + " critério" + (faltam > 1 ? "s" : "");
+      // Duas chaves em vez de um plural montado no código: o inglês e o
+      // português não flexionam igual, e "1 critério(s)" numa tela de portfólio
+      // é o tipo de detalhe que se lê como descuido.
+      return faltam === 1 ? t("falta.criterio_um") : t("falta.criterios_n", { n: faltam });
     }
     for (let i = 0; i < est.form.criterios.length; i++) {
       const c = est.form.criterios[i];
-      if (c.nome.trim().length < 3) return "Critério " + (i + 1) + ": falta o nome";
-      if (c.descricao.trim().length < 10) return "Critério " + (i + 1) + ": falta a descrição";
+      if (c.nome.trim().length < 3) return t("falta.criterio_nome", { n: i + 1 });
+      if (c.descricao.trim().length < 10) return t("falta.criterio_desc", { n: i + 1 });
       if (c.rotulo_min.trim().length < 3 || c.rotulo_max.trim().length < 3) {
-        return "Critério " + (i + 1) + ": descreva as duas pontas da escala";
+        return t("falta.criterio_pontas", { n: i + 1 });
       }
     }
     return null;
@@ -2133,13 +3144,13 @@ function oQueFalta() {
   if (tipo === "sft_resposta") {
     const piso = lim("min_chars_sft", 40);
     const tem = est.form.resposta.trim().length;
-    if (tem < piso) return "Faltam " + (piso - tem) + " caracteres na resposta";
+    if (tem < piso) return t("falta.sft", { n: piso - tem });
     return null;
   }
-  if (!est.form.preferencia) return "Escolha A, B ou empate";
+  if (!est.form.preferencia) return t("falta.preferencia");
   const piso = lim("min_chars_justificativa", 30);
   const tem = est.form.justificativa.trim().length;
-  if (tem < piso) return "Faltam " + (piso - tem) + " caracteres na justificativa";
+  if (tem < piso) return t("falta.justificativa", { n: piso - tem });
   return null;
 }
 
@@ -2149,7 +3160,7 @@ function atualizarBotaoEnviar() {
   const b = $("#enviar");
   if (!b) return;
   const falta = oQueFalta();
-  b.textContent = falta ? falta : "Enviar e próxima";
+  b.textContent = falta ? falta : t("botao.enviar_proxima");
   b.disabled = !!falta || est.carregando;
 }
 
@@ -2236,13 +3247,14 @@ async function enviar() {
     est.envelope = null;
     est.form = null;
     recado(r.expirou
-      ? "enviado (o prazo tinha expirado, mas seu trabalho foi salvo)"
-      : "enviado para revisão — versão " + r.versao);
+      ? t("recado.enviado_expirado")
+      : t("recado.enviado", { versao: r.versao }));
     est.carregando = false;
     if (r.continuacao) { oferecerContinuacao(r.continuacao); return; }
     // FECHAR O LOOP ANTES DE PEDIR A PRÓXIMA COISA: enviar leva direto à
     // próxima tarefa, sem uma tela intermediária perguntando "e agora?".
     est.motivo = "";
+    est.motivoChave = null;
     est.vista = "fila";
     desenharVistas();
     await carregarFila();
@@ -2258,18 +3270,18 @@ function oferecerContinuacao(cont) {
   const area = $("#area-trabalho");
   limpar(area);
   const painel = el("div", "painel");
-  painel.appendChild(juntar(el("div", "painel-cabeca"), el("h2", null, "Enviado para revisão")));
+  painel.appendChild(juntar(el("div", "painel-cabeca"), el("h2", null, t("cont.titulo"))));
   const caixa = el("div", "vazio");
   juntar(caixa,
-    el("div", "vazio-titulo", cont.convite),
-    el("p", "vazio-linha", cont.porque));
+    el("div", "vazio-titulo", t("cont.convite")),
+    el("p", "vazio-linha", t("cont.porque")));
   const saidas = el("div", "vazio-saidas");
-  const sim = el("button", "botao primaria", "Escrever a resposta agora");
+  const sim = el("button", "botao primaria", t("botao.escrever_resposta_agora"));
   sim.type = "button";
   sim.addEventListener("click", () => aceitarContinuacao(cont));
-  const nao = el("button", "botao", "Não, próxima da fila");
+  const nao = el("button", "botao", t("botao.nao_proxima"));
   nao.type = "button";
-  nao.addEventListener("click", () => { est.motivo = ""; carregarFila(); });
+  nao.addEventListener("click", () => { est.motivo = ""; est.motivoChave = null; carregarFila(); });
   juntar(saidas, sim, nao);
   caixa.appendChild(saidas);
   painel.appendChild(caixa);
@@ -2288,9 +3300,10 @@ async function aceitarContinuacao(cont) {
       prompt_uid: cont.prompt_uid,
       origem: cont.origem,
     }));
-    aceitarEnvelope(r.tarefa, "");
+    aceitarEnvelope(r.tarefa, null);
   } catch (e) {
-    est.motivo = "não deu para abrir a continuação: " + e.message;
+    est.motivoChave = null;
+    est.motivo = t("recado.erro_continuacao", { erro: e.message });
   } finally {
     est.carregando = false;
   }
@@ -2306,13 +3319,14 @@ async function devolver() {
   try {
     await postar("/api/atribuicoes/" + id + "/abandonar", { anotador_id: est.persona.id });
     limparRascunho(id);
-    recado("tarefa devolvida para a fila");
+    recado(t("recado.devolvida_fila"));
   } catch (e) {
     recado(e.message, true);
   }
   est.envelope = null;
   est.form = null;
   est.motivo = "";
+  est.motivoChave = null;
 }
 
 async function abandonar() {
@@ -2346,70 +3360,79 @@ function pintarContagens() {
    ========================================================================== */
 
 const FAIXAS = [
-  ["", "qualquer tamanho"],
-  ["curto", "curto"],
-  ["medio", "médio"],
-  ["longo", "longo"],
+  ["", "catalogo.faixa_qualquer"],
+  ["curto", "catalogo.faixa_curto"],
+  ["medio", "catalogo.faixa_medio"],
+  ["longo", "catalogo.faixa_longo"],
 ];
 
 function desenharCatalogo(area) {
   const painel = el("div", "painel");
   const cabeca = el("div", "painel-cabeca");
   juntar(cabeca,
-    el("h2", null, "Escolher um prompt para " + TIPO_POR_ID[est.aba].nome.toLowerCase()),
+    el("h2", null, t("catalogo.titulo", { tipo: nomeTipo(est.aba).toLowerCase() })),
     el("span", "crescer"));
   const dados = est.catalogo.dados;
-  if (dados) cabeca.appendChild(el("span", "fraco num", n(dados.total) + " de " + n(dados.n_pool) + " no pool"));
+  if (dados) {
+    cabeca.appendChild(el("span", "fraco num",
+      t("catalogo.contagem", { n: n(dados.total), total: n(dados.n_pool) })));
+  }
   painel.appendChild(cabeca);
 
   const corpo = el("div", "painel-corpo");
   const filtros = el("div", "filtros");
   const busca = el("input");
   busca.type = "text";
-  busca.placeholder = "buscar no texto do prompt";
+  busca.placeholder = t("catalogo.busca_ph");
   busca.value = est.catalogo.q;
+  // O texto digitado vai para o ESTADO a cada tecla (a busca só dispara no
+  // Enter ou no botão). Sem isto, trocar de idioma com uma busca escrita e
+  // ainda não disparada apagaria o que a pessoa acabou de digitar.
+  busca.addEventListener("input", () => { est.catalogo.q = busca.value; });
   busca.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") { est.catalogo.q = busca.value; est.catalogo.page = 1; carregarCatalogo(); }
+    if (ev.key === "Enter") { est.catalogo.page = 1; carregarCatalogo(); }
   });
   filtros.appendChild(busca);
 
-  const selIdioma = seletor([["", "todos os idiomas"], ["pt", "português"], ["en", "inglês"]],
+  const selIdioma = seletor([["", "catalogo.todos_idiomas"], ["pt", "lang.pt"], ["en", "lang.en"]],
     est.catalogo.lang, (v) => { est.catalogo.lang = v; est.catalogo.page = 1; carregarCatalogo(); });
   const selFaixa = seletor(FAIXAS, est.catalogo.faixa,
     (v) => { est.catalogo.faixa = v; est.catalogo.page = 1; carregarCatalogo(); });
-  const fontes = [["", "todas as fontes"]].concat(((dados && dados.fontes) || []).map((f) => [f, f]));
-  const selFonte = seletor(fontes, est.catalogo.fonte,
+  // As FONTES são dado (nomes de dataset), não cromo: entram como estão.
+  const selFonte = seletorLivre(
+    [["", t("catalogo.todas_fontes")]].concat(((dados && dados.fontes) || []).map((f) => [f, f])),
+    est.catalogo.fonte,
     (v) => { est.catalogo.fonte = v; est.catalogo.page = 1; carregarCatalogo(); });
   juntar(filtros, selIdioma, selFaixa, selFonte);
 
-  const buscar = el("button", "botao", "Buscar");
+  const buscar = el("button", "botao", t("botao.buscar"));
   buscar.type = "button";
-  buscar.addEventListener("click", () => { est.catalogo.q = busca.value; est.catalogo.page = 1; carregarCatalogo(); });
+  buscar.addEventListener("click", () => { est.catalogo.page = 1; carregarCatalogo(); });
   filtros.appendChild(buscar);
   corpo.appendChild(filtros);
   if (est.catalogo.q && dados && !dados.busca_aplicada) {
-    corpo.appendChild(el("p", "falta", "A busca não sobrou nada depois de limpar os símbolos — a lista abaixo é o pool sem filtro de texto."));
+    corpo.appendChild(el("p", "falta", t("catalogo.busca_vazia")));
   }
   painel.appendChild(corpo);
 
   if (!dados) {
-    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", "Carregando o catálogo…")));
+    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", t("catalogo.carregando"))));
     area.appendChild(painel);
     return;
   }
   if (!dados.items.length) {
     const vazio = el("div", "vazio");
     juntar(vazio,
-      el("div", "vazio-titulo", "Nenhum prompt com esses filtros."),
-      el("p", "vazio-linha", "O pool tem " + n(dados.n_pool) + " prompts. Tire um filtro ou volte para a fila."));
+      el("div", "vazio-titulo", t("catalogo.vazio_titulo")),
+      el("p", "vazio-linha", t("catalogo.vazio_linha", { n: n(dados.n_pool) })));
     const saidas = el("div", "vazio-saidas");
-    const limpaB = el("button", "botao primaria", "Limpar os filtros");
+    const limpaB = el("button", "botao primaria", t("botao.limpar_filtros"));
     limpaB.type = "button";
     limpaB.addEventListener("click", () => {
       est.catalogo = { q: "", lang: "", fonte: "", faixa: "", page: 1, dados: null };
       carregarCatalogo();
     });
-    const volta = el("button", "botao", "Voltar para a fila");
+    const volta = el("button", "botao", t("botao.voltar_fila"));
     volta.type = "button";
     volta.addEventListener("click", () => irPara("fila"));
     juntar(saidas, limpaB, volta);
@@ -2428,25 +3451,26 @@ function desenharCatalogo(area) {
     juntar(meta,
       el("span", "selo", item.fonte),
       el("span", "selo", item.licenca),
-      el("span", "selo", n(item.n_chars) + " caracteres"),
-      el("span", "selo", item.lang === "pt" ? "português" : "inglês"));
-    if (item.ja_anotei) meta.appendChild(el("span", "selo", "você já anotou este"));
+      el("span", "selo", t("ws.prov_chars", { n: n(item.n_chars) })),
+      el("span", "selo", nomeLingua(item.lang)));
+    if (item.ja_anotei) meta.appendChild(el("span", "selo", t("catalogo.ja_anotei")));
     // O ERRO SE ANUNCIA ANTES DE ACONTECER: um prompt cru do corpus não tem
     // resposta de modelo nenhuma, e comparar A/B sobre ele seria um beco.
     const podeEste = (item.pode || []).indexOf(est.aba) >= 0;
-    if (!podeEste) meta.appendChild(el("span", "selo", "sem material para este tipo"));
+    if (!podeEste) meta.appendChild(el("span", "selo", t("catalogo.sem_material_selo")));
     texto.appendChild(meta);
     linha.appendChild(texto);
 
     const impedido = !!item.ja_anotei || !podeEste;
     const b = el("button", "botao" + (impedido ? "" : " primaria"),
-      item.ja_anotei ? "Já anotado" : !podeEste ? "Sem material" : "Anotar este");
+      item.ja_anotei ? t("botao.ja_anotado")
+        : !podeEste ? t("botao.sem_material") : t("botao.anotar_este"));
     b.type = "button";
     b.disabled = impedido;
     if (!podeEste && !item.ja_anotei) {
       b.title = est.aba === "comparar_ab"
-        ? "a comparação A/B precisa de duas respostas de modelo; este prompt tem " + n(item.n_respostas)
-        : "avaliar com rubrica precisa de uma rubrica ativa e de uma resposta de modelo";
+        ? t("catalogo.title_ab", { n: n(item.n_respostas) })
+        : t("catalogo.title_avaliar");
     }
     b.addEventListener("click", () => pegarLivre(item.uid));
     linha.appendChild(b);
@@ -2456,21 +3480,29 @@ function desenharCatalogo(area) {
 
   if (dados.pages > 1) {
     const nav = el("div", "paginacao");
-    const anterior = el("button", "botao", "anterior");
+    const anterior = el("button", "botao", t("botao.anterior"));
     anterior.type = "button";
     anterior.disabled = dados.page <= 1;
     anterior.addEventListener("click", () => { est.catalogo.page = dados.page - 1; carregarCatalogo(); });
-    const proximo = el("button", "botao", "próxima");
+    const proximo = el("button", "botao", t("botao.proxima"));
     proximo.type = "button";
     proximo.disabled = dados.page >= dados.pages;
     proximo.addEventListener("click", () => { est.catalogo.page = dados.page + 1; carregarCatalogo(); });
-    juntar(nav, anterior, el("span", "num", "página " + n(dados.page) + " de " + n(dados.pages)), proximo);
+    juntar(nav, anterior,
+      el("span", "num", t("catalogo.pagina", { page: n(dados.page), pages: n(dados.pages) })),
+      proximo);
     painel.appendChild(nav);
   }
   area.appendChild(painel);
 }
 
+/** Seletor cujos rótulos são CHAVES do dicionário (cromo). */
 function seletor(opcoes, valor, aoMudar) {
+  return seletorLivre(opcoes.map(([v, chave]) => [v, t(chave)]), valor, aoMudar);
+}
+
+/** Seletor cujos rótulos já são texto pronto — usado para DADO (nome de fonte). */
+function seletorLivre(opcoes, valor, aoMudar) {
   const sel = el("select");
   for (const [v, rotulo] of opcoes) {
     const o = el("option", null, rotulo);
@@ -2521,7 +3553,7 @@ async function carregarCatalogo() {
     resultado = await api(comParams("/api/catalogo", p));
   } catch (e) {
     resultado = { items: [], total: 0, pages: 0, page: 1, n_pool: 0, fontes: [] };
-    if (minha === buscaAtual) recado("não deu para ler o catálogo: " + e.message, true);
+    if (minha === buscaAtual) recado(t("catalogo.erro", { erro: e.message }), true);
   }
   if (minha !== buscaAtual) return;  // chegou atrasada: descarta
   c.dados = resultado;
@@ -2541,7 +3573,7 @@ async function pegarLivreEm(tipo, uid) {
       anotador_id: est.persona.id, tipo, prompt_uid: uid,
     }));
     est.aba = tipo;
-    aceitarEnvelope(r.tarefa, "");
+    aceitarEnvelope(r.tarefa, null);
     est.vista = "fila";
     desenharAnotador();
     await recarregarContagens();
@@ -2555,35 +3587,37 @@ async function pegarLivreEm(tipo, uid) {
    ========================================================================== */
 
 const ROTULO_STATUS = {
-  em_andamento: ["pendente", "em andamento"],
-  submetida: ["pendente", "esperando revisão"],
-  aprovada: ["aprovado", "aprovada"],
-  abandonada: ["pendente", "devolvida por você"],
-  expirada: ["pendente", "prazo expirado"],
+  em_andamento: ["pendente", "status.em_andamento"],
+  submetida: ["pendente", "status.submetida"],
+  aprovada: ["aprovado", "status.aprovada"],
+  abandonada: ["pendente", "status.abandonada"],
+  expirada: ["pendente", "status.expirada"],
 };
 
 function desenharMinhas(area) {
   const painel = el("div", "painel");
   const cabeca = el("div", "painel-cabeca");
-  juntar(cabeca, el("h2", null, "Minhas tarefas"), el("span", "crescer"));
-  if (est.minhas) cabeca.appendChild(el("span", "fraco num", n(est.minhas.length) + " no total"));
+  juntar(cabeca, el("h2", null, t("minhas.titulo")), el("span", "crescer"));
+  if (est.minhas) {
+    cabeca.appendChild(el("span", "fraco num", t("minhas.total", { n: n(est.minhas.length) })));
+  }
   painel.appendChild(cabeca);
 
   if (!est.minhas) {
-    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", "Carregando…")));
+    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", t("minhas.carregando"))));
     area.appendChild(painel);
     return;
   }
   if (!est.minhas.length) {
     const vazio = el("div", "vazio");
     juntar(vazio,
-      el("div", "vazio-titulo", "Você ainda não pegou nenhuma tarefa."),
-      el("p", "vazio-linha", "A fila entrega a próxima sozinha; o catálogo deixa você escolher."));
+      el("div", "vazio-titulo", t("minhas.vazio_titulo")),
+      el("p", "vazio-linha", t("minhas.vazio_linha")));
     const saidas = el("div", "vazio-saidas");
-    const fila = el("button", "botao primaria", "Ir para a fila");
+    const fila = el("button", "botao primaria", t("botao.ir_fila"));
     fila.type = "button";
     fila.addEventListener("click", () => irPara("fila"));
-    const cat = el("button", "botao", "Escolher no catálogo");
+    const cat = el("button", "botao", t("botao.escolher_catalogo"));
     cat.type = "button";
     cat.addEventListener("click", () => irPara("catalogo"));
     juntar(saidas, fila, cat);
@@ -2597,17 +3631,17 @@ function desenharMinhas(area) {
     const linha = el("div", "minha");
     const texto = el("div", "item-texto");
     const topo = el("div", "forma");
-    const [classe, rotulo] = ROTULO_STATUS[item.status] || ["pendente", item.status];
+    const [classe, chave] = ROTULO_STATUS[item.status] || ["pendente", null];
     const eti = el("span", "etiqueta " + classe);
-    juntar(eti, el("span", "ponto"), el("span", null, rotulo));
+    juntar(eti, el("span", "ponto"), el("span", null, chave ? t(chave) : item.status));
     juntar(topo, eti,
-      el("span", "fraco", (TIPO_POR_ID[item.tipo] || {}).nome || item.tipo),
-      el("span", "fraco", item.origem === "livre" ? "escolhida por você" : "da fila"));
-    if (item.versao) topo.appendChild(el("span", "fraco", "versão " + item.versao));
+      el("span", "fraco", nomeTipo(item.tipo)),
+      el("span", "fraco", item.origem === "livre" ? t("fila.origem_livre") : t("minhas.da_fila")));
+    if (item.versao) topo.appendChild(el("span", "fraco", t("minhas.versao", { n: item.versao })));
     texto.appendChild(topo);
 
     texto.appendChild(el("div", "item-trecho",
-      item.disponivel ? item.prompt : "este prompt saiu do corpus na última recarga"));
+      item.disponivel ? item.prompt : t("minhas.indisponivel")));
     // A DEVOLUÇÃO é o único item desta lista que exige ação, e por isso ela vem
     // com o comentário embutido: obrigar a abrir a tarefa para descobrir o que
     // o revisor escreveu é a fricção que faz uma devolução ser ignorada.
@@ -2615,14 +3649,15 @@ function desenharMinhas(area) {
     if (devolvida) {
       const dev = el("div", "devolucao");
       juntar(dev,
-        el("div", "devolucao-titulo", "Devolvida para ajuste"),
+        el("div", "devolucao-titulo", t("minhas.devolvida")),
         el("p", null, item.comentario_revisor));
       texto.appendChild(dev);
     }
     linha.appendChild(texto);
 
     if (item.status === "em_andamento" && item.disponivel) {
-      const abrir = el("button", "botao primaria", devolvida ? "Corrigir e reenviar" : "Continuar");
+      const abrir = el("button", "botao primaria",
+        devolvida ? t("botao.corrigir_reenviar") : t("botao.continuar"));
       abrir.type = "button";
       abrir.addEventListener("click", () => reabrir(item));
       linha.appendChild(abrir);
@@ -2640,7 +3675,7 @@ async function carregarMinhas() {
     est.minhas = r.items || [];
   } catch (e) {
     est.minhas = [];
-    recado("não deu para ler suas tarefas: " + e.message, true);
+    recado(t("minhas.erro", { erro: e.message }), true);
   }
   if (est.vista === "minhas") desenharArea();
 }
@@ -2651,7 +3686,7 @@ async function reabrir(item) {
       anotador_id: String(est.persona.id),
     })));
     est.aba = item.tipo;
-    aceitarEnvelope(r.tarefa, "");
+    aceitarEnvelope(r.tarefa, null);
     est.vista = "fila";
     desenharAnotador();
   } catch (e) {
@@ -2703,7 +3738,7 @@ function teclado(ev) {
       const escala = (criterio && criterio.escala) || { min: 1, max: 9 };
       const valor = Number(ev.key);
       if (valor < escala.min || valor > escala.max) {
-        recado("este critério vai de " + escala.min + " a " + escala.max, true);
+        recado(t("recado.escala", { min: escala.min, max: escala.max }), true);
         return;
       }
       ev.preventDefault();
@@ -2727,34 +3762,34 @@ function teclado(ev) {
     "terminei de escrever" do anotador, e obrigar a sair do campo para clicar
     seria a mesma fricção do outro lado da mesa. */
 function tecladoRevisor(ev) {
-  const t = est.triagem;
-  if (!t || est.subaba !== "anotacoes") return;
-  if (t.devolvendo) {
+  const tri = est.triagem;
+  if (!tri || est.subaba !== "anotacoes") return;
+  if (tri.devolvendo) {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
-      const campo = $("#comentario-devolucao");
       const piso = lim("min_chars_devolucao", 20);
-      if (campo && campo.value.trim().length >= piso) {
+      const escrito = (tri.comentario || "").trim();
+      if (escrito.length >= piso) {
         ev.preventDefault();
-        triar("devolvida", campo.value.trim());
+        triar("devolvida", escrito);
       }
     }
     if (ev.key === "Escape") {
       ev.preventDefault();
-      t.devolvendo = false;
+      tri.devolvendo = false;
       desenharDetalheTriagem();
     }
     return;
   }
-  if (ehCampo(ev.target) || !t.itens.length) return;
+  if (ehCampo(ev.target) || !tri.itens.length) return;
 
   if (ev.key === "j" || ev.key === "J" || ev.key === "k" || ev.key === "K") {
     const passo = (ev.key === "j" || ev.key === "J") ? 1 : -1;
-    const i = t.itens.findIndex((x) => x.anotacao_id === t.sel);
-    const alvo = t.itens[Math.min(t.itens.length - 1, Math.max(0, (i < 0 ? 0 : i) + passo))];
+    const i = tri.itens.findIndex((x) => x.anotacao_id === tri.sel);
+    const alvo = tri.itens[Math.min(tri.itens.length - 1, Math.max(0, (i < 0 ? 0 : i) + passo))];
     if (alvo) { ev.preventDefault(); abrirNaTriagem(alvo.anotacao_id); }
     return;
   }
-  if (!t.sel || !t.detalhe) return;
+  if (!tri.sel || !tri.detalhe) return;
   if (ev.key === "a" || ev.key === "A") { ev.preventDefault(); triar("aprovada", null); }
   if (ev.key === "r" || ev.key === "R") { ev.preventDefault(); abrirDevolucao(); }
 }
@@ -2780,7 +3815,7 @@ async function desenharRevisor() {
   const barra = $("#abas-revisor");
   limpar(barra);
   for (const s of SUBABAS_REVISOR) {
-    const b = el("button", "aba", s.nome);
+    const b = el("button", "aba", t(s.nome));
     b.type = "button";
     b.setAttribute("role", "tab");
     b.setAttribute("aria-selected", String(est.subaba === s.id));
@@ -2792,9 +3827,8 @@ async function desenharRevisor() {
   }
 
   const s = SUBABAS_REVISOR.find((x) => x.id === est.subaba);
-  $("#revisor-fila-titulo").textContent = s.titulo;
-  $("#revisor-atalhos").textContent = est.subaba === "anotacoes"
-    ? "J/K andam · A aprova · R devolve" : "";
+  $("#revisor-fila-titulo").textContent = t(s.titulo);
+  $("#revisor-atalhos").textContent = est.subaba === "anotacoes" ? t("revisor.atalhos") : "";
 
   if (est.subaba !== "anotacoes") { desenharCriacoesPendentes(s); return; }
   if (!est.triagem) { await carregarTriagem(); return; }
@@ -2809,22 +3843,20 @@ function desenharCriacoesPendentes(s) {
   const fila = $("#revisor-fila");
   limpar(fila);
   const vazia = el("div", "fila-vazia");
-  juntar(vazia, el("div", "vazio-titulo", s.vazio), el("p", "vazio-linha", s.linha));
+  juntar(vazia, el("div", "vazio-titulo", t(s.vazio)), el("p", "vazio-linha", t(s.linha)));
   fila.appendChild(vazia);
   const det = $("#revisor-detalhe");
   limpar(det);
   const caixa = el("div", "vazio");
   juntar(caixa,
-    el("div", "vazio-titulo", "O modo criar chega no P4."),
-    el("p", "vazio-linha",
-      "Quando ele existir, o prompt escrito por um anotador aparece aqui antes de entrar "
-      + "no corpus, e aprovar grava o uid que a pipeline vai reproduzir."));
+    el("div", "vazio-titulo", t("triagem.criacoes_titulo")),
+    el("p", "vazio-linha", t("triagem.criacoes_linha")));
   // O que ainda não funciona fica desabilitado e MARCADO com o marco em que
   // chega. Um botão morto sem etiqueta parece defeito; com a etiqueta, é
   // roteiro à vista.
   const acoes = el("div", "vazio-saidas");
-  for (const [rotulo, marco] of [["Aprovar criação", "P4"], ["Recusar criação", "P4"]]) {
-    const b = el("button", "botao", rotulo);
+  for (const [chave, marco] of [["botao.aprovar_criacao", "P4"], ["botao.recusar_criacao", "P4"]]) {
+    const b = el("button", "botao", t(chave));
     b.type = "button";
     b.disabled = true;
     b.appendChild(el("span", "marco", marco));
@@ -2839,7 +3871,8 @@ async function carregarTriagem(manterSel) {
   const anterior = manterSel === undefined ? (est.triagem && est.triagem.sel) : manterSel;
   const vazia = {
     itens: [], total: 0, minhas_excluidas: 0, minhas_na_fila: 0, modo_solo: false,
-    sel: null, detalhe: null, form: null, devolvendo: false, carregando: false,
+    sel: null, detalhe: null, form: null, devolvendo: false, comentario: "",
+    carregando: false,
   };
   try {
     const r = await api(comParams("/api/revisao/fila",
@@ -2872,137 +3905,143 @@ async function carregarTriagem(manterSel) {
     aviso que ninguém viu na hora que importava, e esconder isso seria mentir
     sobre o QC — que é exatamente o que este projeto existe para não fazer. */
 function faixaSolo() {
-  const t = est.triagem;
-  if (!t || !t.modo_solo) return null;
+  const tri = est.triagem;
+  if (!tri || !tri.modo_solo) return null;
   const caixa = el("div", "faixa-solo");
   juntar(caixa,
-    el("b", null, "Modo solo"),
-    el("span", null, "você está revisando trabalho seu."),
+    el("b", null, t("solo.titulo")),
+    el("span", null, t("solo.linha")),
     el("span", "fraco",
-      (t.minhas_na_fila
-        ? n(t.minhas_na_fila) + " de " + n(t.itens.length) + " item(ns) nesta página são seus. "
-        : "Nesta página não há item seu. ")
-      + "Uma pessoa nos três papéis: cada revisão fica gravada como autorrevisão, "
-      + "e o painel do admin conta esse número à parte."));
+      (tri.minhas_na_fila
+        ? t("solo.contagem", { n: n(tri.minhas_na_fila), total: n(tri.itens.length) })
+        : t("solo.sem_meus"))
+      + t("solo.nota")));
   return caixa;
 }
 
 function desenharFilaTriagem(s) {
   const fila = $("#revisor-fila");
   limpar(fila);
-  const t = est.triagem;
+  const tri = est.triagem;
   const solo = faixaSolo();
   if (solo) fila.appendChild(solo);
-  if (!t.itens.length) {
+  if (!tri.itens.length) {
     const vazia = el("div", "fila-vazia");
-    juntar(vazia, el("div", "vazio-titulo", s.vazio), el("p", "vazio-linha", s.linha));
-    if (t.minhas_excluidas) {
+    juntar(vazia, el("div", "vazio-titulo", t(s.vazio)), el("p", "vazio-linha", t(s.linha)));
+    if (tri.minhas_excluidas) {
       // Sem esta linha, um revisor que anotou e vê a fila vazia acha que a
       // plataforma perdeu o trabalho dele.
       vazia.appendChild(el("p", "vazio-linha",
-        n(t.minhas_excluidas) + " anotação(ões) sua(s) esperam triagem e não aparecem aqui: "
-        + "quem revisa nunca é quem anotou. Outro revisor as vê."));
+        t("triagem.minhas_excluidas", { n: n(tri.minhas_excluidas) })));
     }
     fila.appendChild(vazia);
     return;
   }
-  for (const item of t.itens) {
+  for (const item of tri.itens) {
     const b = el("button", "fila-item");
     b.type = "button";
-    b.setAttribute("aria-current", String(t.sel === item.anotacao_id));
+    b.setAttribute("aria-current", String(tri.sel === item.anotacao_id));
     const topo = el("div", "fila-item-topo");
     juntar(topo,
-      el("strong", null, (TIPO_POR_ID[item.tipo] || {}).nome || item.tipo),
+      el("strong", null, nomeTipo(item.tipo)),
       // No modo solo a fila é mista: marcar QUAIS são minhas é o que torna o
       // aviso acionável em vez de decorativo.
-      el("span", item.minha ? "eu" : null, item.minha ? item.anotador + " (você)" : item.anotador),
+      el("span", item.minha ? "eu" : null,
+        item.minha ? t("triagem.eu_sufixo", { nome: item.anotador }) : item.anotador),
       el("span", "crescer"));
-    if (item.projeto) topo.appendChild(el("span", "fraco", item.projeto));
+    // `dado`: nome de projeto é conteúdo do banco, não cromo — ele sai na
+    // língua em que foi cadastrado, como o nome de uma pessoa.
+    if (item.projeto) topo.appendChild(el("span", "fraco dado", item.projeto));
     if (item.versao > 1) topo.appendChild(el("span", "etiqueta devolvido", "v" + item.versao));
     b.appendChild(topo);
     b.appendChild(el("div", "fila-item-trecho",
-      item.disponivel ? item.prompt : "(o prompt saiu do corpus na última recarga)"));
+      item.disponivel ? item.prompt : t("triagem.prompt_sumiu")));
     b.addEventListener("click", () => abrirNaTriagem(item.anotacao_id));
     fila.appendChild(b);
   }
 }
 
 async function abrirNaTriagem(anotacaoId) {
-  const t = est.triagem;
-  if (!t) return;
-  t.sel = anotacaoId;
-  t.devolvendo = false;
-  t.carregando = true;
+  const tri = est.triagem;
+  if (!tri) return;
+  tri.sel = anotacaoId;
+  tri.devolvendo = false;
+  tri.comentario = "";
+  tri.carregando = true;
   desenharFilaTriagem(SUBABAS_REVISOR[0]);
   desenharDetalheTriagem();
   try {
     const r = await api(comParams("/api/revisao/" + anotacaoId, { revisor_id: est.persona.id }));
-    t.detalhe = r.tarefa;
-    t.minha = !!r.minha;
-    t.form = formDoPayload(r.tarefa, r.tarefa.anotacao.payload);
+    tri.detalhe = r.tarefa;
+    tri.minha = !!r.minha;
+    tri.form = formDoPayload(r.tarefa, r.tarefa.anotacao.payload);
   } catch (e) {
-    t.detalhe = null;
-    t.form = null;
+    tri.detalhe = null;
+    tri.form = null;
     recado(e.message, true);
   }
-  t.carregando = false;
+  tri.carregando = false;
   desenharDetalheTriagem();
 }
 
 function desenharDetalheTriagem() {
   const det = $("#revisor-detalhe");
   limpar(det);
-  const t = est.triagem;
-  if (!t || !t.sel) {
+  const tri = est.triagem;
+  if (!tri || !tri.sel) {
     const caixa = el("div", "vazio");
     juntar(caixa,
-      el("div", "vazio-titulo", "Nada selecionado."),
-      el("p", "vazio-linha",
-        "O item escolhido na fila abre aqui exatamente como o anotador o produziu: "
-        + "mesma rubrica, mesmas escalas, mesma ordem."));
+      el("div", "vazio-titulo", t("triagem.nada_selecionado")),
+      el("p", "vazio-linha", t("triagem.nada_selecionado_linha")));
     det.appendChild(caixa);
     return;
   }
-  if (t.carregando || !t.detalhe) {
-    det.appendChild(el("div", "vazio-linha", t.carregando ? "abrindo…" : "não deu para abrir este item."));
+  if (tri.carregando || !tri.detalhe) {
+    det.appendChild(el("div", "vazio-linha",
+      tri.carregando ? t("triagem.abrindo") : t("triagem.erro_abrir")));
     return;
   }
-  const env = t.detalhe;
+  const env = tri.detalhe;
   const a = env.anotacao;
 
   const cabeca = el("div", "triagem-cabeca");
   juntar(cabeca,
-    el("span", "etiqueta pendente", "versão " + a.versao),
-    el("span", t.minha ? "eu" : "fraco", t.minha ? "por você" : "por " + a.anotador),
+    el("span", "etiqueta pendente", t("triagem.versao", { n: a.versao })),
+    el("span", tri.minha ? "eu" : "fraco",
+      tri.minha ? t("triagem.por_voce") : t("triagem.por", { nome: a.anotador })),
     el("span", "fraco", (a.submetida_em || "").slice(0, 19).replace("T", " ")),
     el("span", "crescer"),
-    el("span", "fraco", (env.tarefa.projeto ? env.tarefa.projeto + " · " : "") + a.payload_schema
-      + (a.versao_diretriz ? " · diretriz v" + a.versao_diretriz : "")));
+    // O nome do projeto sai num nó próprio, marcado como DADO: junto com o
+    // resto ele viraria uma string única meio cromo, meio conteúdo — e a
+    // varredura de língua deixaria de conseguir separar as duas coisas.
+    env.tarefa.projeto ? el("span", "fraco dado", env.tarefa.projeto + " · ") : null,
+    el("span", "fraco", a.payload_schema
+      + (a.versao_diretriz ? " · " + t("triagem.diretriz", { n: a.versao_diretriz }) : "")));
   det.appendChild(cabeca);
   // O aviso acompanha o ITEM, e não só a fila: julgar o próprio trabalho é uma
   // decisão que se toma no detalhe, com o botão à mão.
-  if (t.minha) {
+  if (tri.minha) {
     const aviso = faixaSolo();
     if (aviso) det.appendChild(aviso);
   }
 
   // O MESMO LAYOUT do anotador, em leitura. Ver `desenharWorkspace`.
-  det.appendChild(desenharWorkspace(env, ctxLeitura(t.form)));
+  det.appendChild(desenharWorkspace(env, ctxLeitura(tri.form)));
 
-  if (t.devolvendo) { det.appendChild(caixaDevolucao()); return; }
+  if (tri.devolvendo) { det.appendChild(caixaDevolucao()); return; }
 
   const acoes = el("div", "triagem-acoes");
-  const aprovar = el("button", "botao primaria", "Aprovar");
+  const aprovar = el("button", "botao primaria", t("botao.aprovar"));
   aprovar.type = "button";
   aprovar.addEventListener("click", () => triar("aprovada", null));
-  const devolver = el("button", "botao", "Devolver para ajuste");
+  const devolver = el("button", "botao", t("botao.devolver_ajuste"));
   devolver.type = "button";
   devolver.addEventListener("click", abrirDevolucao);
   juntar(acoes,
     aprovar, el("span", "atalho", "A"),
     devolver, el("span", "atalho", "R"),
     el("span", "crescer"),
-    el("span", "fraco", "aprovar segue para a avaliação; devolver reabre a tarefa de quem anotou"));
+    el("span", "fraco", t("triagem.nota_acoes")));
   det.appendChild(acoes);
 }
 
@@ -3010,37 +4049,59 @@ function desenharDetalheTriagem() {
     revisor escreve. */
 function caixaDevolucao() {
   const piso = lim("min_chars_devolucao", 20);
+  const tri = est.triagem;
   const caixa = el("div", "devolver-caixa");
-  caixa.appendChild(el("div", "devolucao-titulo", "Devolver para ajuste"));
-  caixa.appendChild(el("p", "vazio-linha",
-    "O comentário volta para o anotador — diga o que corrigir."));
+  caixa.appendChild(el("div", "devolucao-titulo", t("triagem.devolver_titulo")));
+  caixa.appendChild(el("p", "vazio-linha", t("triagem.devolver_microcopy")));
   const area = el("textarea");
   area.rows = 3;
   area.id = "comentario-devolucao";
-  area.placeholder = "o que precisa mudar, e por quê (mínimo de " + piso + " caracteres)";
+  area.placeholder = t("triagem.devolver_ph", { min: piso });
+  // Repovoado do ESTADO: trocar de idioma no meio de uma devolução redesenha
+  // este bloco, e o que o revisor já escreveu tem de continuar aqui.
+  area.value = tri.comentario || "";
   caixa.appendChild(area);
-  const contador = el("div", "contador", "0 de " + piso + " caracteres");
+  const escrito = () => (tri.comentario || "").trim().length;
+  const contador = el("div", "contador", t("ws.contador_de", { n: n(escrito()), min: piso }));
   caixa.appendChild(contador);
+  // O comentário de devolução é METADADO: ele entra no relatório de qualidade e
+  // na auditoria do item, e é o cliente quem lê os dois.
+  caixa.appendChild(dicaLinguaMeta("lingua.meta"));
 
   const acoes = el("div", "triagem-acoes");
-  const enviar = el("button", "botao primaria", "Faltam " + piso + " caracteres");
+  const rotularEnviar = (b) => {
+    const tem = escrito();
+    b.disabled = tem < piso;
+    b.textContent = tem < piso
+      ? t("falta.devolucao", { n: piso - tem })
+      : t("botao.devolver_com_comentario");
+  };
+  const enviar = el("button", "botao primaria", "");
   enviar.type = "button";
-  enviar.disabled = true;
-  enviar.addEventListener("click", () => triar("devolvida", area.value.trim()));
-  const cancelar = el("button", "botao discreta", "Cancelar");
+  rotularEnviar(enviar);
+  enviar.addEventListener("click", () => triar("devolvida", (tri.comentario || "").trim()));
+  const cancelar = el("button", "botao discreta", t("botao.cancelar"));
   cancelar.type = "button";
-  cancelar.addEventListener("click", () => { est.triagem.devolvendo = false; desenharDetalheTriagem(); });
+  cancelar.addEventListener("click", () => {
+    tri.devolvendo = false;
+    tri.comentario = "";
+    desenharDetalheTriagem();
+  });
   area.addEventListener("input", () => {
-    const tem = area.value.trim().length;
-    contador.textContent = n(tem) + " de " + piso + " caracteres";
-    enviar.disabled = tem < piso;
-    enviar.textContent = tem < piso ? "Faltam " + (piso - tem) + " caracteres" : "Devolver com este comentário";
+    tri.comentario = area.value;
+    contador.textContent = t("ws.contador_de", { n: n(escrito()), min: piso });
+    rotularEnviar(enviar);
   });
   juntar(acoes, enviar, cancelar);
   caixa.appendChild(acoes);
   // FOCO no campo: quem apertou R já decidiu devolver, e o próximo gesto é
-  // escrever — não procurar onde escrever.
-  requestAnimationFrame(() => area.focus());
+  // escrever — não procurar onde escrever. O cursor vai para o FIM do que já
+  // existe, para que um redesenho no meio da frase não jogue o texto atrás dele.
+  requestAnimationFrame(() => {
+    area.focus();
+    const fim = area.value.length;
+    area.setSelectionRange(fim, fim);
+  });
   return caixa;
 }
 
@@ -3051,30 +4112,28 @@ function abrirDevolucao() {
 }
 
 async function triar(veredito, comentario) {
-  const t = est.triagem;
-  if (!t || !t.sel || t.carregando) return;
-  const alvo = t.sel;
+  const tri = est.triagem;
+  if (!tri || !tri.sel || tri.carregando) return;
+  const alvo = tri.sel;
   // Qual é o PRÓXIMO nesta fila: depois de triar, este item some, e a seleção
   // precisa cair no seguinte sozinha — fechar o loop antes de pedir a próxima
   // coisa vale para quem revisa igual.
-  const i = t.itens.findIndex((x) => x.anotacao_id === alvo);
-  const proximo = t.itens[i + 1] || t.itens[i - 1] || null;
-  t.carregando = true;
+  const i = tri.itens.findIndex((x) => x.anotacao_id === alvo);
+  const proximo = tri.itens[i + 1] || tri.itens[i - 1] || null;
+  tri.carregando = true;
   try {
     await postar("/api/revisao/" + alvo, {
       revisor_id: est.persona.id,
       veredito: veredito,
       comentario: comentario || null,
     });
-    recado(veredito === "aprovada"
-      ? "aprovada — segue para a avaliação"
-      : "devolvida para ajuste — o comentário foi para quem anotou");
+    recado(veredito === "aprovada" ? t("recado.aprovada") : t("recado.devolvida"));
   } catch (e) {
-    t.carregando = false;
+    tri.carregando = false;
     recado(e.message, true);
     return;
   }
-  t.carregando = false;
+  tri.carregando = false;
   await carregarTriagem(proximo ? proximo.anotacao_id : null);
   await recarregarSaude();
 }
@@ -3091,19 +4150,19 @@ function desenharAdmin() {
   const cards = $("#admin-cards");
   limpar(cards);
   const numeros = [
-    [c.anotadores, "pessoas na equipe", "3 anotadores, 2 revisores, 1 admin no seed"],
-    [c.tarefas, "tarefas criadas", "8 do pacote de demonstração + as do corpus real"],
-    [c.anotacoes, "anotações submetidas", "trabalho humano — não se recria pela pipeline"],
-    [c.revisoes, "triagens feitas", "aprovar segue para a avaliação; devolver reabre a tarefa"],
-    [c.avaliacoes, "avaliações (Rate and Review)", "a passagem 2 chega no P3b"],
-    [c.criacoes, "prompts escritos aqui", "o modo criar chega no P4"],
+    [c.anotadores, "admin.card_anotadores", "admin.card_anotadores_nota"],
+    [c.tarefas, "admin.card_tarefas", "admin.card_tarefas_nota"],
+    [c.anotacoes, "admin.card_anotacoes", "admin.card_anotacoes_nota"],
+    [c.revisoes, "admin.card_revisoes", "admin.card_revisoes_nota"],
+    [c.avaliacoes, "admin.card_avaliacoes", "admin.card_avaliacoes_nota"],
+    [c.criacoes, "admin.card_criacoes", "admin.card_criacoes_nota"],
   ];
   for (const [valor, rotulo, nota] of numeros) {
     const card = el("div", "card");
     juntar(card,
       el("div", "card-valor", n(valor || 0)),
-      el("div", "card-rotulo", rotulo),
-      el("div", "card-nota", nota));
+      el("div", "card-rotulo", t(rotulo)),
+      el("div", "card-nota", t(nota)));
     cards.appendChild(card);
   }
 
@@ -3113,39 +4172,45 @@ function desenharAdmin() {
   limpar(et);
   et.className = "etiqueta " + (p && p.origem !== "fallback" ? "aprovado" : "devolvido");
   juntar(et, el("span", "ponto"),
-    el("span", null, p ? (p.origem === "fallback" ? "fallback" : "coleção curada") : "desconhecido"));
+    el("span", null, p
+      ? (p.origem === "fallback" ? t("admin.pool_fallback") : t("admin.pool_curada"))
+      : t("admin.pool_desconhecido")));
 
   const linhas = $("#pool-linhas");
   limpar(linhas);
   const pol = (p && p.politica_licenca) || null;
+  // A CLASSE do valor vem da própria linha, e não de um `startsWith` no rótulo:
+  // com dois idiomas, casar pelo texto do rótulo quebraria em um deles — e
+  // quebraria em silêncio, num alinhamento de número.
+  // As quatro frases DIAGNÓSTICAS deste painel vêm do servidor como CHAVE +
+  // dados, e não como texto pronto: elas explicam a proveniência, que é a
+  // segunda coisa que o brief manda um avaliador procurar, e o servidor fala
+  // uma língua só. (`p.motivo`, `p.filtro_fallback` e `p.nota_nsfw` continuam
+  // vindo em português na mesma resposta — para /docs e para o terminal.)
   const pares = p ? [
-    ["origem", p.origem],
-    ["itens no pool", n(p.n_pool)],
-    ["por quê", p.motivo],
-    ["coleção procurada", p.colecao],
-    ["filtro do fallback", p.filtro_fallback],
+    ["admin.pool_origem", p.origem, null],
+    ["admin.pool_itens", n(p.n_pool), "num"],
+    ["admin.pool_por_que", p.motivo_chave ? t(p.motivo_chave, p.motivo_dados) : "-", null],
+    ["admin.pool_colecao", p.colecao, null],
+    ["admin.pool_filtro", p.filtro ? t(p.filtro.chave, p.filtro.dados) : "-", null],
     // A POLÍTICA DE LICENÇA e o número que ela exclui. Sem o número, "política
     // ativa" é promessa; com ele, é medida — e foi a ausência dela que deixou
     // 9.148 linhas cc-by-nc entrarem no trabalho sem ninguém ver.
-    ["política de licença", pol ? pol.descricao : "-"],
-    ["excluídas pela licença", n(p.excluidas_por_licenca || 0)],
+    ["admin.pool_politica", pol && pol.descricao_chave ? t(pol.descricao_chave) : "-", null],
+    ["admin.pool_excluidas", n(p.excluidas_por_licenca || 0), "num"],
     // A VERDADE sobre a garantia de NSFW, em vez de "sem NSFW".
-    ["conteúdo sensível", p.nota_nsfw || "-"],
-    ["pool materializado em", (p.materializado_em || "-").slice(0, 19).replace("T", " ")],
-    ["build do corpus no pool", p.build_do_pool || "-"],
+    ["admin.pool_nsfw", p.nota_nsfw_chave ? t(p.nota_nsfw_chave) : "-", null],
+    ["admin.pool_materializado", (p.materializado_em || "-").slice(0, 19).replace("T", " "), null],
+    ["admin.pool_build", p.build_do_pool || "-", "mono"],
     // O MODO SOLO no painel, e não só na fila do revisor: quem lê as métricas
     // precisa saber se a taxa de aprovação veio de revisão cruzada ou de
     // autorrevisão. São números diferentes com o mesmo nome.
-    ["autorrevisão", (est.saude && est.saude.modo_solo)
-      ? "PERMITIDA — o revisor pode julgar o próprio trabalho, e cada revisão fica marcada como autorrevisão"
-      : "bloqueada — quem revisa nunca é quem anotou"],
-  ] : [["estado", "não foi possível ler /api/health"]];
-  for (const [rotulo, valor] of pares) {
-    linhas.appendChild(el("dt", null, rotulo));
-    const dd = el("dd", null, valor);
-    if (rotulo === "itens no pool" || rotulo === "excluídas pela licença") dd.className = "num";
-    if (rotulo === "build do corpus no pool") dd.className = "mono";
-    linhas.appendChild(dd);
+    ["admin.pool_autorrevisao", (est.saude && est.saude.modo_solo)
+      ? t("admin.pool_autorrevisao_on") : t("admin.pool_autorrevisao_off"), null],
+  ] : [["admin.pool_estado", t("admin.pool_sem_health"), null]];
+  for (const [rotulo, valor, classe] of pares) {
+    linhas.appendChild(el("dt", null, t(rotulo)));
+    linhas.appendChild(el("dd", classe, valor));
   }
 
   /* ---- projetos ---- */
@@ -3160,39 +4225,40 @@ function desenharAdmin() {
   const a = (s && s.anotacao) || {};
   const co = (s && s.corpus) || {};
   const dados = [
-    ["plataforma (escrita)", a.arquivo || "-"],
-    ["schema da plataforma", String(a.schema_version ?? "-")],
-    ["corpus (só leitura)", co.arquivo || "-"],
-    ["prompts no corpus", n(co.n_prompts)],
-    ["build do corpus", co.db_build_id || "-"],
-    ["construído em", co.built_at || "-"],
+    ["admin.banco_plataforma", a.arquivo || "-", "mono"],
+    ["admin.banco_schema", String(a.schema_version ?? "-"), "num"],
+    ["admin.banco_corpus", co.arquivo || "-", "mono"],
+    ["admin.banco_prompts", n(co.n_prompts), "num"],
+    ["admin.banco_build", co.db_build_id || "-", "mono"],
+    ["admin.banco_construido", co.built_at || "-", null],
   ];
-  for (const [rotulo, valor] of dados) {
-    bancos.appendChild(el("dt", null, rotulo));
-    const dd = el("dd", null, valor);
-    if (rotulo.startsWith("prompts") || rotulo.startsWith("schema")) dd.className = "num";
-    if (rotulo.indexOf("(") >= 0 || rotulo.startsWith("build")) dd.className = "mono";
-    bancos.appendChild(dd);
+  for (const [rotulo, valor, classe] of dados) {
+    bancos.appendChild(el("dt", null, t(rotulo)));
+    bancos.appendChild(el("dd", classe, valor));
   }
 
   /* ---- roteiro ---- */
   const rot = $("#roteiro");
   limpar(rot);
-  for (const [marco, texto] of ROTEIRO) {
+  for (const [marco, chave] of ROTEIRO) {
     const li = el("li");
-    juntar(li, el("b", null, marco + " — "), el("span", null, texto));
+    juntar(li, el("b", null, marco + " — "), el("span", null, t(chave)));
     rot.appendChild(li);
   }
 
   /* ---- formulário de equipe ---- */
+  // Reconstruído a cada desenho, e não só quando está vazio: o rótulo dos
+  // papéis muda de língua, e um `if (!options.length)` deixaria a lista na
+  // língua da primeira montagem para sempre.
   const sel = $("#admin-papel");
-  if (!sel.options.length) {
-    for (const pp of PAPEIS) {
-      const o = el("option", null, pp.nome);
-      o.value = pp.id;
-      sel.appendChild(o);
-    }
+  const escolhido = sel.value;
+  limpar(sel);
+  for (const pp of PAPEIS) {
+    const o = el("option", null, t(pp.nome));
+    o.value = pp.id;
+    sel.appendChild(o);
   }
+  if (escolhido) sel.value = escolhido;
 }
 
 /** A separação entre demonstração e trabalho real, com número.
@@ -3206,7 +4272,7 @@ function desenharProjetosAdmin() {
   const padrao = (est.saude && est.saude.projetos && est.saude.projetos.padrao) || "";
   if (!est.projetos.length) {
     const tr = el("tr");
-    const td = el("td", "secundario", "Nenhum projeto — rode `pf annotate seed`.");
+    const td = el("td", "secundario", t("admin.sem_projetos"));
     td.colSpan = 5;
     juntar(tr, td);
     corpo.appendChild(tr);
@@ -3215,13 +4281,13 @@ function desenharProjetosAdmin() {
   for (const p of est.projetos) {
     const tr = el("tr");
     const nome = el("td");
-    juntar(nome, el("span", null, p.nome));
-    if (p.nome === padrao) nome.appendChild(el("span", "etiqueta aprovado", "padrão"));
+    juntar(nome, el("span", "dado", p.nome));
+    if (p.nome === padrao) nome.appendChild(el("span", "etiqueta aprovado", t("admin.padrao")));
     juntar(tr, nome,
-      el("td", "fraco", p.cliente),
+      el("td", "fraco dado", p.cliente),
       el("td", "num", n(p.n_tarefas)),
       el("td", "num", n(p.n_abertas)),
-      el("td", "secundario", p.descricao));
+      el("td", "secundario dado", p.descricao));
     corpo.appendChild(tr);
   }
 }
@@ -3231,9 +4297,8 @@ function desenharEquipe() {
   limpar(corpo);
   if (!est.perfis.length) {
     const tr = el("tr");
-    const td = el("td", null, "Ninguém cadastrado — rode `pf annotate seed` ou use o campo abaixo.");
+    const td = el("td", "secundario", t("admin.sem_equipe"));
     td.colSpan = 4;
-    td.className = "secundario";
     juntar(tr, td);
     corpo.appendChild(tr);
   } else {
@@ -3241,17 +4306,18 @@ function desenharEquipe() {
       const tr = el("tr");
       const estado = el("td");
       const eti = el("span", "etiqueta " + (p.ativo ? "aprovado" : "pendente"));
-      juntar(eti, el("span", "ponto"), el("span", null, p.ativo ? "ativo" : "inativo"));
+      juntar(eti, el("span", "ponto"),
+        el("span", null, p.ativo ? t("admin.ativo") : t("admin.inativo")));
       juntar(estado, eti);
       juntar(tr,
-        el("td", null, p.nome),
-        el("td", null, NOME_PAPEL[p.papel] || p.papel),
+        el("td", "dado", p.nome),
+        el("td", null, nomePapel(p.papel)),
         estado,
         el("td", "mono", String(p.criado_em || "").slice(0, 19).replace("T", " ")));
       corpo.appendChild(tr);
     }
   }
-  $("#equipe-conta").textContent = n(est.perfis.length) + " pessoa(s)";
+  $("#equipe-conta").textContent = t("admin.equipe_conta", { n: n(est.perfis.length) });
 }
 
 async function criarPelaEquipe() {
@@ -3259,7 +4325,7 @@ async function criarPelaEquipe() {
   const aviso = $("#admin-aviso");
   const nome = campo.value.trim();
   aviso.textContent = "";
-  if (!nome) { aviso.textContent = "digite um nome"; return; }
+  if (!nome) { aviso.textContent = t("barra.sem_nome"); return; }
   try {
     const criado = await postar("/api/perfis", { nome, papel: $("#admin-papel").value });
     est.perfis.push(criado);
@@ -3269,7 +4335,9 @@ async function criarPelaEquipe() {
     desenharPersonas();  // a barra tem de enxergar quem acabou de entrar
     await recarregarSaude();
     desenharAdmin();
-    recado(criado.nome + " entrou na equipe como " + NOME_PAPEL[criado.papel].toLowerCase());
+    recado(t("recado.entrou_equipe", {
+      nome: criado.nome, papel: nomePapel(criado.papel).toLowerCase(),
+    }));
   } catch (e) {
     aviso.textContent = e.message;
   }
@@ -3292,6 +4360,14 @@ function ligarEventos() {
 }
 
 async function iniciar() {
+  // O IDIOMA VEM PRIMEIRO, antes de qualquer desenho: não existe um quadro em
+  // que a plataforma possa aparecer na língua errada, e `aplicarTema` já escreve
+  // no botão de tema.
+  est.idioma = idiomaInicial();
+  NUM = new Intl.NumberFormat(est.idioma === "pt" ? "pt-BR" : "en-US");
+  aplicarTextos();
+  desenharIdiomas();
+
   let tema = "claro";
   try { tema = localStorage.getItem(CHAVE + "tema") || "claro"; } catch (_) {}
   aplicarTema(tema === "escuro" ? "escuro" : "claro");
@@ -3307,7 +4383,7 @@ async function iniciar() {
     const r = await api("/api/perfis");
     est.perfis = r.items || [];
   } catch (e) {
-    recado("não deu para ler as personas: " + e.message, true);
+    recado(t("recado.erro_personas", { erro: e.message }), true);
   }
 
   // A persona guardada é RECONFERIDA contra o banco: ela pode ter sido criada
@@ -3317,7 +4393,7 @@ async function iniciar() {
   let inicial = null;
   if (guardada) {
     inicial = est.perfis.find((p) => p.nome === guardada.nome && p.papel === guardada.papel) || null;
-    if (!inicial) recado("a persona guardada não existe mais neste banco", true);
+    if (!inicial) recado(t("recado.persona_sumiu"), true);
   }
   // SEM VESTÍBULO: a plataforma abre já trabalhando. Sem persona guardada, o
   // papel inicial é o primeiro (anotador) com a primeira pessoa dele — que é o

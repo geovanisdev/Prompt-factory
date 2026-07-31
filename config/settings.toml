@@ -274,7 +274,14 @@ pool_max = 500
 # do corpus — e um pool vazio numa demo é uma tela morta. O fallback é um filtro
 # determinístico sobre o corpus, e a origem ativa aparece no /api/health e no
 # painel do admin (pool trocando em silêncio seria mentira de interface).
-pool_fallback_lang = "pt"
+# Aceita um valor único ("pt", que é o que valia até o P3i) OU uma lista. Com
+# lista, o teto de `pool_max` é dividido em COTA IGUAL por língua e cada cota é
+# amostrada com passo constante dentro dela. Proporcional ao corpus não serviria:
+# são 116.051 linhas em inglês contra uma fração disso em português, e o pool
+# sairia monolíngue de novo, agora na outra ponta. Quem mantém as 9.148 linhas
+# `cc-by-nc-4.0` do inglês fora do trabalho é a política de licença abaixo, não
+# o filtro de idioma.
+pool_fallback_lang = ["pt", "en"]
 # 40 caracteres: abaixo disso não há o que avaliar com rubrica. 2.000: acima
 # disso o anotador rola a tela em vez de julgar (o corpus tem prompts de ~1 MB).
 pool_fallback_min_chars = 40
