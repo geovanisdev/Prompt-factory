@@ -1,0 +1,28 @@
+{
+  "schema": "diretrizes@1",
+  "sobre": "A INSTRUÇÃO sob a qual cada anotação foi feita, versionada. Até o P3a este texto era literal no index.html; a versão 1 é EXATAMENTE aquele texto, para que as anotações já gravadas possam ser carimbadas com ela sem mentira. O cenário que a versão resolve: a regra do A/B é ajustada na terça, o cliente reclama de inconsistência na quinta, e sem versão gravada por anotação a única saída é refazer o lote inteiro. Ao mudar uma diretriz, ACRESCENTE uma versão nova — nunca edite a que já foi usada para gravar trabalho.",
+  "versao": 1,
+  "tipos": {
+    "avaliar_rubrica": [
+      "Cada critério tem a própria escala, com as pontas descritas na rubrica — use a régua inteira, inclusive os extremos.",
+      "Julgue a resposta contra o critério, não contra o que você teria escrito.",
+      "Justificar é opcional por critério e obrigatório quando a nota destoa das outras.",
+      "Pelo teclado: ↑ e ↓ andam entre critérios, os números graduam o critério em foco, Ctrl+Enter envia."
+    ],
+    "escrever_rubrica": [
+      "De 3 a 8 critérios. Rubrica com 20 critérios não é mais rigorosa, é impossível de aplicar duas vezes igual.",
+      "Cada critério precisa de uma escala com as pontas descritas — 'clareza 1 a 5' sem descrição não mede nada.",
+      "Três modelos de partida ficam disponíveis para não começar de uma página em branco."
+    ],
+    "sft_resposta": [
+      "Responda ao prompt como o modelo deveria ter respondido — é este texto que vira exemplo de treino.",
+      "Quando a tarefa vem de uma rubrica aprovada, ela aparece ao lado como checklist.",
+      "Não invente fato para preencher espaço: resposta curta e correta vale mais que longa e plausível."
+    ],
+    "comparar_ab": [
+      "Escolha A, B ou empate — e escreva por que. A justificativa é obrigatória: o valor está no motivo, não na preferência.",
+      "As duas colunas rolam juntas para a comparação ser trecho a trecho.",
+      "Pelo teclado: ← escolhe A, → escolhe B, E marca empate, Ctrl+Enter envia."
+    ]
+  }
+}

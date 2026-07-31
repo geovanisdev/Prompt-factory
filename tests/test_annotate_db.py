@@ -60,16 +60,39 @@ def test_ddl_roda_duas_vezes(tmp_path: Path) -> None:
         c.close()
 
 
-def test_init_db_nao_reescreve_a_versao(conn: sqlite3.Connection) -> None:
-    """``DO NOTHING``: um banco de schema antigo continua dizendo o que é.
+def test_init_db_recusa_versao_divergente(conn: sqlite3.Connection) -> None:
+    """Versão divergente **para o DDL antes de ele rodar**, e a versão fica.
 
-    Se ``init_db`` sobrescrevesse a versão, um banco de schema 1 aberto por uma
-    app de schema 2 passaria a se declarar 2 sem que nada tivesse migrado — e a
-    guarda do lifespan nunca dispararia.
+    Duas garantias numa: (a) ``init_db`` nunca reescreve a versão — um banco de
+    schema 1 aberto por uma app de schema 2 continua dizendo 1, senão a guarda
+    do lifespan nunca dispararia; (b) ele nem chega a aplicar o DDL novo, porque
+    aplicar metade dele criaria as tabelas da v2 ao lado das tabelas da v1 com os
+    CHECKs velhos. Meio-migrado é pior que não migrado: não parece quebrado.
+
+    E a mensagem tem de trazer o conserto — a recusa do P1 não tinha caminho, e
+    era esse o buraco que o P3a fecha.
     """
     adb.set_meta(conn, adb.CHAVE_VERSAO, "99")
-    adb.init_db(conn)
+    with pytest.raises(adb.SchemaDivergente) as exc:
+        adb.init_db(conn)
+    assert "pf annotate migrate" in str(exc.value)
+    assert exc.value.versao == 99
     assert adb.get_meta(conn, adb.CHAVE_VERSAO) == "99"
+
+
+def test_versao_do_banco_em_arquivo_novo(tmp_path: Path) -> None:
+    """``None`` num banco sem ``app_meta`` — e não ``OperationalError``.
+
+    É a diferença entre "banco novo" e "banco de outra versão", e ela precisa
+    ser lida ANTES do DDL, quando a tabela ainda não existe.
+    """
+    c = dbmod.connect(tmp_path / "novo.sqlite")
+    try:
+        assert adb.versao_do_banco(c) is None
+        adb.init_db(c)
+        assert adb.versao_do_banco(c) == adb.SCHEMA_VERSION_ANOTACAO
+    finally:
+        c.close()
 
 
 def test_contagens_cobre_todas_as_tabelas(conn: sqlite3.Connection) -> None:
@@ -163,11 +186,16 @@ def test_duas_versoes_da_mesma_anotacao_convivem(conn: sqlite3.Connection) -> No
         )
 
 
-def test_rejeitar_sem_comentario_e_recusado_pelo_banco(conn: sqlite3.Connection) -> None:
+def test_devolver_sem_comentario_e_recusado_pelo_banco(conn: sqlite3.Connection) -> None:
     """Regra de produto escrita no DDL: devolver trabalho sem devolver informação.
 
-    A tela também cobra o comentário, mas quem garante é o CHECK — uma rota nova
-    que esqueça a validação não consegue gravar uma devolução muda.
+    A tela também cobra o comentário, e o Pydantic também — mas quem garante é o
+    CHECK: uma rota nova que esqueça a validação não consegue gravar uma
+    devolução muda.
+
+    O vocabulário do veredito é ``aprovada|devolvida`` desde o P3a. ``rejeitada``
+    saiu de propósito: nada é *recusado* na triagem, o trabalho volta para
+    ajuste — e o status que a anotação recebe tem exatamente este nome.
     """
     ids = _cenario(conn)
     base = (
@@ -175,9 +203,12 @@ def test_rejeitar_sem_comentario_e_recusado_pelo_banco(conn: sqlite3.Connection)
         "VALUES (?, ?, ?, ?)"
     )
     with pytest.raises(sqlite3.IntegrityError):
-        conn.execute(base, (ids["anotacao"], ids["revisor"], "rejeitada", None))
+        conn.execute(base, (ids["anotacao"], ids["revisor"], "devolvida", None))
     with pytest.raises(sqlite3.IntegrityError):
-        conn.execute(base, (ids["anotacao"], ids["revisor"], "rejeitada", "   "))
+        conn.execute(base, (ids["anotacao"], ids["revisor"], "devolvida", "   "))
+    with pytest.raises(sqlite3.IntegrityError):
+        # O vocabulário velho não entra mais nem com comentário.
+        conn.execute(base, (ids["anotacao"], ids["revisor"], "rejeitada", "explicando"))
     # Aprovar sem comentário, sim: não há nada a corrigir.
     conn.execute(base, (ids["anotacao"], ids["revisor"], "aprovada", None))
     with pytest.raises(sqlite3.IntegrityError):

@@ -13,11 +13,13 @@ primeira, e a que diverge é sempre a que não está no banco.
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .db import PAPEIS, TIPOS_TAREFA
+from ..config import get as _cfg
+from .db import PAPEIS, TIPOS_TAREFA, VEREDITOS
 
 #: Comprimento máximo de um nome de perfil. Não é estética: o nome é o
 #: identificador da pessoa em toda rota e aparece em tabela no painel do admin.
@@ -100,7 +102,22 @@ class _ComTipo(_ComAnotador):
 
 
 class ProximaIn(_ComTipo):
-    """``POST /api/tarefas/proxima`` — me dá a próxima deste tipo."""
+    """``POST /api/tarefas/proxima`` — me dá a próxima deste tipo.
+
+    ``projeto_id`` recorta a fila a um projeto. É o que torna "trabalhar só no
+    Portfólio" possível sem esbarrar nas tarefas do pacote de demonstração —
+    e é opcional porque a fila sem recorte continua sendo o caminho de quem
+    não se importa com a separação.
+    """
+
+    projeto_id: Annotated[int | None, Field(ge=1)] = None
+
+    @field_validator("projeto_id", mode="before")
+    @classmethod
+    def _projeto_nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("projeto_id não é booleano")
+        return v
 
 
 class LivreIn(_ComTipo):
@@ -114,6 +131,18 @@ class LivreIn(_ComTipo):
 
     prompt_uid: Annotated[str, Field(min_length=4, max_length=200)]
     origem: str = "livre"
+    #: Em qual projeto a tarefa nasce. Sem isso, escolher um prompt no catálogo
+    #: enquanto se trabalha no Portfólio criaria a tarefa no projeto padrão de
+    #: qualquer jeito — e o recorte que a barra promete não valeria para as
+    #: tarefas criadas dentro dele.
+    projeto_id: Annotated[int | None, Field(ge=1)] = None
+
+    @field_validator("projeto_id", mode="before")
+    @classmethod
+    def _projeto_nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("projeto_id não é booleano")
+        return v
 
     @field_validator("origem")
     @classmethod
@@ -150,17 +179,78 @@ class AbandonarIn(_ComAnotador):
     """``POST /api/atribuicoes/{id}/abandonar`` — devolve a vaga na hora."""
 
 
+class TriarIn(BaseModel):
+    """``POST /api/revisao/{id}`` — a passagem 1: aprovar ou devolver.
+
+    ``comentario`` é **obrigatório na devolução** em três camadas: aqui (para o
+    422 dizer o campo), na rota (que não deixa passar vazio depois do strip) e
+    no CHECK do DDL (que é quem de fato garante). Três não é exagero: o
+    comentário é a única informação que o anotador recebe sobre o que corrigir,
+    e sem ele o re-trabalho sai igual ao primeiro.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    revisor_id: Annotated[int, Field(ge=1)]
+    veredito: str
+    comentario: Annotated[str | None, Field(max_length=4_000)] = None
+
+    @field_validator("revisor_id", mode="before")
+    @classmethod
+    def _id_nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("revisor_id não é booleano")
+        return v
+
+    @field_validator("veredito")
+    @classmethod
+    def _veredito_conhecido(cls, v: str) -> str:
+        if v not in VEREDITOS:
+            raise ValueError(f"veredito fora de {list(VEREDITOS)}: {v!r}")
+        return v
+
+    @field_validator("comentario")
+    @classmethod
+    def _comentario_limpo(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        limpo = v.strip()
+        return limpo or None
+
+    @model_validator(mode="after")
+    def _devolver_exige_motivo(self) -> TriarIn:
+        if self.veredito != "devolvida":
+            return self
+        piso = int(_cfg("annotate", "min_chars_devolucao", default=20))
+        if not self.comentario or len(self.comentario) < piso:
+            raise ValueError(
+                f"a devolução precisa de um comentário de ao menos {piso} caracteres — "
+                "ele volta para o anotador e é a única instrução que ele recebe"
+            )
+        return self
+
+
 def perfil(linha: Any) -> dict[str, Any]:
     """Linha de ``anotadores`` -> dict JSON.
 
     ``ativo`` sai como booleano de verdade (o SQLite guarda 0/1): a interface
     escreve ``if (p.ativo)`` e precisa que isso signifique o que parece.
+
+    ``qualificacoes`` sai como dicionário. A coluna existe e é escrita desde o
+    P3a (o seed a preenche); **barrar** quem não é qualificado fica para quando
+    a tela existir — mas o dado começa a ser gravado hoje, que é o ponto de
+    fechar o schema antes de mais trabalho humano entrar.
     """
+    try:
+        quali = json.loads(str(linha["qualificacoes_json"] or "{}"))
+    except (IndexError, KeyError, TypeError, ValueError):  # pragma: no cover
+        quali = {}
     return {
         "id": int(linha["id"]),
         "nome": str(linha["nome"]),
         "papel": str(linha["papel"]),
         "ativo": bool(linha["ativo"]),
+        "qualificacoes": quali if isinstance(quali, dict) else {},
         "criado_em": linha["criado_em"],
     }
 
@@ -173,5 +263,6 @@ __all__ = [
     "PerfilIn",
     "ProximaIn",
     "SubmeterIn",
+    "TriarIn",
     "perfil",
 ]

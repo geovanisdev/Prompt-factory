@@ -95,9 +95,17 @@ def expirar_vencidas(conn: sqlite3.Connection) -> int:
 # ---------------------------------------------------------------------------
 
 
-def uids_do_pool(conn_corpus: sqlite3.Connection) -> list[str]:
-    """Os uids que a plataforma pode oferecer, na ordem determinística do pool."""
-    return poolmod.resolver(conn_corpus, com_uids=True).uids
+def uids_do_pool(
+    conn: sqlite3.Connection, conn_corpus: sqlite3.Connection
+) -> list[str]:
+    """Os uids que a plataforma pode oferecer, na ordem determinística do pool.
+
+    Lê a tabela ``pool`` do banco da plataforma (materializada e invalidada pela
+    assinatura do corpus, ver ``pool.materializar``). Antes do P3a isto resolvia
+    o pool no corpus a cada chamada e custava **607 ms medidos** — em três rotas
+    do caminho principal.
+    """
+    return poolmod.uids(conn, conn_corpus)
 
 
 def _do_corpus(conn_corpus: sqlite3.Connection, uid: str) -> dict[str, Any] | None:
@@ -185,7 +193,9 @@ def no_pool(conn: sqlite3.Connection, conn_corpus: sqlite3.Connection, uid: str)
             ).fetchone()
             is not None
         )
-    return uid in set(uids_do_pool(conn_corpus))
+    # Uma leitura de chave primária na tabela materializada — não a lista
+    # inteira em memória para depois procurar dentro dela.
+    return poolmod.esta_no_pool(conn, conn_corpus, uid)
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +242,7 @@ def reivindicar(
     conn_corpus: sqlite3.Connection,
     anotador_id: int,
     tipo: str,
+    projeto_id: int | None = None,
 ) -> tuple[int | None, str]:
     """Pega a próxima tarefa do tipo. Devolve ``(atribuicao_id, motivo)``.
 
@@ -239,6 +250,9 @@ def reivindicar(
     não 404. Fila vazia não é erro: é o estado mais comum de uma plataforma de
     anotação bem servida, e responder 404 faria o cliente tratar o caso normal
     como falha.
+
+    ``projeto_id`` recorta a fila a um projeto — é o que torna "trabalhar só no
+    Portfólio" possível sem esbarrar nas tarefas do pacote de demonstração.
 
     A ordem é exatamente ``idx_tarefas_fila (status, tipo, prioridade DESC, id)``
     — o índice foi criado no P1 com esta consulta em mente.
@@ -250,6 +264,7 @@ def reivindicar(
         candidatas = conn.execute(
             "SELECT t.id, t.prompt_uid FROM tarefas t "
             "WHERE t.status = 'aberta' AND t.tipo = :tipo "
+            "  AND (:projeto IS NULL OR t.projeto_id = :projeto) "
             # A trava anti-repetição, metade em SQL e metade no
             # UNIQUE(tarefa_id, anotador_id): ninguém pega duas vezes a mesma
             # tarefa, nem para "ver de novo".
@@ -259,7 +274,12 @@ def reivindicar(
             f"       WHERE a.tarefa_id = t.id AND {SQL_VIVA}) < t.n_anotacoes_alvo "
             "ORDER BY t.prioridade DESC, t.id "
             "LIMIT :limite",
-            {"tipo": tipo, "eu": anotador_id, "limite": CANDIDATAS_POR_CLAIM},
+            {
+                "tipo": tipo,
+                "eu": anotador_id,
+                "projeto": projeto_id,
+                "limite": CANDIDATAS_POR_CLAIM,
+            },
         ).fetchall()
 
         escolhida: int | None = None
@@ -302,25 +322,29 @@ def reivindicar(
 
 
 def contagens_por_tipo(
-    conn: sqlite3.Connection, anotador_id: int
+    conn: sqlite3.Connection, anotador_id: int, projeto_id: int | None = None
 ) -> dict[str, int]:
     """Quantas tarefas de cada tipo estão disponíveis **para esta pessoa**.
 
     É o número dos contadores das abas. Ele é pessoal de propósito: mostrar "12
     na fila" para quem já anotou as 12 é a forma mais rápida de fazer a tela
-    parecer quebrada. Não confere uid sumido (isso custaria uma ida ao corpus
-    por tarefa) — o claim confere, e a diferença aparece como "pulei uma".
+    parecer quebrada. E respeita o projeto em foco pela mesma razão: um
+    contador que promete 12 e uma fila que entrega 0 é pior que contador nenhum.
+
+    Não confere uid sumido (isso custaria uma ida ao corpus por tarefa) — o
+    claim confere, e a diferença aparece como "pulei uma".
     """
     expirar_vencidas(conn)
     linhas = conn.execute(
         "SELECT t.tipo, count(*) AS n FROM tarefas t "
         "WHERE t.status = 'aberta' "
+        "  AND (:projeto IS NULL OR t.projeto_id = :projeto) "
         "  AND NOT EXISTS (SELECT 1 FROM atribuicoes a "
         "                  WHERE a.tarefa_id = t.id AND a.anotador_id = :eu) "
         "  AND (SELECT count(*) FROM atribuicoes a "
         f"       WHERE a.tarefa_id = t.id AND {SQL_VIVA}) < t.n_anotacoes_alvo "
         "GROUP BY t.tipo",
-        {"eu": anotador_id},
+        {"eu": anotador_id, "projeto": projeto_id},
     ).fetchall()
     contagem = dict.fromkeys(adb.TIPOS_TAREFA, 0)
     for linha in linhas:
@@ -375,7 +399,10 @@ def _rubrica_proposta_por_mim(
         "JOIN atribuicoes a ON a.id = an.atribuicao_id "
         "JOIN tarefas t ON t.id = a.tarefa_id "
         "WHERE t.prompt_uid = ? AND t.tipo = 'escrever_rubrica' "
-        "  AND a.anotador_id = ? AND an.status <> 'rejeitada' "
+        # Devolvida ou descartada não serve de guia: a primeira está errada por
+        # decisão do revisor, a segunda foi encerrada. As demais servem — uma
+        # rubrica ainda em triagem é a melhor guia que existe para a resposta.
+        "  AND a.anotador_id = ? AND an.status NOT IN ('devolvida','descartada') "
         "ORDER BY an.id DESC LIMIT 1",
         (uid, anotador_id),
     ).fetchone()
@@ -463,8 +490,9 @@ def hidratar(
         "SELECT a.id AS atribuicao_id, a.status AS atribuicao_status, a.expira_em, "
         "       a.iniciada_em, a.anotador_id, "
         "       t.id AS tarefa_id, t.tipo, t.origem, t.prompt_uid, t.payload_json, "
-        "       t.prioridade, t.n_anotacoes_alvo "
+        "       t.prioridade, t.n_anotacoes_alvo, t.projeto_id, pr.nome AS projeto "
         "FROM atribuicoes a JOIN tarefas t ON t.id = a.tarefa_id "
+        "LEFT JOIN projetos pr ON pr.id = t.projeto_id "
         "WHERE a.id = ?",
         (atribuicao_id,),
     ).fetchone()
@@ -505,6 +533,10 @@ def hidratar(
             "origem": str(linha["origem"]),
             "prioridade": int(linha["prioridade"]),
             "n_anotacoes_alvo": int(linha["n_anotacoes_alvo"]),
+            # O PROJETO à vista no envelope: quem trabalha nos dois precisa
+            # saber, sem sair da tarefa, se aquilo é fixture ou portfólio.
+            "projeto_id": None if linha["projeto_id"] is None else int(linha["projeto_id"]),
+            "projeto": linha["projeto"],
             # Só as chaves que a TELA usa. `gabarito_json` não é lido do banco
             # nem por acidente: ele nem está no SELECT acima.
             "payload": {k: v for k, v in payload_tarefa.items() if k != CHAVE_INDISPONIVEL},
@@ -513,6 +545,58 @@ def hidratar(
         "rubrica": rubrica,
         "respostas": _respostas(conn, uid, quais),
         "versao_anterior": _versao_anterior(conn, int(linha["atribuicao_id"])),
+    }
+
+
+def hidratar_anotacao(
+    conn: sqlite3.Connection,
+    conn_corpus: sqlite3.Connection,
+    anotacao_id: int,
+) -> dict[str, Any] | None:
+    """O envelope de uma ANOTAÇÃO submetida — para quem revisa, não para quem anota.
+
+    É deliberadamente **o mesmo envelope** de ``hidratar``, mais o payload
+    submetido e quem o escreveu. Reconhecimento em vez de memória: o revisor vê
+    a submissão no mesmo layout em que ela foi produzida — mesma rubrica, mesmas
+    escalas, mesma ordem — e a tela do detalhe reusa os mesmos quatro
+    workspaces em modo de leitura. Um segundo formato de exibição para o revisor
+    seria um segundo lugar onde a rubrica pode divergir de si mesma.
+
+    ``None`` quando a anotação não existe ou o prompt dela sumiu do corpus —
+    nunca 500, pela mesma razão de sempre: o corpus é recarregado por baixo.
+    """
+    linha = conn.execute(
+        "SELECT an.id, an.atribuicao_id, an.versao, an.payload_schema, an.payload_json, "
+        "       an.versao_diretriz, an.status, an.submetida_em, an.tempo_ativo_ms, "
+        "       a.anotador_id, au.nome AS anotador, t.tipo, t.prompt_uid "
+        "FROM anotacoes an "
+        "JOIN atribuicoes a ON a.id = an.atribuicao_id "
+        "JOIN anotadores au ON au.id = a.anotador_id "
+        "JOIN tarefas t ON t.id = a.tarefa_id "
+        "WHERE an.id = ?",
+        (anotacao_id,),
+    ).fetchone()
+    if linha is None:
+        return None
+    env = hidratar(conn, conn_corpus, int(linha["atribuicao_id"]))
+    if env is None:
+        return None
+    return {
+        **env,
+        "anotacao": {
+            "id": int(linha["id"]),
+            "versao": int(linha["versao"]),
+            "payload": _carregar_json(linha["payload_json"], {}),
+            "payload_schema": str(linha["payload_schema"]),
+            "versao_diretriz": (
+                None if linha["versao_diretriz"] is None else int(linha["versao_diretriz"])
+            ),
+            "status": str(linha["status"]),
+            "submetida_em": linha["submetida_em"],
+            "tempo_ativo_ms": int(linha["tempo_ativo_ms"]),
+            "anotador_id": int(linha["anotador_id"]),
+            "anotador": str(linha["anotador"]),
+        },
     }
 
 
@@ -525,6 +609,7 @@ __all__ = [
     "contagens_por_tipo",
     "expirar_vencidas",
     "hidratar",
+    "hidratar_anotacao",
     "no_pool",
     "reivindicar",
     "resolver_prompt",

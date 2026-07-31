@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bancada",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "pf", "annotate", "serve"],
+      "port": 8766
+    },
+    {
+      "name": "curadoria",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "pf", "serve"],
+      "port": 8765
+    }
+  ]
+}

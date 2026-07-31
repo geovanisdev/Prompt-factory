@@ -283,6 +283,28 @@ pool_fallback_max_chars = 2000
 # teto o pool inteiro seria o mesmo prompt com números diferentes.
 pool_fallback_max_dups = 0
 
+# --- POLÍTICA DE LICENÇA DO POOL (P3a) ----------------------------------------
+# Vale nas DUAS origens (coleção curada e fallback), e o default é FECHADO.
+#
+# O defeito que isto corrige, medido: até o P3a o pool filtrava idioma, tamanho e
+# duplicatas e NÃO filtrava licença. Trocar `pool_fallback_lang` para "en" trazia
+# 9.148 linhas `cc-by-nc-4.0` com commercial_ok = 0 para dentro do trabalho de
+# anotação (60 delas na amostra de 500 que a plataforma serve), sem aviso na
+# tela. Isso contradiz a tese do projeto: o `export.py` já exclui
+# redistributable = 0 do export justamente porque a proveniência por linha é o
+# argumento do Prompt Factory, e a plataforma não tinha herdado a política.
+#
+# Desligar qualquer uma das duas é um ato explícito, e o /api/health e o painel
+# do admin dizem qual política está ativa e quantas linhas ela exclui.
+pool_exigir_commercial_ok = true
+pool_exigir_redistributable = true
+
+# NOTA SOBRE NSFW, honesta: o filtro do pool tem `nsfw IS NOT 1`, e hoje ele
+# exclui ZERO linhas — `nsfw` é nulo nas 159.733 do corpus, porque a campanha de
+# rotulagem ainda não rodou. A cláusula fica (passa a valer quando os rótulos
+# existirem) e a tela diz isso com todas as letras, em vez de prometer uma
+# garantia que o dado não sustenta. Por isso ela NÃO é configurável.
+
 # --- fila e trabalho ----------------------------------------------------------
 # Validade de uma atribuição sem submissão (trava do modo locked). Expiração
 # preguiçosa: o UPDATE roda antes de cada claim/listagem, sem thread de fundo.
@@ -317,3 +339,33 @@ min_criterios_rubrica = 3
 # treino: 40 caracteres é curto o bastante para caber um "não sei responder"
 # honesto e longo o bastante para barrar um envio acidental de campo em branco.
 min_chars_sft = 40
+
+# --- triagem (P3a, passagem 1 da revisão) -------------------------------------
+# Piso do comentário de DEVOLUÇÃO. O comentário volta para o anotador e é a
+# única informação que ele recebe sobre o que corrigir: "refaça" devolve
+# trabalho sem devolver instrução, e o re-trabalho sai igual ao primeiro.
+min_chars_devolucao = 20
+
+# MODO SOLO. Com `false` (o default), o revisor NÃO vê as próprias submissões:
+# é a regra de QC de qualquer operação com equipe, e sem ela a taxa de
+# aprovação do painel do admin não mede coisa nenhuma.
+#
+# Com `true`, o autor revisa o próprio trabalho — que é o caso de uso de quem
+# monta o portfólio sozinho, atuando nos três papéis. A plataforma NÃO esconde
+# isso: a fila de revisão mostra uma faixa permanente dizendo que o modo está
+# ligado, e cada revisão gravada carrega `autorrevisao = 1`, para o export e o
+# painel poderem declarar o número separado. Esconder seria mentir sobre o QC,
+# que é justamente o que este projeto existe para não fazer.
+permitir_autorrevisao = false
+
+# --- projetos (escopo) --------------------------------------------------------
+# Toda tarefa nasce dentro de um projeto desde o P3a. Dois nascem com o banco:
+#  * `projeto_padrao` — o trabalho REAL sobre o corpus, o que compõe o
+#    portfólio. É onde nasce toda tarefa nova.
+#  * `projeto_demonstracao` — o pacote de fixtures (prompts à mão, rubricas de
+#    exemplo, respostas com defeito plantado). Mostra a mecânica; não é
+#    portfólio.
+# Separá-los é o que permite ao painel e ao export dizerem qual trabalho é de
+# quem, em vez de somar fixture com autoria na mesma coluna.
+projeto_padrao = "Portfólio"
+projeto_demonstracao = "Demonstração"

@@ -130,8 +130,18 @@ def exigir_papel(linha: sqlite3.Row, *papeis: str) -> sqlite3.Row:
     cliente afirma ser. Sem senha, a identidade é escolhida na tela; a
     autorização, não. É teatro de demonstração — mas teatro coerente, senão
     vira defeito de verdade no dia em que isto sair do ``127.0.0.1``.
+
+    **No MODO SOLO a porta se abre**, e isso é uma decisão, não um furo: com
+    ``[annotate] permitir_autorrevisao`` ligada, a plataforma declara estar
+    sendo operada por uma pessoa só nos três papéis, e o papel passa a ser uma
+    vista em vez de uma autorização. Sem isso, trocar para o papel de revisor
+    obrigaria a interface a vestir OUTRA persona, e o trabalho do autor
+    apareceria revisado por uma fixture — atribuição falsa, que é pior que
+    permissão larga numa app de ``127.0.0.1``. Ver ``annotate/solo.py``.
     """
-    if str(linha["papel"]) not in papeis:
+    from . import solo as solomod
+
+    if str(linha["papel"]) not in papeis and not solomod.ligado():
         raise HTTPException(
             status_code=403,
             detail=(

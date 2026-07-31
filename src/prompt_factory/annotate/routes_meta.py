@@ -24,11 +24,19 @@ from fastapi import APIRouter, HTTPException
 from .. import __version__
 from ..config import get as _cfg
 from . import db as adb
+from . import diretrizes as dirmod
 from . import pool as poolmod
+from . import projetos as projmod
+from . import solo as solomod
 from .deps import ConAnotacao, ConCorpus, Estado
 from .models import PerfilIn, perfil
 
 router = APIRouter(tags=["bancada"])
+
+#: As colunas de ``anotadores`` que ``models.perfil`` lê. Uma constante porque
+#: são três consultas em dois módulos e um ``SELECT`` que esquece
+#: ``qualificacoes_json`` só falha na hora de serializar.
+COLUNAS_PERFIL = "id, nome, papel, ativo, qualificacoes_json, criado_em"
 
 #: Os limites de ``[annotate]`` que a INTERFACE precisa conhecer para dizer o
 #: que falta **antes** do clique. Lidos por request (o ``config`` é cacheado por
@@ -40,6 +48,7 @@ LIMITES: tuple[tuple[str, int], ...] = (
     ("min_criterios_rubrica", 3),
     ("max_criterios_rubrica", 8),
     ("min_chars_criacao", 15),
+    ("min_chars_devolucao", 20),
     ("claim_ttl_min", 120),
     ("page_size", 20),
 )
@@ -52,13 +61,20 @@ def limites() -> dict[str, int]:
 
 @router.get("/api/health", summary="Os dois bancos abriram, e de onde vem o pool")
 def health(anot: ConAnotacao, corpus: ConCorpus, meta: Estado) -> dict[str, Any]:
-    """O primeiro request da interface. Barato: ~0,2 ms de pool + 10 contagens.
+    """O primeiro request da interface, e o painel de estado do admin.
+
+    **É aqui que o pool é materializado.** No caminho comum são duas leituras
+    indexadas (a assinatura bate e não há nada a fazer); quando o corpus muda
+    por baixo, esta chamada reconstrói a tabela ``pool`` e as rotas seguintes já
+    a encontram pronta. Colocar isso no primeiro request da tela, e não no
+    lifespan, é o mesmo princípio de sempre: o corpus é trocado por swap embaixo
+    da app, e o que se lê na subida tem data de validade.
 
     Note que **as duas conexões são pedidas na assinatura**: se o corpus tiver
     sumido entre a subida e agora, o erro aparece aqui, na primeira chamada, em
     vez de numa rota qualquer no meio de uma anotação.
     """
-    p = poolmod.resolver(corpus)
+    p = poolmod.materializar(anot, corpus)
     linha = corpus.execute("SELECT count(*) AS n FROM prompts").fetchone()
     corpus_meta = {
         r["key"]: r["value"] for r in corpus.execute("SELECT key, value FROM app_meta")
@@ -93,21 +109,70 @@ def health(anot: ConAnotacao, corpus: ConCorpus, meta: Estado) -> dict[str, Any]
             "motivo": p.motivo,
             "colecao": p.colecao,
             "filtro_fallback": poolmod.descrever_fallback(),
+            # A POLÍTICA DE LICENÇA À VISTA, com o número que ela exclui. Sem o
+            # número, "política ativa" é uma promessa; com ele, é uma medida —
+            # e foi justamente a ausência dela que deixou 9.148 linhas
+            # `cc-by-nc` entrarem no trabalho de anotação sem ninguém ver.
+            "politica_licenca": poolmod.politica_licenca(),
+            "excluidas_por_licenca": p.excluidas_licenca,
+            # A verdade sobre a garantia de NSFW, no mesmo lugar em que a tela
+            # a mostra. Ver `pool.NOTA_NSFW`.
+            "nota_nsfw": poolmod.NOTA_NSFW,
+            "materializado_em": adb.get_meta(anot, poolmod.CHAVE_ATUALIZADO),
+            "build_do_pool": adb.get_meta(anot, poolmod.CHAVE_BUILD),
         },
         # OS LIMITES SAEM DAQUI, e a tela os LÊ. É o que faz "o botão diz o que
         # falta" concordar com o 422 do servidor sem que os números existam em
         # dois lugares — eles moram em `config/settings.toml`, e uma cópia no
         # JavaScript divergiria na primeira vez que alguém ajustasse o arquivo.
         "limites": limites(),
+        # MODO SOLO à vista, ligado ou desligado. É dele que a tela monta a
+        # faixa permanente na fila de revisão. Um modo que muda a regra de QC e
+        # não aparece na tela seria exatamente a mentira que este projeto não
+        # conta — por isso ele sai do health e não de uma variável do JS.
+        "modo_solo": solomod.ligado(),
+        "projetos": {
+            "padrao": projmod.nome_padrao(),
+            "demonstracao": projmod.nome_demonstracao(),
+        },
     }
+
+
+@router.get("/api/projetos", summary="Os projetos, com quanto trabalho cada um tem")
+def listar_projetos(anot: ConAnotacao) -> dict[str, Any]:
+    """O que o seletor da barra mostra, e o que o painel do admin separa.
+
+    Dois nascem com o banco: ``Portfólio`` (o trabalho real sobre o corpus, e o
+    default de toda tarefa nova) e ``Demonstração`` (o pacote de fixtures).
+    Separá-los é o que permite dizer qual trabalho é de quem, em vez de somar
+    fixture com autoria na mesma coluna — e é o que faz o portfólio significar
+    alguma coisa.
+    """
+    projmod.garantir_padroes(anot)
+    return {
+        "items": projmod.listar(anot),
+        "padrao": projmod.nome_padrao(),
+        "demonstracao": projmod.nome_demonstracao(),
+    }
+
+
+@router.get("/api/diretrizes", summary="A regra vigente de cada estilo de tarefa")
+def listar_diretrizes(anot: ConAnotacao) -> dict[str, Any]:
+    """As diretrizes **do banco**, com a versão — não literais no HTML.
+
+    A tela desenha o que vier daqui, e a submissão carimba
+    ``anotacoes.versao_diretriz`` com a mesma versão lida do banco (pelo
+    servidor, nunca pelo que o cliente afirmar ter lido). Assim "sob qual regra
+    isto foi anotado?" vira uma consulta em vez de uma arqueologia de git.
+    """
+    return {"items": dirmod.vigentes(anot)}
 
 
 @router.get("/api/perfis", summary="As personas cadastradas")
 def listar_perfis(anot: ConAnotacao) -> dict[str, Any]:
-    """Ordenadas por papel e nome — é a ordem em que a tela de entrada agrupa."""
+    """Ordenadas por papel e nome — é a ordem em que o seletor da barra agrupa."""
     linhas = anot.execute(
-        "SELECT id, nome, papel, ativo, criado_em FROM anotadores "
-        "ORDER BY papel, nome"
+        f"SELECT {COLUNAS_PERFIL} FROM anotadores ORDER BY papel, nome"
     ).fetchall()
     return {"items": [perfil(linha) for linha in linhas]}
 
@@ -131,7 +196,7 @@ def criar_perfil(corpo: PerfilIn, anot: ConAnotacao) -> dict[str, Any]:
             detail=f"já existe alguém chamado {corpo.nome!r} — escolha outro nome",
         ) from exc
     linha = anot.execute(
-        "SELECT id, nome, papel, ativo, criado_em FROM anotadores WHERE id = ?",
+        f"SELECT {COLUNAS_PERFIL} FROM anotadores WHERE id = ?",
         (int(cur.lastrowid or 0),),
     ).fetchone()
     return perfil(linha)

@@ -157,20 +157,31 @@ def test_respeita_movimento_reduzido_e_mostra_o_foco(html: str) -> None:
     assert "outline:2px solid var(--acento)" in html
 
 
-def test_a_tela_de_entrada_tem_os_tres_papeis_e_o_rodape(html: str, js: str) -> None:
+def test_o_seletor_de_papel_esta_na_barra(html: str, js: str) -> None:
+    """P3a: os três papéis viraram um controle da BARRA, não uma tela de entrada.
+
+    A tela de três cards custava os primeiros 15 segundos de quem abre o
+    portfólio — e esses 15 segundos são os únicos garantidos. A honestidade de
+    "sem login" continua à vista, agora na própria barra.
+    """
     for papel in ("anotador", "revisor", "admin"):
         assert f'id: "{papel}"' in js
     assert "Demonstração — sem login" in html
     assert 'id="papeis"' in html
+    # A app abre direto: nada de um `<div id="entrada">` escondendo o produto.
+    assert 'id="entrada"' not in html
+    assert '<div id="app">' in html
 
 
 def test_marca_o_que_ainda_nao_existe(js: str) -> None:
     """Nada de "em construção": o que não funciona é desabilitado e marcado com
-    o marco em que chega."""
+    o marco em que chega. Com o P3a entregue, "P3" sai da lista e entra "P3b"."""
     assert '"marco"' in js
     assert "em construção" not in js.lower()
-    for marco in ("P3", "P4", "P5", "P6", "P7"):
+    for marco in ("P3b", "P4", "P5", "P6", "P7"):
         assert f'"{marco}"' in js
+    roteiro = js.split("const ROTEIRO = [", 1)[1].split("];", 1)[0]
+    assert '"P3"' not in roteiro
 
 
 def test_o_p2_saiu_do_roteiro_do_que_falta(js: str) -> None:
@@ -192,19 +203,23 @@ def test_estados_vazios_tem_saida(js: str) -> None:
     assert "Ir para a fila" in js
 
 
-#: As rotas que a tela do P2 chama. Um caminho construído por concatenação
+#: As rotas que a tela chama. Um caminho construído por concatenação
 #: (``"/api/atribuicoes/" + id + "/submeter"``) aparece aqui pelo PREFIXO, que é
 #: o pedaço que continua sendo literal no código.
 ROTAS_DO_FRONT: frozenset[str] = frozenset(
     {
         "/api/health",
         "/api/perfis",
+        "/api/diretrizes",
+        "/api/projetos",
         "/api/tarefas/proxima",
         "/api/tarefas/livre",
         "/api/tarefas/contagens",
         "/api/catalogo",
         "/api/atribuicoes",
         "/api/atribuicoes/",
+        "/api/revisao/fila",
+        "/api/revisao/",
     }
 )
 
@@ -317,6 +332,109 @@ def test_o_gabarito_nao_e_sequer_nomeado_na_tela(js: str) -> None:
     """A tela do anotador não conhece o conceito — nem para escondê-lo."""
     assert "gabarito" not in js.lower()
     assert "defeito_plantado" not in js
+
+
+# ---------------------------------------------------------------------------
+# 3c. a triagem do P3a (passagem 1 da revisão)
+# ---------------------------------------------------------------------------
+
+
+def test_as_diretrizes_vem_do_servidor_com_versao(js: str) -> None:
+    """P3a: a regra sob a qual se anota deixou de ser literal no HTML.
+
+    O cenário que isto resolve: a regra do A/B é ajustada na terça, o cliente
+    reclama de inconsistência na quinta — sem a versão gravada por anotação, a
+    única saída é refazer o lote inteiro.
+    """
+    assert "function carregarDiretrizes()" in js
+    assert '"/api/diretrizes"' in js
+    assert "est.diretrizes[t.id]" in js
+    assert "versão " in js
+    # E o texto NÃO volta a morar no JS: os TIPOS não carregam mais `diretrizes`.
+    tipos = js.split("const TIPOS = [", 1)[1].split("\n];", 1)[0]
+    assert "diretrizes:" not in tipos
+
+
+def test_a_triagem_aprova_devolve_e_anda_pelo_teclado(js: str) -> None:
+    """`A` aprova, `R` devolve, `J`/`K` andam — o teclado é o caminho principal."""
+    assert "function tecladoRevisor(" in js
+    assert 'ev.key === "a" || ev.key === "A"' in js
+    assert 'ev.key === "r" || ev.key === "R"' in js
+    assert 'ev.key === "j" || ev.key === "J"' in js
+    assert "function triar(veredito, comentario)" in js
+
+
+def test_devolver_pede_comentario_com_foco(js: str) -> None:
+    """A microcopy diz PARA QUEM o comentário vai — é isso que muda o que o
+    revisor escreve. E o campo recebe foco: quem apertou R já decidiu devolver."""
+    assert "O comentário volta para o anotador — diga o que corrigir." in js
+    assert "min_chars_devolucao" in js
+    assert "area.focus()" in js
+
+
+def test_o_revisor_ve_no_mesmo_layout_em_que_foi_produzido(js: str) -> None:
+    """RECONHECIMENTO, não releitura: os MESMOS `ws*`, em modo leitura.
+
+    Um segundo desenho "de revisão" seria um segundo lugar onde a rubrica pode
+    divergir de si mesma — e a divergência apareceria justamente no item que o
+    revisor está julgando.
+    """
+    assert "function ctxLeitura(form)" in js
+    assert "desenharWorkspace(env, ctxLeitura(t.form))" in js
+    assert "function formDoPayload(env, anterior)" in js
+    # E o mesmo mapa de payload → formulário serve aos dois lados.
+    assert "return formDoPayload(env, env.versao_anterior && env.versao_anterior.payload)" in js
+
+
+def test_o_revisor_e_avisado_das_proprias_anotacoes_excluidas(js: str) -> None:
+    """Fila vazia sem explicação faria um revisor que anotou achar que a
+    plataforma perdeu o trabalho dele."""
+    assert "minhas_excluidas" in js
+    assert "quem revisa nunca é quem anotou" in js
+
+
+def test_o_modo_solo_se_declara_na_tela(js: str) -> None:
+    """A regra de QC afrouxada precisa APARECER, e a faixa não se fecha.
+
+    Um aviso dispensável vira um aviso que ninguém viu na hora que importava —
+    e esconder que o revisor é o autor seria mentir sobre o QC, que é
+    exatamente o que este projeto existe para não fazer.
+    """
+    assert "function faixaSolo()" in js
+    assert "Modo solo" in js
+    assert "você está revisando trabalho seu." in js
+    assert "fica gravada como autorrevisão" in js
+    # Nada de botão de fechar/dispensar na faixa.
+    faixa = js.split("function faixaSolo()", 1)[1].split("\n}", 1)[0]
+    assert "addEventListener" not in faixa
+    # E o painel do admin declara qual dos dois números ele está mostrando.
+    assert "quem revisa nunca é quem anotou" in js
+
+
+def test_o_seletor_de_projeto_separa_fixture_de_trabalho_real(html: str, js: str) -> None:
+    """Sem o seletor, "trabalhar só num projeto" seria uma promessa do schema
+    que a interface não cumpre."""
+    assert 'id="projeto"' in html
+    assert "function paramsProjeto(base)" in js
+    assert "function trocarProjeto()" in js
+    assert '"/api/projetos"' in js
+    # O número de tarefas abertas no rótulo: um seletor que não diz quanto
+    # trabalho tem cada projeto obriga a entrar em todos para descobrir.
+    assert "p.nome +" in js and "p.n_abertas" in js
+
+
+def test_criar_persona_convida_o_autor_pelo_nome(html: str) -> None:
+    """O trabalho é do autor; as personas da lista são fixtures. A tela diz
+    isso e oferece o caminho, em vez de empurrar um pseudônimo."""
+    assert "+ meu nome" in html
+    assert "para trabalhar de verdade, entre com o seu nome nos três papéis" in html
+
+
+def test_a_devolucao_usa_o_vocabulario_novo(js: str) -> None:
+    """``rejeitada`` saiu do vocabulário: nada é recusado na triagem, o trabalho
+    volta para ajuste — e o status da anotação tem exatamente este nome."""
+    assert 'anterior.veredito !== "devolvida"' in js
+    assert "rejeitada" not in js
 
 
 # ---------------------------------------------------------------------------

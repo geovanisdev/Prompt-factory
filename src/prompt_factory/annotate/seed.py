@@ -36,15 +36,31 @@ from typing import Any
 
 from ..config import get as _cfg
 from . import db as adb
+from . import diretrizes as dirmod
 from . import pool as poolmod
+from . import projetos as projmod
 
 #: O pacote de demonstração, dentro do pacote Python.
 PACOTE = Path(__file__).resolve().parent / "fixtures" / "demo_pack.json"
 
+#: Qualificação (P3a). A coluna existe e É ESCRITA; **barrar** quem não é
+#: qualificado fica para quando a tela existir. Estas são as combinações que a
+#: demonstração precisa sustentar: todo anotador é qualificado nos quatro tipos,
+#: menos Carla no A/B — para que exista um caso "não qualificada" visível no
+#: dado desde o primeiro dia, em vez de uma coluna uniforme que não prova nada.
+QUALIFICACOES: dict[str, dict[str, str]] = {
+    "Ana Ribeiro": dict.fromkeys(adb.TIPOS_TAREFA, "aprovada"),
+    "Bruno Tavares": dict.fromkeys(adb.TIPOS_TAREFA, "aprovada"),
+    "Carla Nunes": {
+        **dict.fromkeys(adb.TIPOS_TAREFA, "aprovada"),
+        "comparar_ab": "pendente",
+    },
+}
+
 #: As seis personas do plano: 3 anotadores, 2 revisores, 1 admin.
 #:
 #: Dois revisores existem por um motivo de produto, não de simetria: o revisor
-#: **não pode revisar a própria anotação** (P3), então um revisor sozinho
+#: **não pode revisar a própria anotação** (P3a), então um revisor sozinho
 #: travaria a fila assim que ele mesmo anotasse alguma coisa. Três anotadores
 #: são o mínimo para uma tarefa com ``n_anotacoes_alvo = 2`` ainda deixar alguém
 #: de fora e o agreement ter de quem discordar.
@@ -73,11 +89,19 @@ def semear_personas(conn: sqlite3.Connection) -> int:
 
     A conta é a diferença do total, e não ``changes()``: depois de um
     ``executemany`` o ``changes()`` reporta só a última instrução.
+
+    A qualificação é escrita **só nas personas que entram agora**: um papel ou
+    uma qualificação que alguém mudou na tela continua mudado, porque semear é
+    começar, não reinicializar.
     """
     antes = int(conn.execute("SELECT count(*) AS n FROM anotadores").fetchone()["n"])
     conn.executemany(
-        "INSERT INTO anotadores (nome, papel) VALUES (?, ?) ON CONFLICT(nome) DO NOTHING",
-        PERSONAS,
+        "INSERT INTO anotadores (nome, papel, qualificacoes_json) VALUES (?, ?, ?) "
+        "ON CONFLICT(nome) DO NOTHING",
+        [
+            (nome, papel, json.dumps(QUALIFICACOES.get(nome, {}), ensure_ascii=False))
+            for nome, papel in PERSONAS
+        ],
     )
     depois = int(conn.execute("SELECT count(*) AS n FROM anotadores").fetchone()["n"])
     return depois - antes
@@ -126,6 +150,10 @@ def semear_pacote(conn: sqlite3.Connection, dados: dict[str, Any] | None = None)
     pacote = dados if dados is not None else carregar_pacote()
     conta = dict.fromkeys(("prompts_demo", "rubricas", "respostas_modelo", "tarefas"), 0)
     uid_por_chave: dict[str, str] = {}
+    # O pacote vai para o projeto DEMONSTRAÇÃO, não para o do trabalho real:
+    # misturar fixture com autoria na mesma lista apagaria justamente a
+    # distinção que dá valor ao segundo. Ver `projetos.py`.
+    projeto_id = projmod.garantir_demonstracao(conn)
 
     for item in pacote["itens"]:
         texto = item["prompt"]
@@ -193,12 +221,13 @@ def semear_pacote(conn: sqlite3.Connection, dados: dict[str, Any] | None = None)
             # não saberia o que mostrar numa tarefa de `avaliar_rubrica`.
             payload["resposta"] = tarefa["resposta"]
         conn.execute(
-            "INSERT INTO tarefas (tipo, prompt_uid, origem, payload_json, gabarito_json, "
-            "                     n_anotacoes_alvo, prioridade, status) "
-            "VALUES (?, ?, 'semente', ?, ?, ?, ?, 'aberta')",
+            "INSERT INTO tarefas (tipo, prompt_uid, origem, projeto_id, payload_json, "
+            "                     gabarito_json, n_anotacoes_alvo, prioridade, status) "
+            "VALUES (?, ?, 'semente', ?, ?, ?, ?, ?, 'aberta')",
             (
                 tarefa["tipo"],
                 uid,
+                projeto_id,
                 json.dumps(payload, ensure_ascii=False),
                 None
                 if tarefa.get("gabarito") is None
@@ -217,6 +246,42 @@ def semear_pacote(conn: sqlite3.Connection, dados: dict[str, Any] | None = None)
 # ---------------------------------------------------------------------------
 
 
+def fatias_por_passo(
+    uids: list[str], quantas: int
+) -> tuple[list[str], list[str]]:
+    """Duas fatias disjuntas de ``quantas`` uids, **espalhadas pelo pool inteiro**.
+
+    O DEFEITO QUE ISTO CONSERTA (medido)
+    ====================================
+    A versão anterior fazia ``uids[:8]`` e ``uids[8:16]``. O pool é ordenado por
+    ``id`` do corpus, e o universo é **gravado agrupado por fonte**: os
+    dezesseis primeiros saíam praticamente todos da mesma fonte. Medido no banco
+    real: **16 das 17 tarefas do corpus eram ``arena140k``** — e uma delas era o
+    texto "Você não tem nada pra responder. Isso não é realmente um prompt…",
+    impossível de rotular. A plataforma passava a mentir sobre o corpus que ela
+    representa logo na primeira tela que um avaliador abre.
+
+    É exatamente o mesmo defeito que o P1 já havia consertado em
+    ``pool._uids_fallback``, com a mesma solução: **passo constante sobre o
+    conjunto inteiro**. O passo do pool devolve a proporção real das fontes; o
+    passo daqui preserva essa proporção dentro da amostra que vira tarefa.
+
+    Depois de escolher ``2 * quantas`` posições com passo constante, as duas
+    fatias saem **alternadas** (pares e ímpares). Alternar, e não cortar ao
+    meio, é o que impede que a segunda metade caia toda numa fonte só quando o
+    pool tem blocos grandes — que é o caso do corpus de hoje (411 dos 500 uids
+    são ``wildchat_pt``).
+
+    Determinístico: mesma lista, mesmas fatias, sempre.
+    """
+    if quantas <= 0 or not uids:
+        return [], []
+    alvo = min(len(uids), quantas * 2)
+    passo = len(uids) / alvo
+    escolhidos = [uids[int(i * passo)] for i in range(alvo)]
+    return escolhidos[0::2], escolhidos[1::2]
+
+
 def semear_pool(
     conn: sqlite3.Connection, conn_corpus: sqlite3.Connection
 ) -> dict[str, int]:
@@ -227,20 +292,19 @@ def semear_pool(
     nunca teria o que criar. Separando, a continuação vira uma tarefa nova de
     ``origem='continuacao'`` e o mecanismo fica visível na demonstração.
 
-    Determinístico: os uids do pool saem sempre na mesma ordem (amostra de passo
-    constante sobre o corpus), então rodar em duas máquinas com o mesmo corpus
-    gera as mesmas tarefas — e rodar duas vezes na mesma não gera nenhuma.
+    Determinístico: os uids do pool saem sempre na mesma ordem, e as duas fatias
+    também (``fatias_por_passo``), então rodar em duas máquinas com o mesmo
+    corpus gera as mesmas tarefas — e rodar duas vezes na mesma não gera nenhuma.
     """
     quantas = int(_cfg("annotate", "seed_pool_tarefas", default=8))
-    uids = poolmod.resolver(conn_corpus, com_uids=True).uids
+    uids = poolmod.uids(conn, conn_corpus)
     if not uids:
         return {"escrever_rubrica": 0, "sft_resposta": 0}
 
-    # Fatias disjuntas. Num pool menor que 2*N (só acontece em teste ou num
-    # corpus minúsculo) as fatias se sobrepõem — e o find-or-create por
-    # (tipo, prompt_uid) resolve, porque os TIPOS são diferentes.
-    para_rubrica = uids[:quantas]
-    para_sft = uids[quantas : quantas * 2] or uids[:quantas]
+    para_rubrica, para_sft = fatias_por_passo(uids, quantas)
+    # As tarefas sobre o corpus REAL vão para o projeto do portfólio: é este o
+    # trabalho que um avaliador vai ler.
+    projeto_id = projmod.garantir(conn)
 
     conta = {"escrever_rubrica": 0, "sft_resposta": 0}
     for tipo, lista in (("escrever_rubrica", para_rubrica), ("sft_resposta", para_sft)):
@@ -250,12 +314,12 @@ def semear_pool(
             ):
                 continue
             conn.execute(
-                "INSERT INTO tarefas (tipo, prompt_uid, origem, prioridade, status) "
-                "VALUES (?, ?, 'semente', ?, 'aberta')",
+                "INSERT INTO tarefas (tipo, prompt_uid, origem, projeto_id, prioridade, status) "
+                "VALUES (?, ?, 'semente', ?, ?, 'aberta')",
                 # Prioridade decrescente na ordem do pool: a fila sai na mesma
                 # ordem em duas execuções, o que é o que torna a demonstração
                 # reproduzível ("a primeira tarefa é sempre esta").
-                (tipo, uid, PRIORIDADE_POOL - i),
+                (tipo, uid, projeto_id, PRIORIDADE_POOL - i),
             )
             conta[tipo] += 1
     return conta
@@ -314,6 +378,14 @@ def semear(
             )
         relatorio["apagados"] = apagar_fixtures(conn)
 
+    ids = projmod.garantir_padroes(conn)
+    relatorio["projetos"] = {
+        projmod.nome_padrao(): ids["padrao"],
+        projmod.nome_demonstracao(): ids["demonstracao"],
+    }
+    # As diretrizes ANTES das tarefas: uma anotação submetida antes delas
+    # existirem gravaria `versao_diretriz = NULL`, que é honesto mas evitável.
+    relatorio["diretrizes"] = dirmod.semear(conn)
     relatorio["personas"] = semear_personas(conn)
     relatorio["pacote"] = semear_pacote(conn)
     if conn_corpus is None:
@@ -333,10 +405,12 @@ __all__ = [
     "PACOTE",
     "PERSONAS",
     "PRIORIDADE_POOL",
+    "QUALIFICACOES",
     "SCHEMA_RUBRICA",
     "TABELAS_FIXTURE",
     "apagar_fixtures",
     "carregar_pacote",
+    "fatias_por_passo",
     "semear",
     "semear_pacote",
     "semear_personas",

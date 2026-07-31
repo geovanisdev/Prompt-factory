@@ -575,10 +575,10 @@ def _serve(args: argparse.Namespace) -> int:
 
 
 def _annotate(args: argparse.Namespace) -> int:
-    """``pf annotate [serve|seed|status]`` (P1) — a plataforma de anotação "Bancada".
+    """``pf annotate [serve|seed|status|migrate]`` — a plataforma "Bancada".
 
-    Um comando com AÇÃO POSICIONAL, e não três subcomandos de topo, porque os
-    três operam o mesmo par de bancos e compartilham ``--db``/``--corpus-db``:
+    Um comando com AÇÃO POSICIONAL, e não quatro subcomandos de topo, porque os
+    quatro operam o mesmo par de bancos e compartilham ``--db``/``--corpus-db``:
     ``pf annotate-serve``, ``pf annotate-seed`` e ``pf annotate-status`` soltos
     na raiz esconderiam que a Bancada é UM produto ao lado da pipeline. É o
     mesmo formato de ``pf labels <ação>``.
@@ -604,6 +604,54 @@ def _annotate(args: argparse.Namespace) -> int:
     banco = Path(args.db).resolve() if args.db else paths.ANNOTATE_DB_FILE
     corpus = Path(args.corpus_db).resolve() if args.corpus_db else paths.DB_FILE
     acao = args.action or "serve"
+
+    if acao == "migrate":
+        # A ÚNICA saída para um banco de schema divergente. Ele guarda trabalho
+        # humano e não se recria a partir da pipeline — a migração reconstrói ao
+        # lado, confere as contagens e as FKs, e só então troca o arquivo,
+        # deixando o antigo como `.v1.bak`.
+        from .annotate import migracao
+
+        if not banco.is_file():
+            print(f"[annotate] {banco} ainda não existe — não há o que migrar")
+            print(
+                f"[annotate] um banco novo já nasce na versão "
+                f"{adb.SCHEMA_VERSION_ANOTACAO}: rode `pf annotate seed`"
+            )
+            return 0
+        try:
+            rel = migracao.migrar(banco)
+        except migracao.MigracaoImpossivel as exc:
+            # Código 3, como a recusa do --force e a do swap do load-db: não é
+            # erro de uso, é uma guarda que disparou e nada foi alterado.
+            print(f"[annotate] migração recusada: {exc}", file=sys.stderr)
+            return 3
+        if rel.get("ja_estava"):
+            print(f"[annotate] {banco} já está na versão {rel['versao']} — nada a fazer")
+            return 0
+        print(f"[annotate] {banco}: schema {rel['de']} -> {rel['para']}")
+        print(f"[annotate] cópia do banco anterior em {rel['backup']}")
+        print(f"[annotate] {rel['diretrizes']} diretriz(es) versionada(s) inserida(s)")
+        for nome, pid in rel["projetos"].items():
+            quantas = rel["alocacao"].get(nome, 0)
+            print(f"[annotate] projeto {nome!r} (id {pid}): {quantas} tarefa(s)")
+        for antes, quantas in (rel.get("status_backfill") or {}).items():
+            print(
+                f"[annotate] status {antes!r} -> "
+                f"{migracao.MAPA_STATUS[antes]!r}: {quantas} anotação(ões)"
+            )
+        from .stages import imprimir_funil
+
+        imprimir_funil(
+            "annotate",
+            ("tabela", "linhas"),
+            [[t, n] for t, n in rel["copiadas"].items()],
+        )
+        print(
+            f"[annotate] {rel['copiadas']['anotacoes']} anotação(ões) preservada(s) — "
+            "nenhuma linha de trabalho humano foi apagada"
+        )
+        return 0
 
     if acao == "serve":
         if not corpus.is_file():
@@ -638,9 +686,12 @@ def _annotate(args: argparse.Namespace) -> int:
         conn = dbmod.connect(banco)
         conn_corpus = dbmod.connect(corpus, readonly=True) if corpus.is_file() else None
         try:
-            adb.init_db(conn)
             try:
+                adb.init_db(conn)
                 relatorio = seedmod.semear(conn, conn_corpus, force=bool(args.force))
+            except adb.SchemaDivergente as exc:
+                print(f"[pf] {banco}: {exc}", file=sys.stderr)
+                return 3
             except RuntimeError as exc:
                 # A recusa do --force sobre trabalho humano. Código 3 (e não 1)
                 # pelo mesmo motivo do swap recusado do `load-db`: não é erro de
@@ -669,6 +720,11 @@ def _annotate(args: argparse.Namespace) -> int:
         print(f"[annotate] {novas} persona(s) criada(s), {total - novas} já existia(m)")
         for nome, papel in seedmod.PERSONAS:
             print(f"[annotate]   {nome} — {papel}")
+        projetos = ", ".join(f"{nome!r} (id {pid})" for nome, pid in relatorio["projetos"].items())
+        print(
+            f"[annotate] projetos: {projetos}; "
+            f"{relatorio['diretrizes']} diretriz(es) versionada(s) inserida(s)"
+        )
         pacote = relatorio["pacote"]
         print(
             f"[annotate] pacote de demonstração: {pacote['prompts_demo']} prompt(s), "
@@ -697,15 +753,43 @@ def _annotate(args: argparse.Namespace) -> int:
             return 0
         conn = dbmod.connect(banco)
         try:
-            adb.init_db(conn)
+            try:
+                adb.init_db(conn)
+            except adb.SchemaDivergente as exc:
+                # O status é justamente o comando que alguém roda para descobrir
+                # POR QUE a app não sobe: ele precisa dizer o conserto, não
+                # falhar com um traceback.
+                print(f"[annotate] {banco}: {exc}", file=sys.stderr)
+                return 3
             linhas = [[t, n] for t, n in adb.contagens(conn).items()]
             versao = adb.get_meta(conn, adb.CHAVE_VERSAO, "?")
+            n_anotacoes = dict(linhas).get("anotacoes", 0)
+            from .annotate import projetos as projmod
+
+            projetos_do_banco = projmod.listar(conn)
         finally:
             conn.close()
         from .stages import imprimir_funil
 
         print(f"[annotate] {banco} — schema {versao}")
         imprimir_funil("annotate", ("tabela", "linhas"), linhas)
+        if n_anotacoes:
+            print(f"[annotate] {n_anotacoes} anotação(ões) — trabalho humano, não regenerável")
+        for p in projetos_do_banco:
+            print(
+                f"[annotate] projeto {p['nome']!r} ({p['cliente']}): "
+                f"{p['n_tarefas']} tarefa(s), {p['n_abertas']} aberta(s)"
+            )
+        from .annotate import solo as solomod
+
+        print(
+            "[annotate] autorrevisão: "
+            + (
+                "PERMITIDA — " + solomod.AVISO
+                if solomod.ligado()
+                else "bloqueada — " + solomod.AVISO_DESLIGADO
+            )
+        )
         if corpus.is_file():
             conn = dbmod.connect(corpus, readonly=True)
             try:
@@ -713,10 +797,18 @@ def _annotate(args: argparse.Namespace) -> int:
 
                 n = int(conn.execute("SELECT count(*) AS n FROM prompts").fetchone()["n"])
                 p = poolmod.resolver(conn)
+                politica = poolmod.politica_licenca()
             finally:
                 conn.close()
             print(f"[annotate] corpus (só leitura): {corpus} — {n} prompts")
             print(f"[annotate] pool: {p.origem} — {p.n_pool} item(ns); {p.motivo}")
+            print(f"[annotate] licença: {politica['descricao']}")
+            if p.excluidas_licenca:
+                print(
+                    f"[annotate] a política de licença exclui {p.excluidas_licenca} "
+                    "linha(s) que passariam nos demais filtros"
+                )
+            print(f"[annotate] NSFW: {poolmod.NOTA_NSFW}")
             # A conexão read-only deixa um -shm órfão ao lado do corpus, e é ele
             # que o pré-voo do swap do `pf load-db` lê como "alguém está com
             # isto aberto". Mesma limpeza do shutdown da app (nunca o -wal).
@@ -730,7 +822,10 @@ def _annotate(args: argparse.Namespace) -> int:
             print(f"[annotate] corpus AUSENTE em {corpus} — `pf annotate serve` vai recusar")
         return 0
 
-    print(f"[pf] ação desconhecida: {acao!r} (use serve | seed | status)", file=sys.stderr)
+    print(
+        f"[pf] ação desconhecida: {acao!r} (use serve | seed | status | migrate)",
+        file=sys.stderr,
+    )
     return 2
 
 
@@ -1065,15 +1160,18 @@ COMMANDS: tuple[_Cmd, ...] = (
     ),
     _Cmd(
         "annotate",
-        "P2",
+        "P3a",
         "sobe a Bancada: plataforma de anotação (banco próprio; corpus só leitura)",
         [
             (
                 ("action",),
                 {
                     "nargs": "?",
-                    "choices": ["serve", "seed", "status"],
-                    "help": "serve (padrão) | seed (personas + fixtures + tarefas) | status",
+                    "choices": ["serve", "seed", "status", "migrate"],
+                    "help": (
+                        "serve (padrão) | seed (personas + fixtures + tarefas) | "
+                        "status | migrate (sobe o schema preservando as anotações)"
+                    ),
                 },
             ),
             (("--host",), {"metavar": "HOST", "help": "padrão: [annotate] host do settings.toml"}),

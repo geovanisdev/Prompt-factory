@@ -84,18 +84,13 @@ def _preparar(db_anotacao: Path, db_corpus: Path) -> dict[str, Any]:
     novo = not db_anotacao.is_file()
     conn = dbmod.connect(db_anotacao)
     try:
+        # `init_db` recusa ANTES de tocar no DDL quando a versão diverge (este
+        # banco guarda trabalho humano e não é regenerável pela pipeline).
+        # Recusar é a única resposta honesta — e desde o P3a ela vem com um
+        # caminho: `pf annotate migrate` migra preservando o que já está lá.
         adb.init_db(conn)
-        versao = adb.get_meta(conn, adb.CHAVE_VERSAO)
-        if versao is not None and int(versao) != adb.SCHEMA_VERSION_ANOTACAO:
-            # Este banco guarda trabalho humano e NÃO é regenerável pela
-            # pipeline: recusar é a única resposta honesta a um schema que a app
-            # não fala. "Apagar e recriar" aqui apagaria anotações.
-            raise RuntimeError(
-                f"{db_anotacao}: {adb.CHAVE_VERSAO}={versao} mas esta app fala "
-                f"{adb.SCHEMA_VERSION_ANOTACAO}. Este banco guarda trabalho "
-                "humano e não se recria a partir da pipeline — mova o arquivo "
-                "para o lado antes de subir uma versão nova."
-            )
+    except adb.SchemaDivergente as exc:
+        raise RuntimeError(f"{db_anotacao}: {exc}") from exc
     finally:
         conn.close()
     if novo:
@@ -184,10 +179,11 @@ def criar_app(
 
     # Import aqui dentro (e não no topo) para manter o grafo de import acíclico:
     # as rotas importam `deps`, que importa daqui.
-    from . import routes_meta, routes_trabalho
+    from . import routes_meta, routes_revisao, routes_trabalho
 
     app.include_router(routes_meta.router)
     app.include_router(routes_trabalho.router)
+    app.include_router(routes_revisao.router)
 
     # POR ÚLTIMO. Um mount em "/" registrado antes dos routers engoliria
     # /api/* — o Starlette casa as rotas na ordem em que foram adicionadas.

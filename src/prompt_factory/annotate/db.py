@@ -45,7 +45,16 @@ from typing import Any
 #: Versão do schema físico da plataforma, gravada em ``app_meta``.
 #: Incrementar exige migração — este banco guarda trabalho humano e, ao
 #: contrário do corpus, **não** é regenerável a partir da pipeline.
-SCHEMA_VERSION_ANOTACAO = 1
+#:
+#: **v2 (P3a)**: a revisão em duas passagens (``avaliacoes``,
+#: ``edicoes_avaliacao``, ``decisoes_admin``), a máquina de status de
+#: ``anotacoes`` e as quatro colunas de OPERAÇÃO — escopo de projeto,
+#: versão da diretriz, qualificação e trilha de auditoria. As telas de três
+#: delas só chegam depois; o schema entra agora porque este banco já guarda
+#: trabalho humano e cada anotação a mais encarece a migração seguinte.
+#: Quem sobe a versão é ``annotate/migracao.py`` (``pf annotate migrate``),
+#: nunca um UPDATE silencioso.
+SCHEMA_VERSION_ANOTACAO = 2
 
 #: Chave de ``app_meta`` onde a versão acima mora.
 CHAVE_VERSAO = "schema_version_anotacao"
@@ -85,13 +94,78 @@ STATUS_ATRIBUICAO: tuple[str, ...] = (
     "expirada",
 )
 
-#: Estados de uma anotação submetida. Rejeitada NÃO apaga nada: o re-trabalho
-#: grava ``versao + 1`` e a história fica.
-STATUS_ANOTACAO: tuple[str, ...] = ("pendente_revisao", "aprovada", "rejeitada")
+#: Estados de uma anotação submetida — a MÁQUINA da revisão em duas passagens.
+#: Nada aqui apaga nada: uma devolução grava ``versao + 1`` e a história fica.
+#:
+#: A máquina, por extenso (``TRANSICOES`` abaixo é a mesma coisa em dados)::
+#:
+#:   pendente_triagem --devolve--> devolvida --anotador refaz--> pendente_triagem
+#:   pendente_triagem --aprova---> pendente_avaliacao
+#:   pendente_avaliacao ---------> avaliada | escalada | descartada
+#:   escalada --(admin)----------> avaliada | devolvida | descartada
+#:
+#: **Só a triagem devolve trabalho ao anotador.** A passagem 2 (Rate and
+#: Review, P3b) corrige no lugar e, no pior caso, descarta: um item que já foi
+#: aprovado na triagem e volta ao anotador dias depois mede o revisor, não quem
+#: anotou — e a métrica de QC que nasce disso ficaria embaralhada.
+STATUS_ANOTACAO: tuple[str, ...] = (
+    "pendente_triagem",
+    "devolvida",
+    "pendente_avaliacao",
+    "avaliada",
+    "escalada",
+    "descartada",
+)
 
-#: Veredito do revisor. Os mesmos dois valores do ``status`` da anotação que ele
-#: produz, de propósito: um veredito que não vira estado seria decoração.
-VEREDITOS: tuple[str, ...] = ("aprovada", "rejeitada")
+#: A máquina acima como DADO: ``{status: (destinos permitidos)}``. As rotas
+#: consultam daqui em vez de repetir a regra em cada ``if``, e o teste da
+#: máquina lê isto — uma transição nova aparece nos dois lugares de uma vez.
+TRANSICOES: dict[str, tuple[str, ...]] = {
+    "pendente_triagem": ("devolvida", "pendente_avaliacao"),
+    "devolvida": ("pendente_triagem",),
+    "pendente_avaliacao": ("avaliada", "escalada", "descartada"),
+    "escalada": ("avaliada", "devolvida", "descartada"),
+    "avaliada": (),
+    "descartada": (),
+}
+
+#: Veredito da TRIAGEM (passagem 1). ``devolvida`` e não ``rejeitada``: o
+#: trabalho volta para ajuste, não é recusado — e o status que ele produz na
+#: anotação tem exatamente este nome, porque um veredito que não vira estado
+#: seria decoração.
+VEREDITOS: tuple[str, ...] = ("aprovada", "devolvida")
+
+#: Passagem 2, escala 1 — o trabalho **como chegou**. ``inutilizavel`` tem de
+#: existir mesmo esperando-se que a triagem já o tenha barrado: é justamente o
+#: caso "a triagem deixou passar" que precisa ficar registrado, e ele mede o
+#: revisor da triagem, não o anotador.
+AVALIACOES_ANTES: tuple[str, ...] = (
+    "inutilizavel",
+    "ajustavel",
+    "adequado",
+    "excepcional",
+)
+
+#: Passagem 2, escala 2 — o RESULTADO, depois de o revisor corrigir no lugar.
+#: ``borderline_admin`` é o único desfecho que escala; ``incorrigivel`` é
+#: terminal e **não** volta ao anotador.
+AVALIACOES_DEPOIS: tuple[str, ...] = (
+    "incorrigivel",
+    "borderline_admin",
+    "adequado",
+    "excepcional",
+)
+
+#: O que o admin decide sobre um item escalado. Encerra o item nos três casos.
+DECISOES_ADMIN: tuple[str, ...] = ("aprovada", "devolvida", "descartada")
+
+#: Ciclo de vida de um projeto/campanha. Sem ele dois clientes não cabem no
+#: mesmo banco — e acrescentar o escopo depois seria migrar trabalho humano.
+STATUS_PROJETO: tuple[str, ...] = ("ativo", "pausado", "encerrado")
+
+#: Estado de uma qualificação de anotador (a coluna existe e é escrita no P3a;
+#: **barrar** quem não é qualificado fica para depois, com a tela).
+STATUS_QUALIFICACAO: tuple[str, ...] = ("pendente", "aprovada", "reprovada")
 
 #: Origem de rubricas e respostas de modelo. ``fixture`` = pacote de
 #: demonstração; ``anotacao`` = materializada da aba escrever-rubrica na
@@ -144,7 +218,50 @@ CREATE TABLE IF NOT EXISTS anotadores (
   -- Desativar em vez de apagar: apagar um anotador levaria junto o histórico
   -- que as métricas do admin somam.
   ativo     INTEGER NOT NULL DEFAULT 1 CHECK (ativo IN (0,1)),
+  -- QUALIFICAÇÃO por estilo de tarefa: um JSON no formato
+  -- 'avaliar_rubrica' -> 'aprovada' | 'pendente' | 'reprovada'.
+  -- A coluna existe e É ESCRITA desde o P3a; barrar quem não é qualificado
+  -- fica para quando a tela existir. JSON (e não tabela) porque são 4 chaves
+  -- por pessoa, lidas sempre inteiras junto do perfil — uma tabela custaria um
+  -- JOIN em toda listagem para guardar o mesmo dicionário.
+  qualificacoes_json TEXT NOT NULL DEFAULT '{{}}',
   criado_em TEXT NOT NULL DEFAULT ({_agora()})
+);
+
+-- ---------------------------------------------------------------------------
+-- ESCOPO: projeto/campanha
+-- ---------------------------------------------------------------------------
+-- Sem isto, dois clientes não cabem no mesmo banco, e acrescentar o escopo
+-- DEPOIS seria migrar trabalho humano — o que este marco existe para evitar.
+-- A tela do admin para gerenciar projetos vem depois; a coluna e o projeto
+-- padrão entram agora, enquanto são baratos.
+CREATE TABLE IF NOT EXISTS projetos (
+  id        INTEGER PRIMARY KEY,
+  nome      TEXT NOT NULL UNIQUE,
+  cliente   TEXT NOT NULL DEFAULT '',
+  descricao TEXT NOT NULL DEFAULT '',
+  status    TEXT NOT NULL DEFAULT 'ativo'
+              CHECK (status IN ({_lista(STATUS_PROJETO)})),
+  criado_em TEXT NOT NULL DEFAULT ({_agora()})
+);
+
+-- ---------------------------------------------------------------------------
+-- A REGRA SOB A QUAL O TRABALHO FOI FEITO
+-- ---------------------------------------------------------------------------
+-- As diretrizes eram texto literal no `index.html`. O cenário que isto resolve:
+-- a regra do A/B é ajustada na terça; o cliente reclama de inconsistência na
+-- quinta; sem versão gravada por anotação, a única saída é refazer o lote
+-- inteiro, porque não há como separar "antes" de "depois".
+--
+-- `texto_json` guarda um objeto com a chave `linhas` — a diretriz é uma LISTA
+-- de regras, não um parágrafo, e é assim que a tela a desenha.
+CREATE TABLE IF NOT EXISTS diretrizes (
+  id         INTEGER PRIMARY KEY,
+  tipo       TEXT NOT NULL CHECK (tipo IN ({_lista(TIPOS_TAREFA)})),
+  versao     INTEGER NOT NULL CHECK (versao >= 1),
+  texto_json TEXT NOT NULL,
+  criada_em  TEXT NOT NULL DEFAULT ({_agora()}),
+  UNIQUE (tipo, versao)
 );
 
 -- ---------------------------------------------------------------------------
@@ -182,6 +299,11 @@ CREATE TABLE IF NOT EXISTS tarefas (
   tipo             TEXT NOT NULL CHECK (tipo IN ({_lista(TIPOS_TAREFA)})),
   prompt_uid       TEXT NOT NULL,
   origem           TEXT NOT NULL CHECK (origem IN ({_lista(ORIGENS_TAREFA)})),
+  -- NULL é permitido porque `ALTER TABLE ADD COLUMN` com REFERENCES exige
+  -- default NULL, e o schema de um banco NOVO tem de ser idêntico ao de um
+  -- MIGRADO (há um teste que compara os dois `sqlite_master`). Quem garante o
+  -- preenchimento é o seed e as rotas, que sempre usam o projeto padrão.
+  projeto_id       INTEGER REFERENCES projetos(id),
   payload_json     TEXT NOT NULL DEFAULT '{{}}',
   gabarito_json    TEXT,
   -- >= 1 no CHECK: uma tarefa que aceita zero anotações nunca sairia da fila e
@@ -199,6 +321,7 @@ CREATE INDEX IF NOT EXISTS idx_tarefas_fila   ON tarefas(status, tipo, prioridad
 -- E o de "que tarefas existem para este prompt?", que o catálogo do modo livre
 -- usa para o find-or-create e para marcar "você já anotou este".
 CREATE INDEX IF NOT EXISTS idx_tarefas_prompt ON tarefas(prompt_uid, tipo);
+CREATE INDEX IF NOT EXISTS idx_tarefas_projeto ON tarefas(projeto_id, status);
 
 -- ---------------------------------------------------------------------------
 -- QUEM PEGOU O QUÊ  (a trava)
@@ -253,22 +376,32 @@ CREATE TABLE IF NOT EXISTS anotacoes (
   atribuicao_id  INTEGER NOT NULL REFERENCES atribuicoes(id) ON DELETE CASCADE,
   versao         INTEGER NOT NULL DEFAULT 1 CHECK (versao >= 1),
   payload_schema TEXT NOT NULL,
+  -- QUAL REGRA VALIA quando esta anotação foi feita. O `payload_schema` versiona
+  -- o FORMATO; esta coluna versiona a INSTRUÇÃO. São coisas diferentes e as duas
+  -- mudam sozinhas: dá para ajustar o texto do A/B sem mexer no formato.
+  versao_diretriz INTEGER,
   payload_json   TEXT NOT NULL,
   tempo_ativo_ms INTEGER NOT NULL DEFAULT 0 CHECK (tempo_ativo_ms >= 0),
   iniciada_em    TEXT,
   submetida_em   TEXT NOT NULL DEFAULT ({_agora()}),
-  status         TEXT NOT NULL DEFAULT 'pendente_revisao'
+  status         TEXT NOT NULL DEFAULT 'pendente_triagem'
                    CHECK (status IN ({_lista(STATUS_ANOTACAO)})),
   UNIQUE (atribuicao_id, versao)
 );
--- A fila do revisor é exatamente `status='pendente_revisao' ORDER BY id`.
+-- A fila da TRIAGEM é exatamente `status='pendente_triagem' ORDER BY id`, e a
+-- do Rate and Review é `status='pendente_avaliacao' ORDER BY id`. O mesmo
+-- índice serve às duas.
 CREATE INDEX IF NOT EXISTS idx_anotacoes_fila ON anotacoes(status, id);
 
--- O veredito. UNIQUE(anotacao_id): uma revisão por VERSÃO da anotação — o
--- re-trabalho cria uma versão nova, que é revisada de novo, e as duas revisões
--- coexistem apontando para linhas diferentes.
+-- PASSAGEM 1 — A TRIAGEM. Aprova ou devolve, sem escore. É a ÚNICA passagem que
+-- devolve trabalho ao anotador; o que ela aprova não volta mais para quem
+-- anotou (segue para o Rate and Review, que corrige no lugar).
 --
--- O CHECK do comentário é a regra de produto escrita no banco: rejeitar sem
+-- UNIQUE(anotacao_id): uma triagem por VERSÃO da anotação — o re-trabalho cria
+-- uma versão nova, que é triada de novo, e as duas coexistem apontando para
+-- linhas diferentes.
+--
+-- O CHECK do comentário é a regra de produto escrita no banco: devolver sem
 -- dizer o que corrigir devolve trabalho para o anotador sem devolver
 -- informação. A tela reforça ("o comentário volta para o anotador — diga o que
 -- corrigir"), mas quem garante é o CHECK.
@@ -278,10 +411,103 @@ CREATE TABLE IF NOT EXISTS revisoes (
   revisor_id  INTEGER NOT NULL REFERENCES anotadores(id),
   veredito    TEXT NOT NULL CHECK (veredito IN ({_lista(VEREDITOS)})),
   comentario  TEXT,
+  -- MODO SOLO: o revisor É o autor. Fica GRAVADO, e não deduzido depois, porque
+  -- `atribuicoes.anotador_id` pode ser corrigido por um admin e a linha passaria
+  -- a mentir sobre uma revisão que já aconteceu. O export e o painel declaram
+  -- este número: uma taxa de aprovação calculada sobre autorrevisão não é a
+  -- mesma coisa que uma calculada sobre revisão cruzada, e apresentar as duas
+  -- como se fossem é o tipo de silêncio que este projeto não pratica.
+  autorrevisao INTEGER NOT NULL DEFAULT 0 CHECK (autorrevisao IN (0,1)),
   criada_em   TEXT NOT NULL DEFAULT ({_agora()}),
-  CHECK (veredito <> 'rejeitada' OR (comentario IS NOT NULL AND trim(comentario) <> ''))
+  CHECK (veredito <> 'devolvida' OR (comentario IS NOT NULL AND trim(comentario) <> ''))
 );
 CREATE INDEX IF NOT EXISTS idx_revisoes_revisor ON revisoes(revisor_id, criada_em);
+
+-- PASSAGEM 2 — RATE AND REVIEW (as telas chegam no P3b; o schema entra agora).
+-- Duas escalas e uma justificativa SEMPRE obrigatória. `avaliacao_antes` mede o
+-- trabalho COMO CHEGOU e `avaliacao_depois` mede o RESULTADO depois de o
+-- revisor corrigir no lugar — a distância entre as duas é o que o painel do
+-- admin lê para dizer quanto de conserto cada anotador custa.
+--
+-- A métrica mais interessante do conjunto nasce daqui: item que a triagem
+-- APROVOU e que o Rate and Review julgou `inutilizavel`/`incorrigivel` mede o
+-- REVISOR DA TRIAGEM, não o anotador.
+CREATE TABLE IF NOT EXISTS avaliacoes (
+  id                     INTEGER PRIMARY KEY,
+  anotacao_id            INTEGER NOT NULL UNIQUE REFERENCES anotacoes(id) ON DELETE CASCADE,
+  revisor_id             INTEGER NOT NULL REFERENCES anotadores(id),
+  avaliacao_antes        TEXT NOT NULL CHECK (avaliacao_antes IN ({_lista(AVALIACOES_ANTES)})),
+  avaliacao_depois       TEXT NOT NULL CHECK (avaliacao_depois IN ({_lista(AVALIACOES_DEPOIS)})),
+  -- NOT NULL e não-vazio: uma avaliação sem motivo é um número que ninguém
+  -- consegue contestar nem aprender com.
+  justificativa          TEXT NOT NULL CHECK (trim(justificativa) <> ''),
+  -- O payload DEPOIS das correções do revisor. NULL quando ele não mexeu em
+  -- nada — e nesse caso `edicoes_avaliacao` também está vazia para esta linha.
+  payload_corrigido_json TEXT,
+  -- Mesma razão do campo homônimo em `revisoes`: no modo solo, quem avalia é
+  -- quem escreveu, e o número que sai daqui precisa dizer isso.
+  autorrevisao           INTEGER NOT NULL DEFAULT 0 CHECK (autorrevisao IN (0,1)),
+  tempo_ativo_ms         INTEGER NOT NULL DEFAULT 0 CHECK (tempo_ativo_ms >= 0),
+  criada_em              TEXT NOT NULL DEFAULT ({_agora()})
+);
+CREATE INDEX IF NOT EXISTS idx_avaliacoes_revisor ON avaliacoes(revisor_id, criada_em);
+CREATE INDEX IF NOT EXISTS idx_avaliacoes_depois  ON avaliacoes(avaliacao_depois, id);
+
+-- O DIFF da passagem 2, campo a campo. `campo` é o CAMINHO no payload
+-- ("notas.2.nota", "justificativa"), e não um nome de coluna: o payload é JSON
+-- versionado e o caminho é a única referência estável dentro dele.
+--
+-- `motivo` NOT NULL: cada alteração exige a própria justificativa curta. Sem
+-- isso, o Rate and Review vira "o revisor mudou as notas" e ninguém consegue
+-- dizer se ele corrigiu um erro ou impôs o gosto dele.
+CREATE TABLE IF NOT EXISTS edicoes_avaliacao (
+  id           INTEGER PRIMARY KEY,
+  avaliacao_id INTEGER NOT NULL REFERENCES avaliacoes(id) ON DELETE CASCADE,
+  campo        TEXT NOT NULL,
+  valor_antes  TEXT,
+  valor_depois TEXT,
+  motivo       TEXT NOT NULL CHECK (trim(motivo) <> '')
+);
+CREATE INDEX IF NOT EXISTS idx_edicoes_avaliacao ON edicoes_avaliacao(avaliacao_id, id);
+
+-- A ESCALAÇÃO. Só `borderline_admin` chega aqui, e o admin ENCERRA o item —
+-- aprovando, devolvendo ou descartando. UNIQUE(avaliacao_id) porque a decisão
+-- é final: uma segunda decisão sobre a mesma avaliação seria uma reabertura
+-- silenciosa do que já foi encerrado.
+CREATE TABLE IF NOT EXISTS decisoes_admin (
+  id           INTEGER PRIMARY KEY,
+  avaliacao_id INTEGER NOT NULL UNIQUE REFERENCES avaliacoes(id) ON DELETE CASCADE,
+  admin_id     INTEGER NOT NULL REFERENCES anotadores(id),
+  decisao      TEXT NOT NULL CHECK (decisao IN ({_lista(DECISOES_ADMIN)})),
+  comentario   TEXT,
+  criada_em    TEXT NOT NULL DEFAULT ({_agora()})
+);
+
+-- ---------------------------------------------------------------------------
+-- TRILHA DE AUDITORIA
+-- ---------------------------------------------------------------------------
+-- Quem fez o quê, quando. Escrita nas transições que importam: claim,
+-- submissão, abandono, triagem, avaliação, decisão do admin.
+--
+-- `acao` NÃO tem CHECK, e é a única exceção da regra deste schema. O motivo é o
+-- mesmo do `task_type` do corpus: o vocabulário de ações cresce a cada marco, e
+-- migrar um banco que guarda trabalho humano só para registrar o NOME de um
+-- evento novo seria absurdo. As ações conhecidas estão em `eventos.ACOES`.
+--
+-- `entidade_id` não é FK: um evento sobre uma tarefa apagada continua sendo um
+-- fato que aconteceu, e uma FK com CASCADE apagaria justamente o registro de
+-- que ela existiu.
+CREATE TABLE IF NOT EXISTS eventos (
+  id           INTEGER PRIMARY KEY,
+  ator_id      INTEGER REFERENCES anotadores(id),
+  acao         TEXT NOT NULL,
+  entidade     TEXT NOT NULL,
+  entidade_id  INTEGER,
+  detalhe_json TEXT NOT NULL DEFAULT '{{}}',
+  criado_em    TEXT NOT NULL DEFAULT ({_agora()})
+);
+CREATE INDEX IF NOT EXISTS idx_eventos_entidade ON eventos(entidade, entidade_id, id);
+CREATE INDEX IF NOT EXISTS idx_eventos_ator     ON eventos(ator_id, id);
 
 -- ---------------------------------------------------------------------------
 -- MATERIAL DE TRABALHO  (fixtures hoje, conteúdo real quando o dono decidir)
@@ -358,6 +584,28 @@ CREATE INDEX IF NOT EXISTS idx_criacoes_hash   ON criacoes(hash_norm);
 CREATE INDEX IF NOT EXISTS idx_criacoes_autor  ON criacoes(autor_id, status);
 
 -- ---------------------------------------------------------------------------
+-- O POOL MATERIALIZADO
+-- ---------------------------------------------------------------------------
+-- Cópia local dos uids que a plataforma pode oferecer. Resolver o pool no
+-- corpus a cada request custava 607 ms MEDIDOS (não os 100 ms que a docstring
+-- prometia), e ele está no caminho de `/api/catalogo`, `/api/prompts/{{uid}}` e
+-- `/api/tarefas/livre` — três rotas do caminho principal.
+--
+-- Isto NÃO é cache de agregado: é uma projeção com CHAVE DE INVALIDAÇÃO
+-- explícita (`pool_assinatura` em `app_meta`, ver `pool.materializar`). Quando
+-- o corpus troca por swap ou a configuração muda, a assinatura muda e a tabela
+-- é reconstruída inteira, dentro do mesmo request. O modo de falha que este
+-- projeto já conhece — "cache mente sob escritor externo" — é justamente o que
+-- a assinatura impede: ela é derivada do build do corpus, não do relógio.
+--
+-- `ordem` é a posição determinística: mesma origem, mesma ordem, sempre. É o
+-- que faz `pf annotate seed` gerar as mesmas tarefas em duas máquinas.
+CREATE TABLE IF NOT EXISTS pool (
+  uid   TEXT PRIMARY KEY,
+  ordem INTEGER NOT NULL UNIQUE
+);
+
+-- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -368,14 +616,21 @@ CREATE TABLE IF NOT EXISTS app_meta (
 #: lista, então uma tabela nova aparece no relatório sozinha.
 TABELAS: tuple[str, ...] = (
     "anotadores",
+    "projetos",
+    "diretrizes",
     "prompts_demo",
     "tarefas",
     "atribuicoes",
     "anotacoes",
     "revisoes",
+    "avaliacoes",
+    "edicoes_avaliacao",
+    "decisoes_admin",
+    "eventos",
     "rubricas",
     "respostas_modelo",
     "criacoes",
+    "pool",
     "app_meta",
 )
 
@@ -402,15 +657,57 @@ def e_demo(uid: str) -> bool:
     return str(uid).startswith(PREFIXO_DEMO)
 
 
+class SchemaDivergente(RuntimeError):
+    """O banco fala uma versão de schema que esta app não fala.
+
+    Exceção própria (e não ``RuntimeError`` cru) porque **todo** ponto de
+    entrada precisa distinguir este caso: a CLI tem de imprimir a linha do
+    conserto (``pf annotate migrate``) em vez de um traceback, e a app tem de
+    recusar subir. Um banco que guarda trabalho humano nunca é "recriado".
+    """
+
+    def __init__(self, versao: int, esperada: int = SCHEMA_VERSION_ANOTACAO) -> None:
+        self.versao = versao
+        self.esperada = esperada
+        super().__init__(
+            f"{CHAVE_VERSAO}={versao} mas esta app fala {esperada}. "
+            "Este banco guarda trabalho humano e não se recria a partir da "
+            "pipeline — rode `pf annotate migrate` para migrar preservando o "
+            "que já está lá (o comando guarda uma cópia do arquivo antigo)."
+        )
+
+
+def versao_do_banco(conn: sqlite3.Connection) -> int | None:
+    """A versão gravada, ou ``None`` num banco que ainda não tem ``app_meta``.
+
+    Precisa existir separada de ``get_meta`` porque é chamada ANTES do DDL: num
+    arquivo recém-criado a tabela ``app_meta`` não existe, e um ``SELECT`` nela
+    levantaria ``OperationalError`` em vez de dizer "banco novo".
+    """
+    tem = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_meta'"
+    ).fetchone()
+    if tem is None:
+        return None
+    bruto = get_meta(conn, CHAVE_VERSAO)
+    return None if bruto is None else int(bruto)
+
+
 def init_db(conn: sqlite3.Connection) -> sqlite3.Connection:
     """Aplica o DDL (idempotente) e semeia a versão do schema em ``app_meta``.
 
     Chamado no lifespan a cada subida: rodar duas vezes tem de ser um no-op, e é
-    por isso que **tudo** no DDL é ``IF NOT EXISTS``. O ``DO NOTHING`` na versão
-    é o mesmo cuidado: um banco de schema 1 continua dizendo 1 depois de a app
-    subir de novo, mesmo que a constante já tenha andado (aí quem decide é a
-    migração, não um UPDATE silencioso).
+    por isso que **tudo** no DDL é ``IF NOT EXISTS``.
+
+    **Recusa ANTES de tocar no DDL quando a versão diverge.** Sem essa guarda,
+    aplicar o DDL da v2 sobre um banco v1 criaria as tabelas novas e deixaria as
+    antigas com os CHECKs velhos — um meio-schema que passa em todo teste de
+    existência e falha na primeira transição de status. Meio-migrado é pior que
+    não migrado, porque não parece quebrado.
     """
+    versao = versao_do_banco(conn)
+    if versao is not None and versao != SCHEMA_VERSION_ANOTACAO:
+        raise SchemaDivergente(versao)
     conn.executescript(DDL)
     conn.execute(
         "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING",
@@ -449,8 +746,11 @@ def contagens(conn: sqlite3.Connection) -> dict[str, int]:
 
 
 __all__ = [
+    "AVALIACOES_ANTES",
+    "AVALIACOES_DEPOIS",
     "CHAVE_VERSAO",
     "DDL",
+    "DECISOES_ADMIN",
     "ORIGENS_RESPOSTA",
     "ORIGENS_RUBRICA",
     "ORIGENS_TAREFA",
@@ -461,14 +761,19 @@ __all__ = [
     "STATUS_ANOTACAO",
     "STATUS_ATRIBUICAO",
     "STATUS_CRIACAO",
+    "STATUS_PROJETO",
+    "STATUS_QUALIFICACAO",
     "STATUS_TAREFA",
     "TABELAS",
     "TIPOS_TAREFA",
+    "TRANSICOES",
     "VEREDITOS",
+    "SchemaDivergente",
     "contagens",
     "e_demo",
     "get_meta",
     "init_db",
     "set_meta",
     "uid_demo",
+    "versao_do_banco",
 ]

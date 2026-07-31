@@ -36,7 +36,10 @@ from pydantic import ValidationError
 
 from . import catalogo as cat
 from . import db as adb
+from . import diretrizes as dirmod
+from . import eventos as evmod
 from . import payloads
+from . import projetos as projmod
 from . import tarefas as tmod
 from .deps import ConAnotacao, ConCorpus, exigir_anotador, exigir_papel
 from .models import AbandonarIn, LivreIn, ProximaIn, SubmeterIn
@@ -86,27 +89,50 @@ def proxima(corpo: ProximaIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str,
     ("você já anotou todas") vale mais que um contador.
     """
     _quem(anot, corpo.anotador_id)
-    atribuicao_id, motivo = tmod.reivindicar(anot, corpus, corpo.anotador_id, corpo.tipo)
+    if corpo.projeto_id is not None and not projmod.existe(anot, corpo.projeto_id):
+        raise HTTPException(status_code=404, detail=f"projeto {corpo.projeto_id} não existe")
+    atribuicao_id, motivo = tmod.reivindicar(
+        anot, corpus, corpo.anotador_id, corpo.tipo, corpo.projeto_id
+    )
     if atribuicao_id is None:
         return {"tarefa": None, "motivo": motivo, "disponiveis": 0}
     env = _envelope(anot, corpus, atribuicao_id)
+    evmod.registrar(
+        anot,
+        acao="tarefa_reivindicada",
+        entidade="atribuicao",
+        entidade_id=atribuicao_id,
+        ator_id=corpo.anotador_id,
+        tarefa_id=int(env["tarefa"]["id"]),
+        tipo=corpo.tipo,
+        prompt_uid=str(env["prompt"]["uid"]),
+    )
     return {
         "tarefa": env,
         "motivo": motivo,
-        "disponiveis": tmod.contagens_por_tipo(anot, corpo.anotador_id)[corpo.tipo],
+        "disponiveis": tmod.contagens_por_tipo(anot, corpo.anotador_id, corpo.projeto_id)[
+            corpo.tipo
+        ],
     }
 
 
 @router.get("/api/tarefas/contagens", summary="Quantas tarefas de cada tipo esperam por mim")
-def contagens(anot: ConAnotacao, anotador_id: Annotated[int, Query(ge=1)]) -> dict[str, Any]:
+def contagens(
+    anot: ConAnotacao,
+    anotador_id: Annotated[int, Query(ge=1)],
+    projeto_id: Annotated[int | None, Query(ge=1)] = None,
+) -> dict[str, Any]:
     """Os números dos contadores das abas — **pessoais**, não globais.
 
     Mostrar "12 na fila" para quem já anotou as 12 é a forma mais rápida de
-    fazer a tela parecer quebrada. Roda a expiração preguiçosa de passagem: uma
-    listagem é exatamente um dos dois momentos em que ela importa.
+    fazer a tela parecer quebrada. O mesmo vale para o projeto em foco: um
+    contador que promete 12 e uma fila que entrega 0 é pior que contador nenhum.
+
+    Roda a expiração preguiçosa de passagem: uma listagem é exatamente um dos
+    dois momentos em que ela importa.
     """
     _quem(anot, anotador_id)
-    return {"contagens": tmod.contagens_por_tipo(anot, anotador_id)}
+    return {"contagens": tmod.contagens_por_tipo(anot, anotador_id, projeto_id)}
 
 
 # ---------------------------------------------------------------------------
@@ -161,9 +187,13 @@ def livre(corpo: LivreIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str, Any
     ).fetchone()
 
     if linha is None:
+        if corpo.projeto_id is not None and not projmod.existe(anot, corpo.projeto_id):
+            raise HTTPException(status_code=404, detail=f"projeto {corpo.projeto_id} não existe")
+        projeto = corpo.projeto_id if corpo.projeto_id is not None else projmod.garantir(anot)
         cur = anot.execute(
-            "INSERT INTO tarefas (tipo, prompt_uid, origem, status) VALUES (?, ?, ?, 'aberta')",
-            (corpo.tipo, corpo.prompt_uid, corpo.origem),
+            "INSERT INTO tarefas (tipo, prompt_uid, origem, projeto_id, status) "
+            "VALUES (?, ?, ?, ?, 'aberta')",
+            (corpo.tipo, corpo.prompt_uid, corpo.origem, projeto),
         )
         tarefa_id = int(cur.lastrowid or 0)
         minha = None
@@ -208,6 +238,18 @@ def livre(corpo: LivreIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str, Any
         atribuicao_id = int(cur.lastrowid or 0)
         novo = True
 
+    evmod.registrar(
+        anot,
+        acao="tarefa_escolhida",
+        entidade="atribuicao",
+        entidade_id=atribuicao_id,
+        ator_id=corpo.anotador_id,
+        tarefa_id=tarefa_id,
+        tipo=corpo.tipo,
+        origem=corpo.origem,
+        prompt_uid=corpo.prompt_uid,
+        atribuicao_nova=novo,
+    )
     return {"tarefa": _envelope(anot, corpus, atribuicao_id), "novo": novo}
 
 
@@ -375,19 +417,28 @@ def submeter(
     if isinstance(dados, payloads.AvaliarRubrica):
         _conferir_contra_a_rubrica(anot, str(linha["prompt_uid"]), dados)
 
+    # O RE-TRABALHO VERSIONA SOZINHO. Uma devolução não apaga a versão 1: o
+    # `max + 1` é o que faz "devolver → corrigir → aprovar" gravar `versao = 2`
+    # sem que a tela precise saber contar.
     versao = 1 + int(
         anot.execute(
             "SELECT COALESCE(max(versao), 0) AS v FROM anotacoes WHERE atribuicao_id = ?",
             (atribuicao_id,),
         ).fetchone()["v"]
     )
+    # A REGRA SOB A QUAL ISTO FOI FEITO, lida do BANCO pelo servidor. Nunca do
+    # cliente: uma tela com o JS em cache diria a versão velha, e a única coluna
+    # que existe para separar "antes" de "depois" passaria a mentir.
+    versao_diretriz = dirmod.versao_vigente(anot, tipo)
     cur = anot.execute(
-        "INSERT INTO anotacoes (atribuicao_id, versao, payload_schema, payload_json, "
-        "                       tempo_ativo_ms, iniciada_em) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO anotacoes (atribuicao_id, versao, payload_schema, versao_diretriz, "
+        "                       payload_json, tempo_ativo_ms, iniciada_em) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
             atribuicao_id,
             versao,
             payloads.nome_schema(tipo),
+            versao_diretriz,
             # `ensure_ascii=False`: acentuação vai como caractere, não como ç.
             # O payload é lido por gente no painel do admin e no export.
             json.dumps(dados.model_dump(), ensure_ascii=False),
@@ -395,15 +446,33 @@ def submeter(
             linha["iniciada_em"],
         ),
     )
+    anotacao_id = int(cur.lastrowid or 0)
     anot.execute(
         f"UPDATE atribuicoes SET status = 'submetida', terminada_em = {tmod.SQL_AGORA} "
         "WHERE id = ?",
         (atribuicao_id,),
     )
+    evmod.registrar(
+        anot,
+        acao="anotacao_submetida",
+        entidade="anotacao",
+        entidade_id=anotacao_id,
+        ator_id=corpo.anotador_id,
+        atribuicao_id=atribuicao_id,
+        tarefa_id=int(linha["tarefa_id"]),
+        tipo=tipo,
+        versao=versao,
+        versao_diretriz=versao_diretriz,
+        tempo_ativo_ms=int(corpo.tempo_ativo_ms),
+        # `versao > 1` é, por construção, uma correção de devolução: a única
+        # forma de reabrir uma atribuição submetida é a triagem devolvê-la.
+        re_trabalho=versao > 1,
+    )
 
     resposta: dict[str, Any] = {
-        "anotacao_id": int(cur.lastrowid or 0),
+        "anotacao_id": anotacao_id,
         "versao": versao,
+        "versao_diretriz": versao_diretriz,
         "expirou": expirou,
         "disponiveis": tmod.contagens_por_tipo(anot, corpo.anotador_id)[tipo],
     }
@@ -439,6 +508,15 @@ def abandonar(atribuicao_id: int, corpo: AbandonarIn, anot: ConAnotacao) -> dict
         f"UPDATE atribuicoes SET status = 'abandonada', terminada_em = {tmod.SQL_AGORA} "
         "WHERE id = ?",
         (atribuicao_id,),
+    )
+    evmod.registrar(
+        anot,
+        acao="tarefa_abandonada",
+        entidade="atribuicao",
+        entidade_id=atribuicao_id,
+        ator_id=corpo.anotador_id,
+        tarefa_id=int(linha["tarefa_id"]),
+        tipo=str(linha["tipo"]),
     )
     return {"atribuicao_id": atribuicao_id, "status": "abandonada"}
 
