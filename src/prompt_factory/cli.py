@@ -4,7 +4,7 @@ Cada subcomando corresponde a um estágio da pipeline e vai saindo do stub no
 marco indicado em `_Cmd.milestone` (implementados: `db-check` no M1; `ingest` e
 `report raw` no M2; `run` s01-s06 e `report universe`/`dedup-sample` no M4;
 `make-seed`, `labels` e `merge-labels` no M5; `load-db` e `db-check --bench` no
-M8).
+M8; `serve` e `export` no M9).
 Enquanto é stub, o comando imprime em que marco chega e sai com código 2.
 `pf --help` e `pf <cmd> --help` funcionam e saem 0 — é isso que a DoD do M0
 exige.
@@ -519,6 +519,142 @@ def _labels(args: argparse.Namespace) -> int:
     return 2
 
 
+def _serve(args: argparse.Namespace) -> int:
+    """``pf serve`` (M9) — sobe a interface local em ``[app] host``/``[app] port``.
+
+    **Um worker, sempre.** Com N workers cada processo carregaria a própria
+    cópia da matriz de embeddings do M10 (~293 MB) e o próprio modelo e5, para
+    servir um usuário só numa máquina só. E, com o SQLite em WAL, escrita
+    concorrente de vários processos só traria ``database is locked`` de brinde.
+
+    O import do uvicorn/fastapi mora aqui dentro: ``pf --help`` não paga por ele.
+    """
+    from pathlib import Path
+
+    from . import paths
+    from .config import get
+
+    banco = Path(args.db).resolve() if args.db else paths.DB_FILE
+    if not banco.is_file():
+        # Falhar aqui, e não no lifespan, é o que transforma um traceback em
+        # instrução: o servidor nem sobe e a linha de comando do conserto está
+        # na tela.
+        print(f"[pf] banco não encontrado em {banco}", file=sys.stderr)
+        print("[pf] a interface só LÊ o SQLite; quem o constrói é a pipeline:")
+        print("[pf]   pf load-db")
+        print("[pf]   pf load-db --allow-unlabeled-pct 100   # antes do M7, sem rótulos")
+        return 1
+
+    import uvicorn
+
+    host = args.host or str(get("app", "host", default="127.0.0.1"))
+    porta = int(args.port or get("app", "port", default=8765))
+    print(f"[pf] banco: {banco}")
+    print(f"[pf] interface em http://{host}:{porta}/  (contrato da API em /docs)")
+
+    if args.reload:
+        # O --reload do uvicorn precisa de um alvo importável por string; a app
+        # é uma FÁBRICA de propósito (ver app/main.py), daí o factory=True.
+        # Nesse modo o --db não chega à app: o processo filho é outro.
+        if args.db:
+            print("[pf] AVISO: --reload ignora --db (o processo recarregado usa o padrão)")
+        uvicorn.run(
+            "prompt_factory.app.main:criar_app",
+            factory=True,
+            host=host,
+            port=porta,
+            reload=True,
+            workers=1,
+        )
+        return 0
+
+    from .app.main import criar_app
+
+    uvicorn.run(criar_app(banco), host=host, port=porta, workers=1)
+    return 0
+
+
+def _export(args: argparse.Namespace) -> int:
+    """``pf export`` (M9) — o mesmo export da interface, pela linha de comando.
+
+    Divide a lógica com ``POST /api/export``: o formato do arquivo, o manifesto
+    e a política de licença saem de ``prompt_factory.export``, nunca duplicados
+    aqui. O que este comando faz a mais é resolver o nome da coleção para o id.
+    """
+    from pathlib import Path
+
+    from . import db as dbmod
+    from . import export as exportmod
+    from . import paths
+    from .app import presenters, queries
+    from .app.models import Filtros, dump_filtros
+    from .config import get
+
+    banco = Path(args.db).resolve() if args.db else paths.DB_FILE
+    if not banco.is_file():
+        print(f"[pf] banco não encontrado em {banco} — rode `pf load-db`", file=sys.stderr)
+        return 1
+
+    conn = dbmod.connect(banco)
+    try:
+        filtro = Filtros(
+            lang=[args.lang] if args.lang else None,
+            commercial_only=bool(args.commercial_only),
+            # A CLI exporta o recorte inteiro por padrão: quem digita um comando
+            # de export quer o conjunto, não a política de exibição da tela.
+            nsfw="include",
+        )
+        modo = "filter"
+        if args.collection:
+            linha = conn.execute(
+                "SELECT id FROM collections WHERE name = ?", (args.collection,)
+            ).fetchone()
+            if linha is None:
+                nomes = [str(r["name"]) for r in conn.execute("SELECT name FROM collections")]
+                print(
+                    f"[pf] coleção {args.collection!r} não existe "
+                    f"(existem: {', '.join(nomes) or 'nenhuma'})",
+                    file=sys.stderr,
+                )
+                return 1
+            filtro = filtro.model_copy(update={"collection_id": int(linha["id"])})
+            modo = "collection"
+
+        sql, params = queries.sql_export(filtro)
+        chave = f"flat.{args.format}"
+        resultado = exportmod.executar(
+            queries.executar_fts(conn, sql, params, None),
+            destino_dir=Path(args.out).resolve() if args.out else paths.EXPORTS,
+            chave_formato=chave,
+            atribuicoes=presenters.atribuicoes(),
+            nome=args.name,
+            mode=modo,
+            filtros=dump_filtros(filtro),
+            include_nonredistributable=bool(args.include_nonredistributable),
+            include_text_original=bool(args.include_text_original),
+            max_rows=int(get("app", "export_max_rows", default=250_000)),
+            meta_banco={"build_id": dbmod.get_meta(conn, "db_build_id")},
+        )
+        export_id = exportmod.registrar(conn, resultado, filtros=dump_filtros(filtro))
+    finally:
+        conn.close()
+
+    m = resultado.manifest
+    print(f"[export] #{export_id} {resultado.arquivo} — {resultado.row_count} linhas")
+    print(f"[export] manifesto: {resultado.manifesto}")
+    print(f"[export] sha256: {m['sha256']}")
+    if m["excluded_nonredistributable_count"]:
+        print(
+            f"[export] {m['excluded_nonredistributable_count']} linha(s) EXCLUÍDAS por "
+            "redistributable=0 (use --include-nonredistributable para uso local)"
+        )
+    if m["nao_comercial_count"]:
+        print(f"[export] {m['nao_comercial_count']} linha(s) não comerciais (CC-BY-NC) incluídas")
+    if "WARNING" in m:
+        print(f"[export] ATENÇÃO: {m['WARNING']}")
+    return 0
+
+
 COMMANDS: tuple[_Cmd, ...] = (
     _Cmd(
         "ingest",
@@ -727,12 +863,32 @@ COMMANDS: tuple[_Cmd, ...] = (
     _Cmd(
         "export",
         "M9",
-        "s12: exporta JSONL/CSV com licença e atribuição por linha + manifest",
+        "exporta JSONL/CSV com licença e atribuição por linha + manifesto",
         [
             (("--format",), {"choices": ["jsonl", "csv"], "default": "jsonl", "help": "formato de saída"}),
             (("--collection",), {"metavar": "NOME", "help": "exporta uma coleção específica"}),
-            (("--include-nc",), {"action": "store_true", "help": "inclui fontes não comerciais (CC-BY-NC)"}),
+            (("--lang",), {"choices": ["pt", "en"], "help": "restringe a um idioma"}),
+            (
+                ("--commercial-only",),
+                {"action": "store_true", "help": "só linhas com commercial_ok=1 (exclui CC-BY-NC)"},
+            ),
+            (
+                ("--include-nonredistributable",),
+                {
+                    "action": "store_true",
+                    "help": "inclui redistributable=0 — USO LOCAL, o manifesto carimba um WARNING",
+                },
+            ),
+            (
+                ("--include-text-original",),
+                {"action": "store_true", "help": "acrescenta a coluna text_original"},
+            ),
+            (("--name",), {"metavar": "NOME", "help": "nome do arquivo (padrão: export_<timestamp>)"}),
+            (("--out",), {"metavar": "DIR", "help": "diretório de saída (padrão: data/exports)"}),
+            (("--db",), {"metavar": "PATH", "help": "banco a exportar (padrão: data/db/prompts.sqlite)"}),
         ],
+        implemented=True,
+        handler=_export,
     ),
     _Cmd(
         "serve",
@@ -741,8 +897,11 @@ COMMANDS: tuple[_Cmd, ...] = (
         [
             (("--host",), {"metavar": "HOST", "help": "padrão: [app] host do settings.toml"}),
             (("--port",), {"type": int, "metavar": "PORT", "help": "padrão: [app] port do settings.toml"}),
+            (("--db",), {"metavar": "PATH", "help": "banco a servir (padrão: data/db/prompts.sqlite)"}),
             (("--reload",), {"action": "store_true", "help": "auto-reload do uvicorn (dev)"}),
         ],
+        implemented=True,
+        handler=_serve,
     ),
 )
 

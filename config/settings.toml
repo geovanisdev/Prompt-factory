@@ -137,3 +137,35 @@ truncate_chars = 3000
 [app]
 host = "127.0.0.1"
 port = 8765
+
+# --- listagem -----------------------------------------------------------------
+# Itens por página (default e teto). O teto existe porque o corte de texto é por
+# ITEM: 200 itens x list_text_chars ainda é uma resposta pequena, 5.000 não.
+page_size = 50
+max_page_size = 200
+# Corte do `text` na LISTAGEM (o /api/prompts/{uid} devolve inteiro). O corpus
+# tem prompts de ~1 milhão de caracteres: 50 deles numa página seriam ~50 MB de
+# JSON e travariam a aba. Quem quer o texto todo busca o item.
+list_text_chars = 1200
+# Janela do snippet do FTS5, em tokens. É o que o card mostra na busca — o
+# trecho com o termo, não o começo do texto.
+snippet_tokens = 18
+# Quantos caracteres do início do texto são varridos atrás de "User:"/"Assistant:".
+# Bound de propósito: um LIKE sobre 1 MB x 50 linhas por página seria pago em
+# TODA busca, e o marcador de conversa colada aparece cedo.
+chat_markers_scan_chars = 20000
+# Teto de `page * page_size`. Ninguém pagina até a linha 100.000 com a mão; quem
+# faz isso é robô, e um OFFSET gigante mais o corte de texto viram um scan caro.
+max_offset = 100000
+# Tokens que o sanitizador do FTS aceita numa busca (o resto é descartado).
+fts_max_tokens = 24
+
+# --- coleções e export --------------------------------------------------------
+# Teto de uids por requisição em /api/collections/{id}/items.
+max_uids_por_requisicao = 5000
+# Teto de linhas por export. Vale para os três modos (filtro, coleção, uids).
+export_max_rows = 250000
+# Fronteiras de n_chars da faceta de tamanho. Mesmas do [seed] bucket_edges de
+# propósito: a interface facetando por uma régua e a semente amostrando por
+# outra tornariam impossível ler os dois relatórios juntos.
+size_buckets = [120, 600]

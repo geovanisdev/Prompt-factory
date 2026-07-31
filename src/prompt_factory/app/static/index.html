@@ -1,0 +1,64 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt Factory</title>
+<!--
+  PLACEHOLDER DO M9 (backend). Este arquivo existe para provar que o
+  StaticFiles está montado e que a app responde na mesma origem da API.
+
+  A INTERFACE DE VERDADE é entrega de outro agente e substitui este arquivo
+  inteiro. O contrato que ela consome está em:
+    - src/prompt_factory/app/routes_prompts.py     (lista, item, PATCH, revert, facetas, stats)
+    - src/prompt_factory/app/routes_collections.py (coleções e from-filter)
+    - src/prompt_factory/app/routes_export.py      (export e histórico)
+    - http://127.0.0.1:8765/docs                   (OpenAPI gerado, sempre atual)
+
+  Não há build step: um HTML, um CSS, um JS, tudo servido daqui.
+-->
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 14px/1.5 ui-sans-serif, "Segoe UI", system-ui, sans-serif;
+         margin: 0 auto; max-width: 60ch; padding: 3rem 1.5rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  p  { color: GrayText; margin: .25rem 0 1.5rem; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1rem; }
+  dt { font-weight: 600; }
+  dd { margin: 0; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, Consolas, monospace; font-size: .9em; }
+  a { color: inherit; }
+</style>
+
+<h1>Prompt Factory</h1>
+<p>Backend do M9 no ar. Esta página é um marcador — a interface entra aqui.</p>
+
+<dl id="painel"><dt>estado</dt><dd id="estado">consultando…</dd></dl>
+
+<p><a href="/docs">/docs</a> — contrato completo da API (OpenAPI).</p>
+
+<script>
+  const painel = document.getElementById("painel");
+  const numero = new Intl.NumberFormat("pt-BR");
+
+  function linha(rotulo, valor) {
+    const dt = document.createElement("dt");
+    dt.textContent = rotulo;
+    const dd = document.createElement("dd");
+    // textContent, nunca innerHTML: o corpus contém HTML de verdade.
+    dd.textContent = valor;
+    painel.append(dt, dd);
+  }
+
+  fetch("/api/health")
+    .then((r) => r.json())
+    .then((d) => {
+      document.getElementById("estado").textContent = d.status;
+      linha("prompts", numero.format(d.n_rows));
+      linha("build do banco", d.db_build_id ?? "(sem build_id)");
+      linha("taxonomia", d.taxonomy_version);
+      linha("rotulagem", d.rotulagem_pendente ? "PENDENTE (task_type nulo em tudo)" : "aplicada");
+      linha("pf", d.pf_version);
+    })
+    .catch((e) => {
+      document.getElementById("estado").textContent = "falhou: " + e;
+    });
+</script>

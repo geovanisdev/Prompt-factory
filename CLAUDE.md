@@ -18,7 +18,7 @@ Plano completo (fontes, decisões de engenharia, marcos M0–M10): `C:\Users\gig
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve         # interface local em http://127.0.0.1:8765
 ```
 
-Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1) e `db-check --bench` (M8), `make-seed`/`labels`/`merge-labels` (M5), `load-db` (M8). Ainda stub: `train` (M7), `apply` (M7), `export` (M9), `serve` (M9) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
+Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1) e `db-check --bench` (M8), `make-seed`/`labels`/`merge-labels` (M5), `load-db` (M8), `serve`/`export` (M9). Ainda stub: `train` (M7) e `apply` (M7) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
 
 ```powershell
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf run                 # s01..s06 (= `all`)
@@ -47,6 +47,15 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf load-db --no-swap              # constrói e PARA
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf load-db --swap-only            # retry do swap recusado por lock
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf db-check --bench               # mede o banco real (só leitura)
+```
+
+```powershell
+# Interface e export (M9). A app só LÊ o SQLite — não roda pipeline nenhuma.
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf serve                          # http://127.0.0.1:8765 (contrato em /docs)
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf serve --port 8799 --db X.sqlite # outra porta, outro banco
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf export --format jsonl          # o universo inteiro + manifesto
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf export --collection "curadoria" --format csv
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf export --lang pt --commercial-only --name recorte-pt
 ```
 
 ```powershell
@@ -80,11 +89,11 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 2. `raw/{fonte}.parquet` → s01 normalize → s02 idioma+variante pt-BR/pt-PT → s03 PII → s04 dedup exato → s05 embed (e5-small, `.npy` f16) → s06 dedup próximo → `final/universe.parquet`.
 3. s07 amostra-semente → campanha de rotulagem por agentes → s08 merge → s09 treino → s10 aplica com limiares de confiança.
 4. s11 carrega o universo rotulado num **SQLite** (WAL + FTS5 `remove_diacritics 2`), construído à parte e trocado por swap de arquivo (`pf load-db`).
-5. s12/app: FastAPI toca **apenas** o SQLite (mais os `.npy` por mmap na busca semântica) e serve um `static/index.html` único, sem build.
+5. `app/`: FastAPI toca **apenas** o SQLite (mais os `.npy` por mmap na busca semântica do M10) e serve um `static/index.html` único, sem build.
 
 ## Arquivos críticos
 
-`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `stages/__init__.py` (`StageConfig` + `STAGES`/`CADEIA`, único ponto de contato do `cli.py` com a pipeline) · `labeling_io.py` (manifest atômico, máquina de estados dos lotes e validação estrita) · `db.py` (DDL/FTS/`INDEXES`/conexão — o `executescript(DDL)` idempotente é o pivô da carga bulk) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `labeling/mappings/*.json` (categoria nativa → task_type) · `config/sources.toml` (licença e atribuição por fonte — **a ordem das seções é o desempate do dedup**) · `.claude/skills/rotular-prompts/SKILL.md`.
+`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `stages/__init__.py` (`StageConfig` + `STAGES`/`CADEIA`, único ponto de contato do `cli.py` com a pipeline) · `labeling_io.py` (manifest atômico, máquina de estados dos lotes e validação estrita) · `db.py` (DDL/FTS/`INDEXES`/conexão — o `executescript(DDL)` idempotente é o pivô da carga bulk) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `labeling/mappings/*.json` (categoria nativa → task_type) · `config/sources.toml` (licença e atribuição por fonte — **a ordem das seções é o desempate do dedup**; também a **única** fonte da `attribution` do export) · `app/queries.py` (TODO o SQL de leitura da interface: sanitizador do FTS, WHERE, ORDER BY, facetas) · `app/models.py` (o contrato de entrada da API) · `export.py` (REGISTRY de formatos + manifesto) · `.claude/skills/rotular-prompts/SKILL.md`.
 
 ## Preparo do universo (M4)
 
@@ -161,6 +170,44 @@ Pegadinhas deste bloco:
 - **`--allow-unlabeled-pct` (default 1) recusa a carga ANTES de construir**, com um pré-voo que lê só a coluna `uid` do universo. Sem isso, um banco carregado com o parquet de rótulos ausente fica plausível, abre na interface e só denuncia o erro semanas depois. Antes do M7 a falta de rótulo é intencional: `--allow-unlabeled-pct 100`.
 - **Swap recusado sai com código 3**, não 1: o banco novo está PRONTO em `db/prompts.build.sqlite` e o conserto é parar o `pf serve` e rodar `pf load-db --swap-only`. O build **nunca** é apagado no erro — ele é o produto.
 - **`db_build_id` é `sha256(universe_sha + labels_sha)[:16]`, não um uuid4.** O projeto inteiro se apoia em "mesmas entradas ⇒ mesmo resultado"; um id aleatório faria dois bancos idênticos parecerem diferentes. A carga NÃO é byte-idêntica entre re-runs (`ingested_at`/`updated_at` usam `strftime('now')`) — o que se repete são as contagens e o build_id.
+
+## Interface e export (M9)
+
+`pf serve` sobe a app FastAPI (`src/prompt_factory/app/`) sobre `data/db/prompts.sqlite`; `pf export` faz o mesmo export da interface pela linha de comando. A app **não roda estágio nenhum**: ela lê o SQLite, edita texto/rótulo, monta coleções e escreve `data/exports/`. O contrato completo e sempre atual está em `http://127.0.0.1:8765/docs` (OpenAPI).
+
+| módulo | o que decide |
+| --- | --- |
+| `app/models.py` | o contrato de ENTRADA: `Filtros` (usado em 4 lugares), `ConsultaPrompts`, corpos de PATCH/coleção/export |
+| `app/queries.py` | TODO o SQL de leitura: `sanitize_fts`, `build_where`, `ORDER_BY`, facetas, snippets |
+| `app/deps.py` | a conexão por request + a regra dura sobre `async def` |
+| `app/presenters.py` | linha do SQLite → JSON (bool de verdade, `license_class`, `attribution`) |
+| `app/main.py` | `criar_app()` (fábrica), lifespan, `idx_prompts_app`, mount do `static/` |
+| `export.py` | `REGISTRY` perfil×container, escritores JSONL/CSV, manifesto |
+
+Pegadinhas deste bloco:
+
+- **Nenhuma rota que toca o banco pode ser `async def`.** Medido: rota `def` + `get_conn` rodam na MESMA thread e funcionam com o `check_same_thread=True` padrão; trocar para `async def` põe a rota no event loop e a dependência no threadpool, e a primeira query morre com `sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread`. O conserto é **tirar o `async`**, nunca desligar o `check_same_thread` (isso troca um erro alto por corrupção silenciosa). `db.connect` ganhou o parâmetro só para o caso do gerador em threadpool — não use em rota.
+- **`nsfw = 0` perde as linhas NULL em silêncio.** Não rotulado é o estado normal (a campanha do M6/M7 não rodou: hoje é 100% do banco). Todo booleano anulável usa `IS 1` / `IS NOT 1`; o `nsfw=exclude` da API mantém os não rotulados de propósito. `quality_min`, esse sim, EXCLUI os sem rótulo — é o desejado, mas a interface tem de dizer.
+- **`MATERIALIZED` no CTE do FTS é 100x mais lento** (9,5 → 956 ms em 200k). A palavra não pode aparecer em `queries.py`; o SQLite inlina sozinho.
+- **`snippet()` do FTS5 custa o corpus se ficar dentro do CTE, e 2,3 ms se ficar fora.** Medido em 120k linhas com um termo de 97.541 hits: dentro do CTE 384 ms, restrito aos 50 rowids da página **2,3 ms**. Por isso o snippet sai numa SEGUNDA consulta (`sql_snippets`), depois de a página estar decidida. É o que torna viável devolver o trecho com o termo em vez do começo do texto — num prompt de 1 MB os dois não têm relação.
+- **`sort=random` precisa de DOIS módulos.** `(id * seed) % 1000003` **não embaralha**: com ids pequenos o produto nunca passa do módulo e a ordem sai idêntica à de `id`. A fórmula em uso é `(((id * 2654435761 + seed * 40503) % 4294967291) * 279470273 % 1000003)`. O teste `test_random_embaralha_de_verdade` existe exatamente para pegar a regressão.
+- **Toda ordenação termina em `p.id`.** Sem o desempate, `n_chars DESC` com empates devolve a mesma linha em duas páginas e some com outra, sem aviso.
+- **O Pydantic coage `true` para `1`.** `"quality": true` passaria por um validador comum já convertido e viraria "qualidade ruim" em silêncio — a checagem de `bool` tem de ser `mode="before"`. Mesma pegadinha do `labeling_io`, com um agravante: lá bastava testar `isinstance` na ordem certa, aqui a coerção acontece antes de qualquer validador normal.
+- **`extra="forbid"` em todo modelo.** `?task_types=codigo` (plural) devolve 422 em vez de ignorar o parâmetro e entregar o corpus inteiro como se fosse o recorte pedido.
+- **Cada faceta é contada com o filtro DELA MESMA removido.** Consequência que confunde quem lê os números: uma dimensão **não filtrada** soma exatamente `total`; uma dimensão **filtrada** soma mais que `total`. Sem isso, marcar "pt" zeraria "en" e o usuário ficaria preso no primeiro clique.
+- **`task_type`/`domain` saem na ordem da taxonomia e COM os zeros.** Enquanto `rotulagem_pendente` for `true` todas são zero; a interface desabilita o grupo com explicação em vez de escondê-lo (sumir parece bug).
+- **`idx_prompts_app` é criado pelo lifespan, não pelo DDL.** É índice de consulta da app (15 colunas, ~14 MB em 200k), e o `pf load-db` derruba/recria só os índices que ele conhece — um banco recém-carregado simplesmente não o tem, e a app o recria em ~0,6 s.
+- **`attribution` NÃO é coluna do banco.** Vem de `config/sources.toml` e é resolvida num dict antes do laço do export. Sem ela o export **não cumpre a licença**: ODC-BY, CC-BY e CC-BY-SA exigem crédito a cada uso.
+- **`redistributable = 0` fica fora do export por padrão** e o manifesto conta quantas saíram. `include_nonredistributable=true` é permitido (uso local) e carimba um `WARNING` no manifesto. `commercial_ok = 0` **não** é excluído, só contabilizado — a licença não comercial não impede o uso, impede *um certo* uso.
+- **`exports.format` tem CHECK `IN ('jsonl','csv')`.** Por isso o `REGISTRY` separa `profile` de `container`: um perfil Label Studio entra como `profile="label-studio"` gravando `format="jsonl"`, sem migração. O perfil real fica em `manifest_json.profile`.
+- **O módulo `csv` do Python recusa campo acima de 131.072 caracteres** (`_csv.Error: field larger than field limit`) e este corpus tem prompts de ~1 milhão. O arquivo exportado está CORRETO — quem precisa de ajuste é o leitor (`csv.field_size_limit(10**7)`). O manifesto carimba `NOTA_CSV` quando isso vai acontecer, senão o usuário conclui que o export saiu corrompido. (O Excel corta em 32.767 por célula: para texto longo, JSONL.)
+- **O export escreve em disco e SÓ ENTÃO serve** (`POST /api/export` devolve o manifesto, `GET /api/exports/{id}/download` baixa). Streamar a resposta obrigaria a mandar o corpo antes de saber `row_count`/`sha256`, e faria a conexão atravessar o threadpool do Starlette — o mesmo `ProgrammingError` da primeira pegadinha.
+- **`pf serve` recusa subir sem banco**, com a linha de comando do conserto na tela. Servidor que sobe e dá 500 em tudo enterra a mensagem útil num traceback por request.
+- **Um worker, sempre.** Com N workers cada processo carregaria a própria matriz de embeddings do M10 (~293 MB) e o próprio modelo e5, para servir um usuário numa máquina só.
+- **O lifespan faz `wal_checkpoint(TRUNCATE)` ao sair.** Sem isso um Ctrl+C deixa `-shm` ao lado do banco, e um `-shm` órfão é exatamente o sinal que o pré-voo do swap do `pf load-db` lê como "alguém está com isto aberto" — o próximo `load-db` seria recusado sem motivo.
+- **O mount do `StaticFiles` vem POR ÚLTIMO.** Registrado antes dos routers, um mount em `/` engole `/api/*`.
+- **A app é uma FÁBRICA (`criar_app(db_file, exports_dir)`), não um `app` global.** Um `app = FastAPI()` de módulo leria `paths.DB_FILE` no import e tornaria impossível apontar teste (ou `--db`) para outro arquivo. `--reload` do uvicorn usa `factory=True`.
+- **`<mark>` do snippet viaja como texto no JSON.** A interface **tem** de escapar o resto do conteúdo antes de injetar como HTML: o corpus tem `<script>` de verdade dentro dos prompts.
 
 ## Camada raw (M2/M3)
 

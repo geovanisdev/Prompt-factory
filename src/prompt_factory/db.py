@@ -201,12 +201,25 @@ INDEXES: tuple[str, ...] = (
 )
 
 
-def connect(db_path: str | Path, *, readonly: bool = False) -> sqlite3.Connection:
+def connect(
+    db_path: str | Path,
+    *,
+    readonly: bool = False,
+    check_same_thread: bool = True,
+) -> sqlite3.Connection:
     """Abre o banco com os PRAGMAs do projeto e ``sqlite3.Row``.
 
     ``foreign_keys`` é **por conexão**: abrir com ``sqlite3.connect`` direto (em
     teste, por exemplo) deixa o ON DELETE CASCADE inerte e o teste passa em
     falso. Use sempre esta função.
+
+    ``check_same_thread=False`` existe para UM caso e só um: um gerador que o
+    Starlette itera num threadpool (o download de export), onde a conexão nasce
+    numa thread e é consumida em outra. **Não use isso para "resolver" um
+    ``ProgrammingError`` numa rota** — ali a causa é a rota ter sido escrita
+    ``async def`` consumindo uma dependência síncrona, e o conserto é tirar o
+    ``async`` (ver ``app/deps.py``). Desligar a checagem numa conexão realmente
+    compartilhada troca um erro alto por corrupção silenciosa.
     """
     if sqlite3.sqlite_version_info < MIN_SQLITE:
         alvo = ".".join(map(str, MIN_SQLITE))
@@ -216,9 +229,16 @@ def connect(db_path: str | Path, *, readonly: bool = False) -> sqlite3.Connectio
     if readonly:
         # file:///G:/.../prompts.sqlite no Windows, file:///a/b no POSIX.
         uri = f"file:///{Path(db_path).resolve().as_posix().lstrip('/')}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True, timeout=5.0)
+        conn = sqlite3.connect(
+            uri, uri=True, timeout=5.0, check_same_thread=check_same_thread
+        )
     else:
-        conn = sqlite3.connect(db_path, timeout=5.0, isolation_level=None)  # autocommit
+        conn = sqlite3.connect(
+            db_path,
+            timeout=5.0,
+            isolation_level=None,  # autocommit
+            check_same_thread=check_same_thread,
+        )
     conn.row_factory = sqlite3.Row
     if not readonly:
         # WAL é persistente (fica no arquivo), mas repetir é barato e idempotente.
