@@ -574,6 +574,126 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _annotate(args: argparse.Namespace) -> int:
+    """``pf annotate [serve|seed|status]`` (P1) — a plataforma de anotação "Bancada".
+
+    Um comando com AÇÃO POSICIONAL, e não três subcomandos de topo, porque os
+    três operam o mesmo par de bancos e compartilham ``--db``/``--corpus-db``:
+    ``pf annotate-serve``, ``pf annotate-seed`` e ``pf annotate-status`` soltos
+    na raiz esconderiam que a Bancada é UM produto ao lado da pipeline. É o
+    mesmo formato de ``pf labels <ação>``.
+
+    Os dois bancos, sempre nesta relação:
+
+    * ``--db`` (``data/db/annotate.sqlite``) — desta app, leitura e escrita,
+      **criado sozinho** se faltar;
+    * ``--corpus-db`` (``data/db/prompts.sqlite``) — somente leitura, exigido,
+      construído pela pipeline.
+
+    O import do uvicorn/fastapi mora dentro do ``serve``: ``pf --help`` não paga
+    por ele, e ``pf annotate status`` também não.
+    """
+    from pathlib import Path
+
+    from . import db as dbmod
+    from . import paths
+    from .annotate import db as adb
+    from .annotate import seed as seedmod
+    from .config import get
+
+    banco = Path(args.db).resolve() if args.db else paths.ANNOTATE_DB_FILE
+    corpus = Path(args.corpus_db).resolve() if args.corpus_db else paths.DB_FILE
+    acao = args.action or "serve"
+
+    if acao == "serve":
+        if not corpus.is_file():
+            # Falhar AQUI, e não no lifespan, é o que transforma um traceback em
+            # instrução: o servidor nem sobe e a linha do conserto está na tela.
+            print(f"[pf] banco de prompts não encontrado em {corpus}", file=sys.stderr)
+            print("[pf] a Bancada só LÊ o corpus; quem o constrói é a pipeline:")
+            print("[pf]   pf load-db")
+            print("[pf]   pf load-db --allow-unlabeled-pct 100   # antes do M7, sem rótulos")
+            return 1
+
+        import uvicorn
+
+        from .annotate.main import criar_app
+
+        host = args.host or str(get("annotate", "host", default="127.0.0.1"))
+        porta = int(args.port or get("annotate", "port", default=8766))
+        print(f"[pf] corpus (só leitura): {corpus}")
+        print(f"[pf] plataforma: {banco}")
+        print(f"[pf] Bancada em http://{host}:{porta}/  (contrato da API em /docs)")
+        # workers=1 pelo mesmo motivo do `pf serve`: com o SQLite em WAL, vários
+        # processos escrevendo só trariam `database is locked` de brinde, para
+        # servir um usuário numa máquina só.
+        uvicorn.run(criar_app(banco, corpus), host=host, port=porta, workers=1)
+        return 0
+
+    if acao == "seed":
+        if args.force:
+            # O --force que APAGA fixtures chega no P2, junto com o pacote de
+            # demonstração. Prometer aqui um comportamento destrutivo que não
+            # existe seria pior que não ter a flag.
+            print("[pf] --force ainda não tem efeito: no P1 o seed só cria as personas")
+        banco.parent.mkdir(parents=True, exist_ok=True)
+        conn = dbmod.connect(banco)
+        try:
+            adb.init_db(conn)
+            novas = seedmod.semear_personas(conn)
+        finally:
+            conn.close()
+        total = len(seedmod.PERSONAS)
+        print(f"[annotate] {novas} persona(s) criada(s), {total - novas} já existia(m)")
+        for nome, papel in seedmod.PERSONAS:
+            print(f"[annotate]   {nome} — {papel}")
+        return 0
+
+    if acao == "status":
+        if not banco.is_file():
+            print(f"[annotate] {banco} ainda não existe")
+            print("[annotate] ele nasce sozinho na primeira `pf annotate serve`")
+            print("[annotate] (ou rode `pf annotate seed` para criá-lo agora)")
+            return 0
+        conn = dbmod.connect(banco)
+        try:
+            adb.init_db(conn)
+            linhas = [[t, n] for t, n in adb.contagens(conn).items()]
+            versao = adb.get_meta(conn, adb.CHAVE_VERSAO, "?")
+        finally:
+            conn.close()
+        from .stages import imprimir_funil
+
+        print(f"[annotate] {banco} — schema {versao}")
+        imprimir_funil("annotate", ("tabela", "linhas"), linhas)
+        if corpus.is_file():
+            conn = dbmod.connect(corpus, readonly=True)
+            try:
+                from .annotate import pool as poolmod
+
+                n = int(conn.execute("SELECT count(*) AS n FROM prompts").fetchone()["n"])
+                p = poolmod.resolver(conn)
+            finally:
+                conn.close()
+            print(f"[annotate] corpus (só leitura): {corpus} — {n} prompts")
+            print(f"[annotate] pool: {p.origem} — {p.n_pool} item(ns); {p.motivo}")
+            # A conexão read-only deixa um -shm órfão ao lado do corpus, e é ele
+            # que o pré-voo do swap do `pf load-db` lê como "alguém está com
+            # isto aberto". Mesma limpeza do shutdown da app (nunca o -wal).
+            try:
+                shm = corpus.with_name(corpus.name + "-shm")
+                if shm.is_file():
+                    shm.unlink()
+            except OSError:
+                pass
+        else:
+            print(f"[annotate] corpus AUSENTE em {corpus} — `pf annotate serve` vai recusar")
+        return 0
+
+    print(f"[pf] ação desconhecida: {acao!r} (use serve | seed | status)", file=sys.stderr)
+    return 2
+
+
 def _export(args: argparse.Namespace) -> int:
     """``pf export`` (M9) — o mesmo export da interface, pela linha de comando.
 
@@ -902,6 +1022,37 @@ COMMANDS: tuple[_Cmd, ...] = (
         ],
         implemented=True,
         handler=_serve,
+    ),
+    _Cmd(
+        "annotate",
+        "P1",
+        "sobe a Bancada: plataforma de anotação (banco próprio; corpus só leitura)",
+        [
+            (
+                ("action",),
+                {
+                    "nargs": "?",
+                    "choices": ["serve", "seed", "status"],
+                    "help": "serve (padrão) | seed (personas) | status (contagens)",
+                },
+            ),
+            (("--host",), {"metavar": "HOST", "help": "padrão: [annotate] host do settings.toml"}),
+            (("--port",), {"type": int, "metavar": "PORT", "help": "padrão: [annotate] port (8766)"}),
+            (
+                ("--db",),
+                {"metavar": "PATH", "help": "banco da plataforma (padrão: data/db/annotate.sqlite)"},
+            ),
+            (
+                ("--corpus-db",),
+                {"metavar": "PATH", "help": "corpus, SÓ LEITURA (padrão: data/db/prompts.sqlite)"},
+            ),
+            (
+                ("--force",),
+                {"action": "store_true", "help": "seed: refaz as fixtures (chega no P2)"},
+            ),
+        ],
+        implemented=True,
+        handler=_annotate,
     ),
 )
 

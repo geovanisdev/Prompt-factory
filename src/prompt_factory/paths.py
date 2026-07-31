@@ -41,6 +41,13 @@ EXPORTS: Path = DATA / "exports"  # JSONL/CSV + manifests
 DB_FILE: Path = DB / "prompts.sqlite"
 DB_BUILD: Path = DB / "prompts.build.sqlite"
 
+#: Banco da plataforma de anotação ("Bancada", Trilha B). É um arquivo SEPARADO
+#: de propósito: o ``prompts.sqlite`` é reconstruído inteiro e trocado por swap
+#: a cada ``pf load-db``, e guardar o estado da plataforma lá dentro faria toda
+#: recarga do corpus apagar as anotações. Ao contrário do corpus, este banco é
+#: criado pela própria app na primeira subida — ela é a dona dele.
+ANNOTATE_DB_FILE: Path = DB / "annotate.sqlite"
+
 LABELING: Path = ROOT / "labeling"
 TAXONOMY_JSON: Path = LABELING / "taxonomy.json"
 LABEL_MANIFEST: Path = LABELING / "manifest.json"
@@ -64,6 +71,7 @@ def ensure_dirs(*extra: Path) -> None:
 
 
 __all__ = [
+    "ANNOTATE_DB_FILE",
     "BATCHES",
     "CONFIG",
     "DATA",

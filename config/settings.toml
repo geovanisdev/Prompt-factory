@@ -238,3 +238,66 @@ export_max_rows = 250000
 # propósito: a interface facetando por uma régua e a semente amostrando por
 # outra tornariam impossível ler os dois relatórios juntos.
 size_buckets = [120, 600]
+
+# ==============================================================================
+# [annotate] — plataforma de anotação "Bancada" (Trilha B, P1)
+# ==============================================================================
+# Produto SEPARADO da interface de curadoria acima: banco próprio
+# (data/db/annotate.sqlite, escrita) + prompts.sqlite SOMENTE LEITURA. As duas
+# apps nunca compartilham porta nem conexão.
+[annotate]
+# Porta distinta da curadoria (8765) DE PROPÓSITO: as duas sobem ao mesmo tempo
+# na demonstração, e uma colisão de porta apareceria como "a interface errada
+# abriu", que é o defeito mais confuso possível numa apresentação.
+host = "127.0.0.1"
+port = 8766
+
+# --- pool de prompts ----------------------------------------------------------
+# De onde saem os prompts que a plataforma oferece. A ferramenta de curadoria
+# monta uma COLEÇÃO com este nome e a Bancada a lê do corpus read-only —
+# curadoria humana escolhendo o que vai para a anotação.
+pool_collection = "anotacao"
+# Teto de linhas do pool. Uma plataforma de demonstração não precisa de 144 mil
+# prompts; precisa de um recorte que carregue rápido e que um avaliador consiga
+# percorrer. O corte é aplicado nas DUAS origens (coleção e fallback).
+pool_max = 500
+# FALLBACK OBRIGATÓRIO. `pf load-db` reconstrói o banco do zero e APAGA as
+# coleções: sem fallback, a plataforma ficaria sem pool depois de toda recarga
+# do corpus — e um pool vazio numa demo é uma tela morta. O fallback é um filtro
+# determinístico sobre o corpus, e a origem ativa aparece no /api/health e no
+# painel do admin (pool trocando em silêncio seria mentira de interface).
+pool_fallback_lang = "pt"
+# 40 caracteres: abaixo disso não há o que avaliar com rubrica. 2.000: acima
+# disso o anotador rola a tela em vez de julgar (o corpus tem prompts de ~1 MB).
+pool_fallback_min_chars = 40
+pool_fallback_max_chars = 2000
+# ANTI-ROBÔ: ~34% do português do WildChat é UM template repetido. Sem este
+# teto o pool inteiro seria o mesmo prompt com números diferentes.
+pool_fallback_max_dups = 0
+
+# --- fila e trabalho ----------------------------------------------------------
+# Validade de uma atribuição sem submissão (trava do modo locked). Expiração
+# preguiçosa: o UPDATE roda antes de cada claim/listagem, sem thread de fundo.
+# 120 min é longo o bastante para uma tarefa de SFT com interrupção e curto o
+# bastante para a demo não travar tarefa até o dia seguinte.
+claim_ttl_min = 120
+# Itens por página nas listagens da plataforma (fila do revisor, catálogo,
+# minhas atribuições). Menor que o 50 da curadoria: aqui se lê, não se garimpa.
+page_size = 20
+# Corte do texto do prompt nas LISTAS (o workspace mostra inteiro). O corpus tem
+# prompts de ~1 milhão de caracteres.
+list_text_chars = 600
+# Quantas tarefas o `pf annotate seed` gera por tipo a partir do pool real.
+# (P1 semeia só as 6 personas; o número já mora aqui para o P2 não hardcodar.)
+seed_pool_tarefas = 8
+
+# --- validação de conteúdo escrito pelo anotador ------------------------------
+# Piso do modo criar. Abaixo disso não é prompt, é palavra solta — e o texto vai
+# para o corpus de verdade pela ingestão da plataforma.
+min_chars_criacao = 15
+# Piso da justificativa obrigatória do A/B. "melhor" não é justificativa; o valor
+# de uma comparação está no motivo, não na preferência.
+min_chars_justificativa = 30
+# Teto de critérios de uma rubrica escrita na plataforma. Rubrica com 20
+# critérios não é mais rigorosa, é impossível de aplicar com consistência.
+max_criterios_rubrica = 8
