@@ -327,7 +327,7 @@ Um passe = varrer as **3.199.860** linhas do split `train` com `columns=` (pushd
 * **A `language` da fonte erra.** O mesmo template automatizado em francês aparece 7.553× rotulado `English` e 2.049× rotulado `Portuguese`. No pt, ~34% das linhas são UM robô só ("Usando o seguinte texto:" sobre diários oficiais). O s02 não é opcional.
 * **`HTTP_RANGE_LIMIT` (2 MiB) é obrigatório nesta máquina.** Sem ele o pyarrow coalesce column chunks em ranges de até 32 MiB, o middlebox de TLS corta a resposta em ~4 MB e o passe morre em 76% — sempre no mesmo shard, então os 5 retries do `huggingface_hub` refazem a mesma requisição gigante e falham igual. Acima disso, `wildchat._passe` reabre o stream sozinho a partir do último checkpoint (`MAX_TENTATIVAS_REDE`).
 
-## Bancada — plataforma de anotação (Trilha B, P1–P3i)
+## Bancada — plataforma de anotação (Trilha B, P1–P3b)
 
 Produto **novo e separado**, em `src/prompt_factory/annotate/`, com nome de tela **"Bancada"**. Não é uma aba da interface de curadoria: outro banco, outra porta, outra identidade visual.
 
@@ -335,7 +335,7 @@ Produto **novo e separado**, em `src/prompt_factory/annotate/`, com nome de tela
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate seed          # projetos + diretrizes + personas + pacote + tarefas do pool
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate seed --force  # APAGA fixtures e refaz (recusa se houver anotação; sai 3)
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate status        # contagens + projetos + pool + política de licença
-& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate migrate       # sobe o schema PRESERVANDO as anotações (deixa .v1.bak)
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate migrate       # sobe o schema PRESERVANDO as anotações (deixa .v<N>.bak)
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate               # = serve, em http://127.0.0.1:8766
 ```
 
@@ -447,3 +447,34 @@ Pegadinhas deste bloco:
 - **`pool_fallback_lang` aceita string E lista.** Com `["pt", "en"]` o teto de `pool_max` é dividido em **cota igual por língua** (`pool._cotas`) e cada cota é amostrada com passo constante dentro dela. Proporcional ao corpus não serviria: são 116.051 linhas em inglês contra uma fração disso em português, e o pool sairia monolíngue de novo, na outra ponta. Quem mantém as 9.148 `cc-by-nc-4.0` de fora é a **política de licença**, não o filtro de idioma. Medido no banco real: 500 uids, **250 pt + 250 en**, 8 fontes, zero `cc-by-nc`.
 - **Prompt e resposta de modelo NÃO são traduzidos**, no pacote nem em lugar nenhum: a língua deles é intrínseca ao dado. O que ficou bilíngue é a ESTRUTURA (título de rubrica, critério, descrição, âncora de escala, catálogo de defeitos). Os três itens novos têm prompt em inglês de verdade — um avaliador que não lê português precisa conseguir **fazer** o trabalho, não só olhar a interface traduzida.
 - **`navigator.language` só desvia para o português.** Sem preferência salva, `pt*` abre em pt e todo o resto abre em inglês: um avaliador estrangeiro nunca pode ver esta plataforma em português. A preferência salva vence o navegador, e um valor inválido no `localStorage` cai no inglês.
+
+### Rate and Review e escalação (P3b) — schema v3
+
+`annotate/avaliacoes.py` (o diff campo a campo, a fila, o parecer) · `annotate/routes_avaliacao.py` (passagem 2 + escalação) · `annotate/models.py` (`AvaliarIn`, `EdicaoIn`, `DecisaoAdminIn`) · `annotate/migracao.py` (`_da_v1`/`_da_v2` + `PASSOS`) · `tests/test_annotate_p3b.py`.
+
+A passagem 2 tem quatro passos, nesta ordem: **avalia como chegou** (`inutilizavel|ajustavel|adequado|excepcional`) → **corrige no lugar**, com motivo por mudança → **avalia o resultado** (`incorrigivel|borderline_admin|adequado|excepcional`) → **justificativa geral, obrigatória sempre**. `adequado`/`excepcional` → `avaliada`; `borderline_admin` → `escalada` + fila do admin; `incorrigivel` → `descartada`, terminal.
+
+| rota nova | o que decide |
+| --- | --- |
+| `GET /api/avaliacao/fila` | o que a triagem aprovou, **com quem aprovou** (`triador`) |
+| `GET /api/avaliacao/{id}` | o envelope da triagem + o comentário de quem triou |
+| `POST /api/avaliacao/{id}` | as duas escalas, o diff conferido e o desfecho, numa transação |
+| `GET /api/escalacao/fila` · `POST /api/escalacao/{avaliacao_id}` | os borderline sem decisão · o admin encerra |
+
+Pegadinhas deste bloco:
+
+- **O diff é calculado pelo SERVIDOR, não aceito do cliente.** `avaliacoes.diferencas` achata os dois payloads (`{"notas": [{"nota": 3}]}` → `{"notas.0.nota": 3}`) e exige **igualdade exata** entre os caminhos que mudaram e os motivos declarados. Os dois lados são 422 e são erros diferentes: mudança sem motivo é alguém alterando trabalho alheio em silêncio; motivo sobre campo que não mudou faz a auditoria descrever uma correção que não houve — que é pior que não ter auditoria. Os valores gravados em `edicoes_avaliacao` são os do servidor: a trilha descreve o payload, não a tela.
+- **Só FOLHAS viram caminho.** Sem isso, "mudei a nota do critério 2" apareceria três vezes (`notas`, `notas.2`, `notas.2.nota`) e pediria três motivos para uma mudança. Lista/dicionário **vazio** é folha de propósito — senão apagar o último item de `por_criterio` não seria mudança nenhuma.
+- **O JS e o Python têm de achatar igual**, e é por isso que `montarPayload(env, form)` ganhou o parâmetro: o front monta os DOIS payloads (o original e o corrigido) com a mesma função. Duas montagens diferentes produziriam diferenças que não existem, e o revisor teria de justificar mudanças que não fez. Quem decide continua sendo o servidor — o JS só evita o 422.
+- **`ctxEdicaoRevisor` é o terceiro leitor dos mesmos `ws*`.** O contexto passou a carregar `aoDigitar`/`aoMudar`/`aoFocar`/`motivos` porque os callbacks eram chamadas diretas às funções do ANOTADOR: sem isso, o revisor escreveria no rascunho da tarefa que o anotador tem aberta. `graduar`/`escolherAB` viraram atalhos de `graduarEm`/`escolherABEm`.
+- **O motivo por mudança não é modal, e não redesenha a tela.** `rrSincronizar` reconcilia as caixas de motivo incrementalmente — só entra a linha que passou a existir e só sai a que deixou de existir. Reconstruir tudo a cada tecla tiraria o foco do campo no meio da palavra. Uma caixa de **último recurso** com prefixo `""` é registrada por último: um caminho que nenhum prefixo reivindicasse viraria uma mudança impossível de justificar e um botão que nunca destrava.
+- **Aprovar na triagem invalida `est.rr`.** Sem isso a sub-aba do Rate and Review continuaria mostrando o que leu na última visita, e o item recém-aprovado só apareceria depois de sair da tela e voltar. O contador da sub-aba mostra **`…`** (não `0`) enquanto a fila não foi lida: são estados diferentes, e um zero inventado é a única leitura que faz alguém deixar de clicar.
+- **Devolver tem de RENOVAR o prazo** (`tarefas.reabrir`/`SQL_REABRIR`). Medido no banco real: devolver um item aprovado dias antes reabria a atribuição com `expira_em` no passado, o `expirar_vencidas` da listagem seguinte a marcava `expirada` no mesmo request, e o anotador via "prazo expirado" **sem botão** no lugar da instrução. Vale para os DOIS caminhos de volta — a triagem já tinha o defeito desde o P3a. `expira_em IS NULL` (modo livre) continua sem prazo.
+- **São DOIS caminhos de volta, e o segundo some sem ninguém notar.** A triagem devolve (`revisoes`) e o admin, decidindo uma escalação, também (`decisoes_admin`). `_versao_anterior` e `/api/atribuicoes` trazem os dois comentários em campos próprios (`comentario_revisor` / `comentario_admin`): sem o JOIN de `decisoes_admin`, o admin escreveria um comentário que a rota exige — com a frase "é a única instrução que ele recebe" — e que o anotador nunca leria.
+- **`devolvida` não é transição de `pendente_avaliacao`, e a rota lê isso de `db.TRANSICOES`.** Um item aprovado na triagem que volta ao anotador dias depois mede o revisor da triagem, não quem anotou. O admin, sobre um item **escalado**, pode devolver: é o caminho de escalação, não a segunda passagem se contradizendo.
+- **`incorrigivel` NÃO toca a atribuição.** Ela fica como a triagem a deixou (`aprovada`). Reabri-la devolveria trabalho por um caminho que a máquina de status não conhece.
+- **`gabarito_avaliacao_json` (v3) é o alvo escondido de uma anotação SINTÉTICA** — `{avaliacao_antes, familia_defeito, nota}`, NULL em todo trabalho humano, e é essa nulidade que distingue os dois. Quem preenche é o P4c; quem lê é o painel do P5a. **Nunca sai pela API**: a coluna não entra no SELECT de `tarefas.hidratar_anotacao`, que é o envelope por onde passa TODA leitura do revisor. O teste varre a resposta inteira procurando uma senha plantada, e não a chave — conferir a chave passaria hoje e falharia em silêncio no dia em que alguém a renomeasse ao serializar.
+- **A migração não encadeia versões.** Há `_da_v1` e `_da_v2`, cada uma copiando para dentro de um banco já no schema de HOJE. Encadear 1→2→3 exigiria manter vivo o DDL de cada versão do meio, e o teste que compara `sqlite_master` com um banco novo deixaria de valer no meio da cadeia. O backup vira `.v<origem>.bak`. `app_meta` e `eventos` são conferidos por "nunca menos" em vez de "igual": a própria migração grava o evento `banco_migrado`.
+- **`checklist` do SFT não voltava do payload** — a triagem mostrava "nada marcado" para quem tinha marcado tudo, e o Rate and Review acusaria como mudança do revisor uma caixa que o anotador já havia marcado. `formDoPayload` agora casa por NOME de critério, como as notas do `avaliar_rubrica`.
+- **Sem `A`/`R` na passagem 2, e é decisão.** Ela não tem duas respostas rápidas: tem duas escalas de quatro posições e um diff a justificar. `1..4` também ficou de fora — o mesmo `3` que graduaria a escala está graduando um critério da rubrica logo abaixo, na mesma tela. Ficam `J`/`K`, `Ctrl+Enter` e as setas dentro de cada radiogroup.
+- **Medido no banco real** (8 anotações preservadas na migração 2→3): três avaliações, quatro edições com motivo, duas decisões do admin; `pendente_avaliacao` → `avaliada` (2 edições), → `escalada` → admin `devolvida` → atribuição `em_andamento` com prazo novo.

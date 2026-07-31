@@ -49,6 +49,11 @@ LIMITES: tuple[tuple[str, int], ...] = (
     ("max_criterios_rubrica", 8),
     ("min_chars_criacao", 15),
     ("min_chars_devolucao", 20),
+    # P3b: os dois pisos do Rate and Review. Sem eles no health, o botão que diz
+    # "faltam 12 caracteres" divergiria do 422 na primeira vez que o dono
+    # ajustasse o `settings.toml`.
+    ("min_chars_avaliacao", 30),
+    ("min_chars_motivo_edicao", 10),
     ("claim_ttl_min", 120),
     ("page_size", 20),
 )

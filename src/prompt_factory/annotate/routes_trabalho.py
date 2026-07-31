@@ -544,11 +544,16 @@ def minhas(
     anotador_id: Annotated[int, Query(ge=1)],
     status: Annotated[str | None, Query()] = None,
 ) -> dict[str, Any]:
-    """O histórico desta pessoa, com as DEVOLVIDAS e o comentário do revisor.
+    """O histórico desta pessoa, com as DEVOLVIDAS e o comentário de quem devolveu.
 
     A devolução é o único item desta lista que exige ação, então ela vem com o
     comentário embutido: obrigar a abrir a tarefa para descobrir o que o revisor
     escreveu é a fricção que faz uma devolução ser ignorada.
+
+    **São dois caminhos de volta** (P3b): a triagem (``revisoes``) e o admin
+    decidindo uma escalação (``decisoes_admin``). Os dois comentários saem aqui,
+    em campos próprios — deduzir "veio da triagem" pela ausência do outro faria
+    a lista atribuir ao revisor uma frase que o admin escreveu.
 
     O prompt aparece por um trecho curto (``list_text_chars``), lido do corpus —
     um uid sozinho não diz a ninguém qual tarefa é qual. Uid sumido vira
@@ -563,12 +568,15 @@ def minhas(
         "SELECT a.id, a.status, a.expira_em, a.iniciada_em, a.terminada_em, "
         "       t.id AS tarefa_id, t.tipo, t.origem, t.prompt_uid, "
         "       an.id AS anotacao_id, an.versao, an.status AS anotacao_status, "
-        "       r.veredito, r.comentario "
+        "       r.veredito, r.comentario, "
+        "       d.decisao, d.comentario AS comentario_admin "
         "FROM atribuicoes a "
         "JOIN tarefas t ON t.id = a.tarefa_id "
         "LEFT JOIN anotacoes an ON an.atribuicao_id = a.id "
         "  AND an.versao = (SELECT max(versao) FROM anotacoes WHERE atribuicao_id = a.id) "
         "LEFT JOIN revisoes r ON r.anotacao_id = an.id "
+        "LEFT JOIN avaliacoes av ON av.anotacao_id = an.id "
+        "LEFT JOIN decisoes_admin d ON d.avaliacao_id = av.id "
         "WHERE a.anotador_id = :eu"
     )
     params: dict[str, Any] = {"eu": anotador_id}
@@ -602,6 +610,8 @@ def minhas(
                 "anotacao_status": linha["anotacao_status"],
                 "veredito": linha["veredito"],
                 "comentario_revisor": linha["comentario"],
+                "decisao_admin": linha["decisao"],
+                "comentario_admin": linha["comentario_admin"],
             }
         )
     return {"items": itens, "total": len(itens)}

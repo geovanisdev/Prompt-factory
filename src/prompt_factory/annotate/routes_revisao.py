@@ -311,12 +311,9 @@ def triar(
             if str(env["tarefa"]["tipo"]) == "escrever_rubrica":
                 rubrica_id = _materializar_rubrica(anot, env)
         else:
-            # REABRE A MESMA LINHA. Ver a regra 3 do cabeçalho do módulo.
-            anot.execute(
-                "UPDATE atribuicoes SET status = 'em_andamento', terminada_em = NULL "
-                "WHERE id = ?",
-                (int(env["atribuicao_id"]),),
-            )
+            # REABRE A MESMA LINHA, com PRAZO NOVO. Ver a regra 3 do cabeçalho do
+            # módulo e o porquê do prazo em `tarefas.SQL_REABRIR`.
+            tmod.reabrir(anot, int(env["atribuicao_id"]))
         evmod.registrar(
             anot,
             acao="triagem_aprovada" if corpo.veredito == "aprovada" else "triagem_devolvida",

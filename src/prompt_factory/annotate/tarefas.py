@@ -75,6 +75,36 @@ def ttl_min() -> int:
     return int(_cfg("annotate", "claim_ttl_min", default=120))
 
 
+#: O UPDATE que REABRE uma atribuição devolvida, com prazo NOVO.
+#:
+#: O prazo tem de ser renovado, e não é detalhe: a atribuição foi reivindicada
+#: quando o trabalho começou, e uma devolução acontece horas ou dias depois.
+#: Reabrir mantendo o ``expira_em`` antigo devolve uma tarefa **já vencida** —
+#: o próximo ``expirar_vencidas`` (que roda antes de toda listagem) a marca
+#: ``expirada`` no mesmo request, o botão "Corrigir e reenviar" não aparece, e o
+#: anotador vê um beco no lugar da instrução do revisor. Medido no banco real,
+#: devolvendo um item aprovado dias antes.
+#:
+#: ``expira_em IS NULL`` (modo livre, sem prazo) continua sem prazo: o ``CASE``
+#: não inventa um relógio para quem escolheu a tarefa no catálogo.
+SQL_REABRIR = (
+    "UPDATE atribuicoes SET status = 'em_andamento', terminada_em = NULL, "
+    "  expira_em = CASE WHEN expira_em IS NULL THEN NULL "
+    "              ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now', :prazo) END "
+    "WHERE id = :id"
+)
+
+
+def reabrir(conn: sqlite3.Connection, atribuicao_id: int) -> None:
+    """Devolve o trabalho ao anotador: ``em_andamento`` com prazo novo.
+
+    Os DOIS caminhos de volta passam por aqui — a triagem e a decisão do admin
+    sobre uma escalação. Uma função, e não o mesmo UPDATE escrito duas vezes,
+    porque a regra do prazo é fácil de esquecer no segundo lugar.
+    """
+    conn.execute(SQL_REABRIR, {"id": atribuicao_id, "prazo": f"+{ttl_min()} minutes"})
+
+
 def expirar_vencidas(conn: sqlite3.Connection) -> int:
     """``em_andamento`` com prazo vencido → ``expirada``. Devolve quantas.
 
@@ -474,17 +504,28 @@ def _respostas(conn: sqlite3.Connection, uid: str, quais: list[str]) -> list[dic
 
 
 def _versao_anterior(conn: sqlite3.Connection, atribuicao_id: int) -> dict[str, Any] | None:
-    """A última anotação desta atribuição + o comentário do revisor, se houver.
+    """A última anotação desta atribuição + o que quem a devolveu escreveu.
 
     RECONHECIMENTO EM VEZ DE MEMÓRIA: no re-trabalho, o formulário volta
-    preenchido com o que a pessoa escreveu e o comentário do revisor fica acima
-    dele, no caminho do olho. Reconstruir de memória o que se escreveu há dois
-    dias é a fricção que faz a devolução ser ignorada.
+    preenchido com o que a pessoa escreveu e o comentário fica acima dele, no
+    caminho do olho. Reconstruir de memória o que se escreveu há dois dias é a
+    fricção que faz a devolução ser ignorada.
+
+    **São DOIS caminhos de volta, e os dois precisam chegar aqui.** A triagem
+    devolve (``revisoes``) e o admin, decidindo uma escalação, também
+    (``decisoes_admin``). O segundo é raro e é justamente por isso que ele some
+    sem ninguém notar: sem este JOIN, o admin escreveria um comentário
+    obrigatório — a rota o exige, com a frase "é a única instrução que ele
+    recebe" — que o anotador nunca leria.
     """
     linha = conn.execute(
         "SELECT an.id, an.versao, an.payload_json, an.payload_schema, an.status, "
-        "       r.veredito, r.comentario, r.criada_em AS revisada_em "
-        "FROM anotacoes an LEFT JOIN revisoes r ON r.anotacao_id = an.id "
+        "       r.veredito, r.comentario, r.criada_em AS revisada_em, "
+        "       d.decisao, d.comentario AS comentario_admin, d.criada_em AS decidida_em "
+        "FROM anotacoes an "
+        "LEFT JOIN revisoes r ON r.anotacao_id = an.id "
+        "LEFT JOIN avaliacoes av ON av.anotacao_id = an.id "
+        "LEFT JOIN decisoes_admin d ON d.avaliacao_id = av.id "
         "WHERE an.atribuicao_id = ? ORDER BY an.versao DESC LIMIT 1",
         (atribuicao_id,),
     ).fetchone()
@@ -499,6 +540,12 @@ def _versao_anterior(conn: sqlite3.Connection, atribuicao_id: int) -> dict[str, 
         "veredito": linha["veredito"],
         "comentario_revisor": linha["comentario"],
         "revisada_em": linha["revisada_em"],
+        # O outro caminho de volta. Os dois campos saem sempre (nulos quando não
+        # houve escalação) para que a tela não precise adivinhar por qual deles
+        # o trabalho voltou.
+        "decisao_admin": linha["decisao"],
+        "comentario_admin": linha["comentario_admin"],
+        "decidida_em": linha["decidida_em"],
     }
 
 
@@ -595,6 +642,13 @@ def hidratar_anotacao(
 
     ``None`` quando a anotação não existe ou o prompt dela sumiu do corpus —
     nunca 500, pela mesma razão de sempre: o corpus é recarregado por baixo.
+
+    **``gabarito_avaliacao_json`` NÃO ENTRA AQUI**, e a garantia é a mesma do
+    ``gabarito_json`` das tarefas: a coluna não está no SELECT abaixo e o
+    dicionário de ``anotacao`` é montado campo a campo. É por este envelope que
+    passa TODA leitura do revisor (triagem e Rate and Review), então é aqui que
+    o alvo escondido vaza ou não vaza. Um ``dict(linha)`` passaria no teste de
+    hoje e entregaria o alvo no dia em que alguém acrescentasse uma coluna.
     """
     linha = conn.execute(
         "SELECT an.id, an.atribuicao_id, an.versao, an.payload_schema, an.payload_json, "
@@ -639,12 +693,14 @@ __all__ = [
     "CHAVE_MOTIVO_VAZIA",
     "MOTIVO_VAZIA",
     "SQL_AGORA",
+    "SQL_REABRIR",
     "SQL_VIVA",
     "contagens_por_tipo",
     "expirar_vencidas",
     "hidratar",
     "hidratar_anotacao",
     "no_pool",
+    "reabrir",
     "reivindicar",
     "resolver_prompt",
     "rubrica_ativa",

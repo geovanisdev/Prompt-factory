@@ -54,7 +54,13 @@ from typing import Any
 #: trabalho humano e cada anotação a mais encarece a migração seguinte.
 #: Quem sobe a versão é ``annotate/migracao.py`` (``pf annotate migrate``),
 #: nunca um UPDATE silencioso.
-SCHEMA_VERSION_ANOTACAO = 2
+#:
+#: **v3 (P3b)**: UMA coluna — ``anotacoes.gabarito_avaliacao_json``, a nota-alvo
+#: escondida de uma anotação SINTÉTICA. Uma coluna só justifica uma migração
+#: inteira porque este banco guarda trabalho humano: acrescentá-la depois de a
+#: campanha do P4c gravar centenas de anotações custaria mais, e o preço de
+#: migrar é exatamente o número de linhas que já existem.
+SCHEMA_VERSION_ANOTACAO = 3
 
 #: Chave de ``app_meta`` onde a versão acima mora.
 CHAVE_VERSAO = "schema_version_anotacao"
@@ -157,7 +163,39 @@ AVALIACOES_DEPOIS: tuple[str, ...] = (
 )
 
 #: O que o admin decide sobre um item escalado. Encerra o item nos três casos.
+#:
+#: ``devolvida`` **é** permitida aqui, e não é uma exceção à regra "só a triagem
+#: devolve": a regra existe para que a passagem 2 não jogue trabalho de volta
+#: dias depois de tê-lo aprovado. O admin decidindo sobre um item que o próprio
+#: revisor marcou como duvidoso é o caminho de escalação, não a segunda passagem.
 DECISOES_ADMIN: tuple[str, ...] = ("aprovada", "devolvida", "descartada")
+
+#: Como um ``avaliacao_depois`` vira estado de ``anotacoes``. É DADO, e não uma
+#: sequência de ``if`` na rota, pela razão de ``TRANSICOES``: a máquina e o teste
+#: leem da mesma tabela. Note que ``devolvida`` não aparece — ver ``TRANSICOES``.
+DESFECHO_AVALIACAO: dict[str, str] = {
+    "incorrigivel": "descartada",
+    "borderline_admin": "escalada",
+    "adequado": "avaliada",
+    "excepcional": "avaliada",
+}
+
+#: E o mesmo para a decisão do admin sobre um item escalado.
+DESFECHO_DECISAO: dict[str, str] = {
+    "aprovada": "avaliada",
+    "devolvida": "devolvida",
+    "descartada": "descartada",
+}
+
+#: As chaves de ``anotacoes.gabarito_avaliacao_json``. Contrato do P4c (que
+#: preenche, na campanha de geração) e do P5a (que compara a avaliação do
+#: revisor com o alvo). Uma tupla, e não um modelo Pydantic, porque nenhuma rota
+#: aceita este dado do cliente: ele nasce de um comando local.
+CHAVES_GABARITO_AVALIACAO: tuple[str, ...] = ("avaliacao_antes", "familia_defeito", "nota")
+
+#: O nome da coluna do alvo escondido, em UM lugar. Quem prova que ela não vaza
+#: (``tests/test_annotate_p3b.py``) varre as respostas por esta string.
+COLUNA_GABARITO_AVALIACAO = "gabarito_avaliacao_json"
 
 #: Ciclo de vida de um projeto/campanha. Sem ele dois clientes não cabem no
 #: mesmo banco — e acrescentar o escopo depois seria migrar trabalho humano.
@@ -381,6 +419,23 @@ CREATE TABLE IF NOT EXISTS anotacoes (
   -- mudam sozinhas: dá para ajustar o texto do A/B sem mexer no formato.
   versao_diretriz INTEGER,
   payload_json   TEXT NOT NULL,
+  -- A NOTA-ALVO ESCONDIDA de uma anotação SINTÉTICA (P3b; quem preenche é a
+  -- campanha do P4c). NULL em 100% do trabalho humano, e é essa nulidade que
+  -- define o que é humano: nada aqui marca "sintética" duas vezes.
+  --
+  -- Formato: um objeto com as chaves de CHAVES_GABARITO_AVALIACAO —
+  -- `avaliacao_antes` (uma de AVALIACOES_ANTES), `familia_defeito` (o catálogo
+  -- do P4c) e `nota` (texto livre).
+  -- Sem CHECK, pela razão do `eventos.acao`: o catálogo de defeitos cresce a
+  -- cada rodada da campanha, e migrar um banco com trabalho humano dentro só
+  -- para registrar o NOME de uma família nova seria absurdo.
+  --
+  -- **NUNCA sai pela API do revisor.** É a mesma disciplina do
+  -- `tarefas.gabarito_json`: o envelope é montado campo a campo e a coluna não
+  -- entra no SELECT (ver `tarefas.hidratar_anotacao`). Um alvo visível mede a
+  -- capacidade de ler JSON, não a calibração de quem avalia. Quem consome é o
+  -- painel do admin (P5a), comparando a avaliação do revisor com o alvo.
+  gabarito_avaliacao_json TEXT,
   tempo_ativo_ms INTEGER NOT NULL DEFAULT 0 CHECK (tempo_ativo_ms >= 0),
   iniciada_em    TEXT,
   submetida_em   TEXT NOT NULL DEFAULT ({_agora()}),
@@ -748,9 +803,13 @@ def contagens(conn: sqlite3.Connection) -> dict[str, int]:
 __all__ = [
     "AVALIACOES_ANTES",
     "AVALIACOES_DEPOIS",
+    "CHAVES_GABARITO_AVALIACAO",
     "CHAVE_VERSAO",
+    "COLUNA_GABARITO_AVALIACAO",
     "DDL",
     "DECISOES_ADMIN",
+    "DESFECHO_AVALIACAO",
+    "DESFECHO_DECISAO",
     "ORIGENS_RESPOSTA",
     "ORIGENS_RUBRICA",
     "ORIGENS_TAREFA",

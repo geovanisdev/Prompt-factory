@@ -179,11 +179,12 @@ def criar_app(
 
     # Import aqui dentro (e não no topo) para manter o grafo de import acíclico:
     # as rotas importam `deps`, que importa daqui.
-    from . import routes_meta, routes_revisao, routes_trabalho
+    from . import routes_avaliacao, routes_meta, routes_revisao, routes_trabalho
 
     app.include_router(routes_meta.router)
     app.include_router(routes_trabalho.router)
     app.include_router(routes_revisao.router)
+    app.include_router(routes_avaliacao.router)
 
     # POR ÚLTIMO. Um mount em "/" registrado antes dos routers engoliria
     # /api/* — o Starlette casa as rotas na ordem em que foram adicionadas.

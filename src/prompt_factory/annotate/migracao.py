@@ -1,4 +1,4 @@
-"""``pf annotate migrate`` — schema 1 → 2 **preservando o trabalho humano**.
+"""``pf annotate migrate`` — sobe o schema **preservando o trabalho humano**.
 
 O ``annotate.sqlite`` é o único banco deste projeto que a pipeline **não sabe
 refazer**. O corpus se reconstrói com um ``pf run`` de algumas horas; uma
@@ -21,11 +21,20 @@ faz ``os.replace``. Três propriedades que ``ALTER TABLE`` não daria:
    perderia dados em silêncio na próxima migração; aqui, uma coluna nova sem
    tratamento é um ``KeyError`` na hora, não um NULL descoberto meses depois.
 
-O arquivo antigo **não é apagado**: vira ``<nome>.v1.bak`` ao lado. Custo: um
+O arquivo antigo **não é apagado**: vira ``<nome>.v<N>.bak`` ao lado. Custo: um
 arquivo de alguns MB. Benefício: a operação inteira é reversível com um ``mv``.
 
-O QUE MUDA NOS DADOS
-====================
+DUAS ORIGENS, UM DESTINO
+========================
+O destino é **sempre** o schema corrente, e o arquivo novo nasce do ``db.DDL``
+— nunca de uma sequência de remendos encadeados. Não há "migrar 1→2 e depois
+2→3": há ``_da_v1`` e ``_da_v2``, cada um copiando o que aquele schema tinha
+para dentro de um banco já na versão de hoje. Encadear passos exigiria manter
+vivo o DDL de cada versão intermediária, e o teste que compara ``sqlite_master``
+com um banco novo deixaria de valer no meio da cadeia.
+
+O QUE MUDA NOS DADOS, VINDO DA v1 (P1/P2)
+=========================================
 * ``anotacoes.status``: ``pendente_revisao`` → ``pendente_triagem``;
   ``aprovada`` → ``pendente_avaliacao`` (a triagem aprovou, o Rate and Review
   ainda não passou); ``rejeitada`` → ``devolvida``.
@@ -39,6 +48,16 @@ O QUE MUDA NOS DADOS
 Um status fora do mapa **recusa a migração inteira**, com o id da linha. Migrar
 "quase tudo" e deixar duas linhas com status inválido é o desfecho que este
 módulo existe para impedir.
+
+O QUE MUDA NOS DADOS, VINDO DA v2 (P3a/P3i)
+===========================================
+Nada. A v3 acrescenta ``anotacoes.gabarito_avaliacao_json``, que é NULL em todo
+trabalho humano — e é justamente essa nulidade que o distingue de uma anotação
+sintética. Projetos, diretrizes, avaliações, edições e decisões vêm como estão:
+``projetos`` e ``diretrizes`` são copiadas em vez de re-semeadas, porque um
+``semear`` sobre a v2 recusaria (com razão) reescrever uma diretriz que já
+gravou trabalho, e porque os **ids** de projeto são referenciados por
+``tarefas.projeto_id``.
 """
 
 from __future__ import annotations
@@ -107,6 +126,87 @@ COPIA_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: A união, para quem quiser inventariar o que a migração cobre.
 COPIA_DIRETA: tuple[tuple[str, tuple[str, ...]], ...] = COPIA_ANTES + COPIA_DEPOIS
 
+#: A cópia vinda da **v2**: tudo que a v2 já tinha, na ordem em que as FKs
+#: fecham. ``anotacoes`` é tratada à parte (ela ganha a coluna nova) e por isso
+#: parte a lista em duas, como na v1.
+#:
+#: ``pool`` entra na cópia — e não é cache indevido: ela é uma projeção com
+#: chave de invalidação explícita (``pool_assinatura`` em ``app_meta``, copiada
+#: junto). Deixá-la para trás faria a primeira subida depois da migração
+#: reconstruir 500 linhas por nada, e faria as contagens de conferência não
+#: baterem sem um caso especial.
+COPIA_V2_ANTES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("projetos", ("id", "nome", "cliente", "descricao", "status", "criado_em")),
+    ("diretrizes", ("id", "tipo", "versao", "texto_json", "criada_em")),
+    (
+        "anotadores",
+        ("id", "nome", "papel", "ativo", "qualificacoes_json", "criado_em"),
+    ),
+    ("prompts_demo", ("uid", "text", "lang", "criado_em")),
+    (
+        "tarefas",
+        ("id", "tipo", "prompt_uid", "origem", "projeto_id", "payload_json", "gabarito_json",
+         "n_anotacoes_alvo", "prioridade", "status", "db_build_id", "criado_em"),
+    ),
+    (
+        "atribuicoes",
+        ("id", "tarefa_id", "anotador_id", "status", "iniciada_em", "expira_em", "terminada_em"),
+    ),
+    (
+        "respostas_modelo",
+        ("id", "prompt_uid", "rotulo_modelo", "texto", "origem", "meta_json", "criada_em"),
+    ),
+    (
+        "criacoes",
+        ("id", "autor_id", "texto", "lang", "task_type_sugerido", "domain_sugerido", "brief",
+         "hash_norm", "duplicata_corpus", "status", "revisor_id", "comentario_revisao",
+         "revisada_em", "uid_previsto", "exportada_em", "criada_em"),
+    ),
+    ("pool", ("uid", "ordem")),
+)
+
+#: E o que depende de ``anotacoes`` já existir. A ordem importa por causa do
+#: ``foreign_keys=ON`` que ``db.connect`` liga sempre: ``edicoes_avaliacao``
+#: referencia ``avaliacoes``, que referencia ``anotacoes``.
+COPIA_V2_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "revisoes",
+        ("id", "anotacao_id", "revisor_id", "veredito", "comentario", "autorrevisao",
+         "criada_em"),
+    ),
+    (
+        "avaliacoes",
+        ("id", "anotacao_id", "revisor_id", "avaliacao_antes", "avaliacao_depois",
+         "justificativa", "payload_corrigido_json", "autorrevisao", "tempo_ativo_ms",
+         "criada_em"),
+    ),
+    (
+        "edicoes_avaliacao",
+        ("id", "avaliacao_id", "campo", "valor_antes", "valor_depois", "motivo"),
+    ),
+    (
+        "decisoes_admin",
+        ("id", "avaliacao_id", "admin_id", "decisao", "comentario", "criada_em"),
+    ),
+    (
+        "rubricas",
+        ("id", "prompt_uid", "titulo", "criterios_json", "origem", "anotacao_id", "status",
+         "criada_em"),
+    ),
+    ("eventos", ("id", "ator_id", "acao", "entidade", "entidade_id", "detalhe_json",
+                 "criado_em")),
+)
+
+#: As versões de origem que este módulo sabe ler. Uma lista, e não um ``if``
+#: solto: acrescentar a v3 um dia é acrescentar uma função e uma chave.
+ORIGENS_CONHECIDAS: tuple[int, ...] = (1, 2)
+
+#: As tabelas que a própria migração faz crescer, e que por isso são conferidas
+#: por "nunca menos" em vez de "exatamente igual": ``app_meta`` ganha chaves e
+#: ``eventos`` ganha o registro ``banco_migrado``. Ver a conferência em
+#: ``migrar``.
+TABELAS_QUE_CRESCEM: frozenset[str] = frozenset({"app_meta", "eventos"})
+
 
 class MigracaoImpossivel(RuntimeError):
     """Algo no banco antigo não cabe no schema novo. Nada foi alterado."""
@@ -138,8 +238,11 @@ def _contagens_brutas(conn: sqlite3.Connection) -> dict[str, int]:
     }
 
 
-def _migrar_para(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any]:
-    """Copia a v1 no arquivo já inicializado em v2. Devolve o relatório."""
+def _da_v1(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any]:
+    """Copia a v1 no arquivo já inicializado no schema de HOJE.
+
+    Devolve o relatório que a CLI imprime.
+    """
     relatorio: dict[str, Any] = {"copiadas": {}, "avisos": []}
 
     # 1. os DOIS projetos padrão: toda tarefa passa a ter escopo, e o escopo
@@ -284,6 +387,92 @@ def _migrar_para(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[st
     return relatorio
 
 
+def _da_v2(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any]:
+    """Copia a v2 no arquivo já inicializado no schema de HOJE.
+
+    A v2 já tem projetos, diretrizes e as três tabelas da passagem 2. Nada é
+    transformado: a v3 acrescenta UMA coluna anulável, e o valor certo dela em
+    todo trabalho humano é NULL.
+
+    Projetos e diretrizes são **copiados**, não re-semeados. Re-semear
+    reescreveria (ou recusaria reescrever) uma diretriz que já gravou trabalho,
+    e ainda por cima poderia trocar os ids que ``tarefas.projeto_id`` referencia.
+    """
+    relatorio: dict[str, Any] = {"copiadas": {}, "avisos": []}
+
+    for tabela, colunas in COPIA_V2_ANTES:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+
+    # `anotacoes` à parte: é a única tabela com forma diferente entre as duas
+    # versões. A coluna nova é omitida do INSERT de propósito — ela nasce NULL,
+    # que é o valor que significa "trabalho humano".
+    linhas = velho.execute(
+        "SELECT id, atribuicao_id, versao, payload_schema, versao_diretriz, payload_json, "
+        "       tempo_ativo_ms, iniciada_em, submetida_em, status FROM anotacoes ORDER BY id"
+    ).fetchall()
+    desconhecidos = sorted({str(x["status"]) for x in linhas} - set(adb.STATUS_ANOTACAO))
+    if desconhecidos:
+        raise MigracaoImpossivel(
+            f"anotações com status que o schema {adb.SCHEMA_VERSION_ANOTACAO} não conhece: "
+            f"{', '.join(desconhecidos)}. Nada foi alterado."
+        )
+    novo.executemany(
+        "INSERT INTO anotacoes (id, atribuicao_id, versao, payload_schema, versao_diretriz, "
+        "                       payload_json, tempo_ativo_ms, iniciada_em, submetida_em, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (x["id"], x["atribuicao_id"], x["versao"], x["payload_schema"], x["versao_diretriz"],
+             x["payload_json"], x["tempo_ativo_ms"], x["iniciada_em"], x["submetida_em"],
+             x["status"])
+            for x in linhas
+        ],
+    )
+    relatorio["copiadas"]["anotacoes"] = len(linhas)
+
+    for tabela, colunas in COPIA_V2_DEPOIS:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+
+    # app_meta inteira, MENOS a versão (que o `init_db` já escreveu). As chaves
+    # do pool vêm junto porque a tabela `pool` veio junto: a assinatura continua
+    # descrevendo exatamente o que está materializado.
+    for linha in velho.execute("SELECT key, value FROM app_meta ORDER BY key"):
+        if str(linha["key"]) == adb.CHAVE_VERSAO:
+            continue
+        adb.set_meta(novo, str(linha["key"]), linha["value"])
+
+    # O relatório tem a MESMA forma da v1: a CLI imprime um só bloco.
+    projetos = novo.execute("SELECT id, nome FROM projetos ORDER BY id").fetchall()
+    relatorio["projetos"] = {str(p["nome"]): int(p["id"]) for p in projetos}
+    relatorio["alocacao"] = {
+        str(p["nome"]): int(
+            novo.execute(
+                "SELECT count(*) AS n FROM tarefas WHERE projeto_id = ?", (int(p["id"]),)
+            ).fetchone()["n"]
+        )
+        for p in projetos
+    }
+    relatorio["diretrizes"] = relatorio["copiadas"].get("diretrizes", 0)
+    # Sem backfill: nenhum status mudou de nome entre a v2 e a v3.
+    relatorio["status_backfill"] = {}
+
+    evmod.registrar(
+        novo,
+        acao="banco_migrado",
+        entidade="banco",
+        de=2,
+        para=adb.SCHEMA_VERSION_ANOTACAO,
+        anotacoes_preservadas=relatorio["copiadas"]["anotacoes"],
+        avaliacoes_preservadas=relatorio["copiadas"]["avaliacoes"],
+        projetos=relatorio["projetos"],
+        alocacao=relatorio["alocacao"],
+    )
+    return relatorio
+
+
+#: versão de origem → a função que sabe lê-la. Ver ``ORIGENS_CONHECIDAS``.
+PASSOS = {1: _da_v1, 2: _da_v2}
+
+
 def precisa_migrar(caminho: Path) -> int | None:
     """A versão gravada, se ela diverge. ``None`` quando não há o que fazer."""
     if not Path(caminho).is_file():
@@ -322,9 +511,10 @@ def migrar(caminho: str | Path) -> dict[str, Any]:
                 f"{alvo} não tem {adb.CHAVE_VERSAO} em app_meta — não dá para saber "
                 "de qual versão migrar. Mova o arquivo para o lado."
             )
-        if versao != 1:
+        if versao not in PASSOS:
             raise MigracaoImpossivel(
-                f"{alvo} está na versão {versao}; esta migração só sabe ir de 1 para "
+                f"{alvo} está na versão {versao}; esta migração sabe ler "
+                f"{', '.join(str(v) for v in ORIGENS_CONHECIDAS)} e escrever "
                 f"{adb.SCHEMA_VERSION_ANOTACAO}."
             )
         antes = _contagens_brutas(velho)
@@ -340,7 +530,7 @@ def migrar(caminho: str | Path) -> dict[str, Any]:
             adb.init_db(novo)
             novo.execute("BEGIN")
             try:
-                relatorio = _migrar_para(velho, novo)
+                relatorio = PASSOS[versao](velho, novo)
                 # A prova, DENTRO da transação: as FKs fecham e as contagens das
                 # tabelas que existiam batem uma a uma. Uma linha perdida na
                 # cópia aborta a migração em vez de virar um banco menor.
@@ -352,8 +542,18 @@ def migrar(caminho: str | Path) -> dict[str, Any]:
                     )
                 depois = _contagens_brutas(novo)
                 for tabela, n in antes.items():
-                    if tabela == "app_meta":
-                        continue  # a v2 grava chaves novas de propósito
+                    if tabela in TABELAS_QUE_CRESCEM:
+                        # Estas DUAS crescem de propósito durante a migração:
+                        # `app_meta` ganha chaves novas e `eventos` ganha o
+                        # registro `banco_migrado`. A conferência existe para
+                        # detectar trabalho PERDIDO, e é isso que ela continua
+                        # detectando aqui — só nunca menos.
+                        if depois.get(tabela, -1) < n:
+                            raise MigracaoImpossivel(
+                                f"{tabela}: {n} linha(s) antes, {depois.get(tabela)} depois. "
+                                "Nada foi alterado."
+                            )
+                        continue
                     if depois.get(tabela, -1) != n:
                         raise MigracaoImpossivel(
                             f"{tabela}: {n} linha(s) antes, {depois.get(tabela)} depois. "
@@ -369,8 +569,11 @@ def migrar(caminho: str | Path) -> dict[str, Any]:
     finally:
         velho.close()
 
-    # A troca. O antigo vira `.v1.bak` — a migração inteira se desfaz com um mv.
-    backup = alvo.with_name(alvo.name + ".v1.bak")
+    # A troca. O antigo vira `.v<N>.bak` — a migração se desfaz com um mv. O
+    # número é o da versão de ORIGEM, e não um sufixo fixo: com duas migrações
+    # possíveis, `.v1.bak` ao lado de um banco que veio da v2 mentiria sobre o
+    # que aquele arquivo é.
+    backup = alvo.with_name(f"{alvo.name}.v{versao}.bak")
     if backup.exists():
         backup.unlink()
     os.replace(alvo, backup)
@@ -386,7 +589,7 @@ def migrar(caminho: str | Path) -> dict[str, Any]:
     relatorio.update(
         {
             "ja_estava": False,
-            "de": 1,
+            "de": versao,
             "para": adb.SCHEMA_VERSION_ANOTACAO,
             "arquivo": str(alvo),
             "backup": str(backup),
@@ -398,8 +601,13 @@ def migrar(caminho: str | Path) -> dict[str, Any]:
 
 __all__ = [
     "COPIA_DIRETA",
+    "COPIA_V2_ANTES",
+    "COPIA_V2_DEPOIS",
     "MAPA_STATUS",
     "MAPA_VEREDITO",
+    "ORIGENS_CONHECIDAS",
+    "PASSOS",
+    "TABELAS_QUE_CRESCEM",
     "VERSAO_DIRETRIZ_HERDADA",
     "MigracaoImpossivel",
     "migrar",

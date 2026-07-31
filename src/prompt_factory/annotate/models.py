@@ -19,7 +19,14 @@ from typing import Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..config import get as _cfg
-from .db import PAPEIS, TIPOS_TAREFA, VEREDITOS
+from .db import (
+    AVALIACOES_ANTES,
+    AVALIACOES_DEPOIS,
+    DECISOES_ADMIN,
+    PAPEIS,
+    TIPOS_TAREFA,
+    VEREDITOS,
+)
 
 #: Comprimento máximo de um nome de perfil. Não é estética: o nome é o
 #: identificador da pessoa em toda rota e aparece em tabela no painel do admin.
@@ -230,6 +237,192 @@ class TriarIn(BaseModel):
         return self
 
 
+#: Teto do caminho de um campo dentro do payload (``notas.12.justificativa``).
+#: Curto de propósito: um caminho de 200 caracteres não vem de um formulário,
+#: vem de alguém montando payload à mão.
+MAX_CAMPO = 200
+
+#: Teto do motivo de UMA mudança. Ele é curto por desenho — a justificativa
+#: longa é a geral, e um motivo de mudança que precisa de 2.000 caracteres é um
+#: sinal de que a correção deveria ter sido uma devolução na triagem.
+MAX_MOTIVO = 600
+
+
+class EdicaoIn(BaseModel):
+    """Uma linha do diff: o caminho, os dois valores e **o motivo daquela** mudança.
+
+    ``motivo`` é obrigatório e tem piso de caracteres. Sem ele, o Rate and
+    Review vira "o revisor mudou as notas" e ninguém consegue dizer se ele
+    corrigiu um erro ou impôs o gosto dele — que é exatamente a diferença entre
+    QC e opinião.
+
+    ``valor_antes``/``valor_depois`` chegam do cliente e são **conferidos**
+    contra o diff que o servidor calcula (``avaliacoes.diferencas``): eles
+    existem no corpo para que a tela possa mandar o que mostrou, não para que o
+    servidor acredite.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    campo: Annotated[str, Field(min_length=1, max_length=MAX_CAMPO)]
+    valor_antes: Annotated[str | None, Field(max_length=20_000)] = None
+    valor_depois: Annotated[str | None, Field(max_length=20_000)] = None
+    motivo: Annotated[str, Field(max_length=MAX_MOTIVO)]
+
+    @field_validator("campo", "motivo", mode="before")
+    @classmethod
+    def _texto_limpo(cls, v: Any) -> Any:
+        # `.strip()` ANTES do min_length: um motivo só de espaços passaria pelo
+        # comprimento e gravaria uma justificativa em branco no CHECK do DDL —
+        # que a recusaria com um IntegrityError sem nome de campo.
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("motivo")
+    @classmethod
+    def _motivo_suficiente(cls, v: str) -> str:
+        piso = int(_cfg("annotate", "min_chars_motivo_edicao", default=10))
+        if len(v) < piso:
+            raise ValueError(
+                f"cada mudança precisa do próprio motivo, com ao menos {piso} caracteres "
+                f"(tem {len(v)})"
+            )
+        return v
+
+
+class AvaliarIn(BaseModel):
+    """``POST /api/avaliacao/{anotacao_id}`` — a passagem 2 inteira, num corpo só.
+
+    As duas escalas, o payload corrigido, o diff com um motivo por mudança e a
+    justificativa geral. Tudo junto porque é **uma** decisão: gravar a escala
+    antes e a correção depois deixaria um item medido e não corrigido no banco
+    se a segunda chamada falhasse.
+
+    ``payload_corrigido`` chega como dicionário CRU, pela mesma razão do
+    ``SubmeterIn``: quem o valida é o modelo escolhido pelo **tipo da tarefa
+    lido do banco**.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    revisor_id: Annotated[int, Field(ge=1)]
+    avaliacao_antes: str
+    avaliacao_depois: str
+    justificativa: Annotated[str, Field(max_length=4_000)]
+    payload_corrigido: dict[str, Any] | None = None
+    edicoes: Annotated[list[EdicaoIn], Field(max_length=200)] = []
+    tempo_ativo_ms: Annotated[int, Field(ge=0, le=MAX_TEMPO_ATIVO_MS)] = 0
+
+    @field_validator("revisor_id", "tempo_ativo_ms", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("este campo não é booleano")
+        return v
+
+    @field_validator("avaliacao_antes")
+    @classmethod
+    def _antes_conhecida(cls, v: str) -> str:
+        # Validado contra a MESMA tupla que gerou o CHECK do DDL. `inutilizavel`
+        # está lá de propósito, mesmo tendo passado na triagem: é o caso "a
+        # triagem deixou passar", e registrá-lo é o ponto.
+        if v not in AVALIACOES_ANTES:
+            raise ValueError(f"avaliacao_antes fora de {list(AVALIACOES_ANTES)}: {v!r}")
+        return v
+
+    @field_validator("avaliacao_depois")
+    @classmethod
+    def _depois_conhecida(cls, v: str) -> str:
+        if v not in AVALIACOES_DEPOIS:
+            raise ValueError(f"avaliacao_depois fora de {list(AVALIACOES_DEPOIS)}: {v!r}")
+        return v
+
+    @field_validator("justificativa", mode="before")
+    @classmethod
+    def _justificativa_limpa(cls, v: Any) -> Any:
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("justificativa")
+    @classmethod
+    def _justificativa_suficiente(cls, v: str) -> str:
+        # SEMPRE obrigatória — inclusive quando o revisor não mudou nada e achou
+        # tudo excepcional. Uma avaliação sem motivo é um número que ninguém
+        # consegue contestar nem aprender com.
+        piso = int(_cfg("annotate", "min_chars_avaliacao", default=30))
+        if len(v) < piso:
+            raise ValueError(
+                f"a avaliação precisa de uma justificativa de ao menos {piso} caracteres "
+                f"(tem {len(v)}) — ela é o que o painel e o export mostram ao lado do escore"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _um_motivo_por_campo(self) -> AvaliarIn:
+        campos = [e.campo for e in self.edicoes]
+        if len(set(campos)) != len(campos):
+            # Dois motivos para o mesmo caminho: a tela mandaria um só, e duas
+            # linhas em `edicoes_avaliacao` para o mesmo campo fariam o diff da
+            # auditoria contar a mesma mudança duas vezes.
+            raise ValueError("o mesmo campo aparece duas vezes em `edicoes`")
+        if self.edicoes and self.payload_corrigido is None:
+            raise ValueError(
+                "vieram motivos de mudança sem o payload corrigido — o servidor calcula "
+                "o diff a partir dele, e sem ele não há mudança nenhuma a justificar"
+            )
+        return self
+
+
+class DecisaoAdminIn(BaseModel):
+    """``POST /api/escalacao/{avaliacao_id}`` — o admin encerra um item escalado.
+
+    ``devolvida`` **é** permitida aqui, e não contradiz "só a triagem devolve":
+    a regra existe para que a passagem 2 não jogue de volta, dias depois, um
+    trabalho que ela mesma aprovou. O admin decidindo sobre um item que o
+    revisor marcou como duvidoso é o caminho de escalação.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    admin_id: Annotated[int, Field(ge=1)]
+    decisao: str
+    comentario: Annotated[str | None, Field(max_length=4_000)] = None
+
+    @field_validator("admin_id", mode="before")
+    @classmethod
+    def _id_nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("admin_id não é booleano")
+        return v
+
+    @field_validator("decisao")
+    @classmethod
+    def _decisao_conhecida(cls, v: str) -> str:
+        if v not in DECISOES_ADMIN:
+            raise ValueError(f"decisão fora de {list(DECISOES_ADMIN)}: {v!r}")
+        return v
+
+    @field_validator("comentario")
+    @classmethod
+    def _comentario_limpo(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return v.strip() or None
+
+    @model_validator(mode="after")
+    def _devolver_exige_motivo(self) -> DecisaoAdminIn:
+        # Mesma regra da triagem, e pelo mesmo motivo: devolver sem dizer o que
+        # corrigir devolve trabalho sem devolver informação. Aqui o comentário
+        # atravessa dois saltos (admin → anotador) e é a única coisa que chega.
+        if self.decisao != "devolvida":
+            return self
+        piso = int(_cfg("annotate", "min_chars_devolucao", default=20))
+        if not self.comentario or len(self.comentario) < piso:
+            raise ValueError(
+                f"devolver pede um comentário de ao menos {piso} caracteres — ele volta "
+                "para o anotador e é a única instrução que ele recebe"
+            )
+        return self
+
+
 def perfil(linha: Any) -> dict[str, Any]:
     """Linha de ``anotadores`` -> dict JSON.
 
@@ -256,9 +449,14 @@ def perfil(linha: Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "MAX_CAMPO",
+    "MAX_MOTIVO",
     "MAX_NOME",
     "MAX_TEMPO_ATIVO_MS",
     "AbandonarIn",
+    "AvaliarIn",
+    "DecisaoAdminIn",
+    "EdicaoIn",
     "LivreIn",
     "PerfilIn",
     "ProximaIn",

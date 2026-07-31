@@ -175,21 +175,23 @@ def test_o_seletor_de_papel_esta_na_barra(html: str, js: str) -> None:
 
 def test_marca_o_que_ainda_nao_existe(js: str) -> None:
     """Nada de "em construção": o que não funciona é desabilitado e marcado com
-    o marco em que chega. Com o P3a entregue, "P3" sai da lista e entra "P3b"."""
+    o marco em que chega. Com o P3b entregue, "P3b" sai da lista."""
     assert '"marco"' in js
     assert "em construção" not in js.lower()
-    for marco in ("P3b", "P4", "P5", "P6", "P7"):
+    for marco in ("P4", "P5", "P6", "P7"):
         assert f'"{marco}"' in js
     roteiro = js.split("const ROTEIRO = [", 1)[1].split("];", 1)[0]
     assert '"P3"' not in roteiro
 
 
-def test_o_p2_saiu_do_roteiro_do_que_falta(js: str) -> None:
-    """O roteiro do admin lista o que AINDA NÃO existe. Com o P2 entregue, ele
-    não pode continuar prometendo a fila e o catálogo como futuros — um roteiro
-    que lista o que já está na tela é pior que roteiro nenhum."""
+def test_o_p2_e_o_p3b_sairam_do_roteiro_do_que_falta(js: str) -> None:
+    """O roteiro do admin lista o que AINDA NÃO existe. Com o P2 e o P3b
+    entregues, ele não pode continuar prometendo a fila, o catálogo e o Rate and
+    Review como futuros — um roteiro que lista o que já está na tela é pior que
+    roteiro nenhum."""
     roteiro = js.split("const ROTEIRO = [", 1)[1].split("];", 1)[0]
     assert '"P2"' not in roteiro
+    assert '"P3b"' not in roteiro
 
 
 def test_estados_vazios_tem_saida(js: str) -> None:
@@ -220,6 +222,11 @@ ROTAS_DO_FRONT: frozenset[str] = frozenset(
         "/api/atribuicoes/",
         "/api/revisao/fila",
         "/api/revisao/",
+        # P3b: a passagem 2 e a escalação.
+        "/api/avaliacao/fila",
+        "/api/avaliacao/",
+        "/api/escalacao/fila",
+        "/api/escalacao/",
     }
 )
 

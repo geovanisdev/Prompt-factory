@@ -488,6 +488,84 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .roteiro b{color:var(--texto);font-weight:600}
 
 /* ==========================================================================
+   8b. RATE AND REVIEW (P3b) — as duas escalas, o motivo por mudança e o diff
+
+   As quatro opções de cada escala ficam SEMPRE VISÍVEIS, com a âncora legível
+   ao lado. Um `<select>` economizaria espaço e custaria a única coisa que uma
+   escala ancorada tem: a possibilidade de comparar as quatro descrições antes
+   de escolher uma. É o mesmo motivo pelo qual as notas da rubrica são botões.
+   ========================================================================== */
+.rr-secao{border-top:1px solid var(--linha);padding:16px}
+.rr-secao-titulo{font-size:.98rem;font-weight:600;margin-bottom:4px}
+.rr-secao-nota{color:var(--texto-2);font-size:.88rem;margin:0 0 12px;max-width:70ch}
+.escala{display:flex;flex-direction:column;gap:6px}
+.escala-opcao{
+  display:flex;gap:10px;align-items:baseline;text-align:left;
+  border:1px solid var(--linha-forte);border-radius:var(--raio);
+  background:var(--superficie);padding:9px 12px;cursor:pointer;
+  font:inherit;color:var(--texto);width:100%;
+}
+.escala-opcao:hover{background:var(--superficie-2)}
+.escala-opcao[aria-checked="true"]{
+  border-color:var(--acento);background:var(--acento-fraco);
+  box-shadow:0 0 0 1px var(--acento);
+}
+.escala-opcao b{font-weight:600;white-space:nowrap;min-width:9.5rem}
+.escala-opcao span{color:var(--texto-2);font-size:.88rem}
+.escala-opcao[aria-checked="true"] b{color:var(--acento)}
+/* O DESFECHO de cada opção da escala 2, na cor semântica: descartar e escalar
+   não são a mesma coisa que encerrar, e a cor diz isso antes da leitura. */
+.escala-opcao.grave[aria-checked="true"]{
+  border-color:var(--devolvido);background:var(--devolvido-fundo);box-shadow:0 0 0 1px var(--devolvido);
+}
+.escala-opcao.grave[aria-checked="true"] b{color:var(--devolvido)}
+.escala-opcao.boa[aria-checked="true"]{
+  border-color:var(--aprovado);background:var(--aprovado-fundo);box-shadow:0 0 0 1px var(--aprovado);
+}
+.escala-opcao.boa[aria-checked="true"] b{color:var(--aprovado)}
+
+/* O MOTIVO DE UMA MUDANÇA, inline. Não é modal, não é painel lateral: ele nasce
+   colado ao campo que mudou e some quando a edição é desfeita. */
+.motivos{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.motivo-linha{
+  border-left:3px solid var(--devolvido);background:var(--devolvido-fundo);
+  border-radius:0 var(--raio) var(--raio) 0;padding:8px 10px;
+}
+.motivo-linha label{
+  display:block;font-size:.76rem;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--devolvido);font-weight:600;margin-bottom:5px;
+}
+.motivo-linha input{width:100%}
+
+/* O RESUMO DO DIFF: conferir o que mudou sem rolar a tela inteira de volta. */
+.diff{border-top:1px solid var(--linha);padding:16px;background:var(--superficie-2)}
+.diff-lista{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.diff-item{
+  display:grid;grid-template-columns:minmax(9rem,auto) 1fr;gap:4px 14px;
+  border:1px solid var(--linha);border-radius:var(--raio);
+  background:var(--superficie);padding:9px 12px;
+}
+.diff-campo{font-family:var(--fonte-mono);font-size:.82rem;color:var(--acento);overflow-wrap:anywhere}
+.diff-valores{display:flex;flex-direction:column;gap:3px;font-size:.88rem}
+.diff-valores span{overflow-wrap:anywhere}
+.diff-valores .de{color:var(--texto-3);text-decoration:line-through}
+.diff-valores .para{color:var(--texto)}
+.diff-motivo{grid-column:1/-1;color:var(--texto-2);font-size:.85rem;border-top:1px dashed var(--linha);padding-top:6px}
+.diff-motivo.pendente{color:var(--devolvido);font-weight:600}
+
+/* ---- a escalação, no painel do admin ---- */
+.escalado{border-bottom:1px solid var(--linha);padding:14px 16px}
+.escalado:last-child{border-bottom:none}
+.escalado-topo{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-size:.9rem}
+.escalado-just{
+  font-family:var(--fonte-leitura);color:var(--texto-2);margin:8px 0;
+  border-left:3px solid var(--linha-forte);padding-left:12px;
+}
+.escalado-trecho{color:var(--texto-3);font-size:.86rem;margin:6px 0}
+.escalado-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.escalado textarea{width:100%;margin-top:8px}
+
+/* ==========================================================================
    9. RECADO (confirmação que não bloqueia)
    ========================================================================== */
 .recado{
@@ -734,8 +812,11 @@ textarea{
     </section>
 
     <!-- ---------------- REVISOR ----------------
-         Passagem 1 (TRIAGEM): aprova ou devolve. A passagem 2 (Rate and
-         Review, com escores e correção no lugar) é outra aba, e chega no P3b. -->
+         DUAS passagens, duas sub-abas, os mesmos dois painéis. Passagem 1
+         (TRIAGEM): aprova ou devolve, sem escore — é a única que devolve
+         trabalho ao anotador. Passagem 2 (RATE AND REVIEW): duas escalas e
+         correção no lugar, com motivo por mudança; o que ela não resolve,
+         escala para o admin. -->
     <section id="tela-revisor" class="tela" hidden data-t-aria="a11y.tela_revisor">
       <div class="abas" id="abas-revisor" role="tablist" data-t-aria="a11y.abas_revisao"></div>
       <div class="revisao">
@@ -769,6 +850,19 @@ textarea{
           <span class="etiqueta" id="pool-etiqueta"></span>
         </div>
         <div class="painel-corpo"><dl class="linhas" id="pool-linhas"></dl></div>
+      </div>
+
+      <!-- A ESCALAÇÃO. Fecha o ciclo do Rate and Review: `borderline_admin` cria
+           o item aqui, e a decisão do admin encerra. Fica ACIMA de projetos e
+           equipe porque é a única coisa desta tela que espera uma ação. -->
+      <div class="painel">
+        <div class="painel-cabeca">
+          <h2 data-t="admin.escalacao"></h2>
+          <span class="crescer"></span>
+          <span class="fraco" data-t="admin.escalacao_nota"></span>
+          <span class="etiqueta pendente"><span class="ponto"></span><span id="escalacao-conta"></span></span>
+        </div>
+        <div id="escalacao-lista"></div>
       </div>
 
       <div class="painel">
@@ -933,6 +1027,9 @@ const TEXTOS = {
   "a11y.abas_revisao": "What to review",
   "a11y.vistas": "How to pick work",
   "a11y.nota": "{criterio}: score {valor}",
+  "a11y.escala_antes": "Rating for the work as it arrived",
+  "a11y.escala_depois": "Rating for the result after the corrections",
+  "a11y.decisao": "Decision on the escalated item",
   "barra.como": "as",
   "barra.em": "in",
   "barra.sem_login": "Demo — no sign-in",
@@ -984,6 +1081,10 @@ const TEXTOS = {
   "subaba.anotacoes.titulo": "Triage — waiting for review",
   "subaba.anotacoes.vazio": "Nothing waiting for review.",
   "subaba.anotacoes.linha": "Every submitted annotation lands here. You approve it or send it back — and sending back requires a comment, which goes to whoever annotated together with the filled-in form.",
+  "subaba.avaliacao.nome": "Rate and Review",
+  "subaba.avaliacao.titulo": "Rate and Review — what triage let through",
+  "subaba.avaliacao.vazio": "Nothing waiting to be evaluated.",
+  "subaba.avaliacao.linha": "What triage approves lands here. You score the work as it arrived, fix what can be fixed, score the result — and none of it goes back to whoever annotated.",
   "subaba.criacoes.nome": "Creations",
   "subaba.criacoes.titulo": "Prompts written by annotators",
   "subaba.criacoes.vazio": "No new prompt waiting.",
@@ -1039,6 +1140,8 @@ const TEXTOS = {
   "botao.devolver_com_comentario": "Send it back with this comment",
   "botao.aprovar_criacao": "Approve creation",
   "botao.recusar_criacao": "Turn creation down",
+  "botao.registrar_avaliacao": "Record the evaluation",
+  "botao.decidir": "Record the decision",
   "ws.prompt_rotulo": "what the person actually asked for",
   "ws.prov_demo": "demo pack",
   "ws.prov_demo_atribuicao": "hand-written for the Bancada demo — nobody's real prompt",
@@ -1059,6 +1162,7 @@ const TEXTOS = {
   "ws.comentario_geral_ph": "general comment (optional)",
   "ws.rascunho_recuperado": "We brought back what you had written in this task.",
   "ws.devolvida_versao": "Sent back for a fix — version {versao}",
+  "ws.devolvida_admin": "Sent back by the administrator — version {versao}",
   "ws.modelos_summary": "Start from a template (3 available)",
   "ws.modelos_nota": "The template lands as an editable draft — it exists so you do not start from a blank page, not to be submitted as it is.",
   "modelo.instrucao": "Instruction followed",
@@ -1108,6 +1212,11 @@ const TEXTOS = {
   "falta.preferencia": "Pick A, B or a tie",
   "falta.justificativa": "{n} more characters in the justification",
   "falta.devolucao": "{n} more characters",
+  "falta.rr_antes": "No rating for the work as received",
+  "falta.rr_depois": "No rating for the result",
+  "falta.rr_motivo_um": "1 change without a reason",
+  "falta.rr_motivos": "{n} changes without a reason",
+  "falta.decisao": "Pick one of the three outcomes",
   "catalogo.titulo": "Pick a prompt to {tipo}",
   "catalogo.contagem": "{n} of {total} in the pool",
   "catalogo.busca_ph": "search inside the prompt text",
@@ -1134,6 +1243,7 @@ const TEXTOS = {
   "minhas.vazio_linha": "The queue hands you the next one on its own; the catalog lets you choose.",
   "minhas.indisponivel": "this prompt left the corpus in the last reload",
   "minhas.devolvida": "Sent back for a fix",
+  "minhas.devolvida_admin": "Sent back by the administrator",
   "minhas.versao": "version {n}",
   "minhas.da_fila": "from the queue",
   "minhas.erro": "could not read your tasks: {erro}",
@@ -1162,6 +1272,53 @@ const TEXTOS = {
   "triagem.minhas_excluidas": "{n} annotation(s) of yours are waiting for triage and do not show up here: whoever reviews is never whoever annotated. Another reviewer sees them.",
   "triagem.criacoes_titulo": "Create mode arrives in P4.",
   "triagem.criacoes_linha": "Once it exists, a prompt written by an annotator shows up here before entering the corpus, and approving it records the uid the pipeline will reproduce.",
+  "rr.atalhos": "J/K move · Ctrl+Enter records",
+  "rr.nada_selecionado": "Nothing selected.",
+  "rr.nada_selecionado_linha": "Whatever you pick in the queue opens here in the very layout the annotator produced it in — except that here the fields are yours to fix.",
+  "rr.abrindo": "opening…",
+  "rr.erro_abrir": "could not open this item.",
+  "rr.erro_fila": "could not read the evaluation queue: {erro}",
+  "rr.por": "by {nome}",
+  "rr.por_voce": "by you",
+  "rr.versao": "version {n}",
+  "rr.triagem": "triaged by {nome}",
+  "rr.triagem_comentario": "from triage: {comentario}",
+  "rr.minhas_excluidas": "{n} annotation(s) of yours are waiting to be evaluated and do not show up here: whoever evaluates is never whoever annotated.",
+  "rr.rascunho": "We brought back the evaluation you had started for this item.",
+  "rr.antes_titulo": "1 · The work as it arrived",
+  "rr.antes_nota": "Score it before you touch anything. “Unusable” stays available even though triage approved it — that case is exactly the one worth having on record, and it measures triage, not whoever annotated.",
+  "rr.antes.inutilizavel.nome": "Unusable",
+  "rr.antes.inutilizavel.ancora": "triage let it through; there is nothing here to build on",
+  "rr.antes.ajustavel.nome": "Fixable",
+  "rr.antes.ajustavel.ancora": "right in substance, wrong in the detail — worth correcting",
+  "rr.antes.adequado.nome": "Adequate",
+  "rr.antes.adequado.ancora": "delivers what the task asked for",
+  "rr.antes.excepcional.nome": "Gold standard",
+  "rr.antes.excepcional.ancora": "the one you would show as the example of how it is done",
+  "rr.corrigir_titulo": "2 · Fix it right here",
+  "rr.corrigir_nota": "Every field is editable. What you change is recorded field by field, and each change asks for its own short reason. On this pass the work does NOT go back — whoever evaluates is whoever fixes.",
+  "rr.motivo_ph": "why this change? (at least {min} characters)",
+  "rr.motivo_rotulo": "reason — {campo}",
+  "rr.diff_titulo": "What you changed",
+  "rr.diff_vazio": "Nothing changed so far. Evaluating without touching anything is a legitimate outcome.",
+  "rr.diff_conta": "{n} change(s)",
+  "rr.diff_de": "was",
+  "rr.diff_para": "now",
+  "rr.diff_nada": "(empty)",
+  "rr.diff_sem_motivo": "no reason yet",
+  "rr.depois_titulo": "3 · The result, after your corrections",
+  "rr.depois_nota": "This is the score that decides the outcome: two of them close the item, one escalates it to the administrator and one discards it.",
+  "rr.depois.incorrigivel.nome": "Beyond repair",
+  "rr.depois.incorrigivel.ancora": "discarded — and it does not go back to whoever annotated",
+  "rr.depois.borderline_admin.nome": "Borderline (admin)",
+  "rr.depois.borderline_admin.ancora": "escalated — the administrator decides and closes it",
+  "rr.depois.adequado.nome": "Adequate",
+  "rr.depois.adequado.ancora": "closed, and it goes out as it stands",
+  "rr.depois.excepcional.nome": "Gold standard",
+  "rr.depois.excepcional.ancora": "closed, and it goes out as a reference",
+  "rr.just_titulo": "4 · Why this evaluation",
+  "rr.just_ph": "what the two scores mean, in one paragraph (at least {min} characters)",
+  "rr.just_nota": "Required, always — including when you changed nothing. A score with no reason is a number nobody can argue with or learn from.",
   "solo.titulo": "Solo mode",
   "solo.linha": "you are reviewing work of your own.",
   "solo.contagem": "{n} of {total} item(s) on this page are yours. ",
@@ -1173,6 +1330,11 @@ const TEXTOS = {
   "recado.modelo_carregado": "template loaded — now fit the criteria to the prompt",
   "recado.aprovada": "approved — moves on to the evaluation",
   "recado.devolvida": "sent back for a fix — the comment went to whoever annotated",
+  "recado.avaliada": "evaluation recorded — the item is closed",
+  "recado.escalada": "escalated — it is in the administrator's queue now",
+  "recado.descartada": "recorded as beyond repair — discarded, and it does not go back to whoever annotated",
+  "recado.decisao": "decision recorded — the item is closed",
+  "recado.decisao_devolvida": "sent back to whoever annotated — your comment went with it",
   "recado.admin_gera": "it is the administrator who creates tasks for the queue",
   "recado.entrou_equipe": "{nome} joined the team as {papel}",
   "recado.escala": "this criterion runs from {min} to {max}",
@@ -1186,6 +1348,23 @@ const TEXTOS = {
   "semPersona.titulo": "Nobody registered as {papel}.",
   "semPersona.linha": "Use “+ my name” in the bar to enter with a new name, or run `pf annotate seed` to bring in the six demo people.",
   "admin.pool": "Pool state",
+  "admin.escalacao": "Escalations waiting for you",
+  "admin.escalacao_nota": "borderline in the second pass — you decide, and the decision closes the item",
+  "admin.escalacao_vazia": "Nothing escalated.",
+  "admin.escalacao_vazia_linha": "An item only lands here when a reviewer marks it “Borderline (admin)” in the Rate and Review. Approving closes it, sending it back reopens the task, discarding ends it without delivery.",
+  "admin.escalacao_por": "{rev} on work by {aut}",
+  "admin.escalacao_escalas": "as it arrived: {nota1} · result: {nota2}",
+  "admin.escalacao_edicoes": "{n} change(s), each with a recorded reason",
+  "admin.escalacao_sem_edicoes": "no change was made — it was escalated as it arrived",
+  "admin.escalacao_ph": "comment (required to send it back — at least {min} characters)",
+  "admin.escalacao_erro": "could not read the escalations: {erro}",
+  "admin.escalacao_conta": "{n} waiting",
+  "admin.decisao.aprovada.nome": "Approve and close",
+  "admin.decisao.aprovada.ancora": "the work goes out as the reviewer left it",
+  "admin.decisao.devolvida.nome": "Send back to the annotator",
+  "admin.decisao.devolvida.ancora": "the only path back after triage — and your comment is what reaches them",
+  "admin.decisao.descartada.nome": "Discard",
+  "admin.decisao.descartada.ancora": "closed without delivery, and it does not go back",
   "admin.projetos": "Projects",
   "admin.projetos_nota": "what is demo and what is real work",
   "admin.col_projeto": "Project",
@@ -1213,7 +1392,7 @@ const TEXTOS = {
   "admin.card_revisoes": "triages done",
   "admin.card_revisoes_nota": "approving moves it to the evaluation; sending back reopens the task",
   "admin.card_avaliacoes": "evaluations (Rate and Review)",
-  "admin.card_avaliacoes_nota": "pass 2 arrives in P3b",
+  "admin.card_avaliacoes_nota": "pass 2 — two scores, corrections with a reason each",
   "admin.card_criacoes": "prompts written here",
   "admin.card_criacoes_nota": "create mode arrives in P4",
   "admin.pool_origem": "source",
@@ -1258,7 +1437,6 @@ const TEXTOS = {
   "pool.politica_redistribuivel": "only prompts with redistributable = 1 get in",
   "pool.politica_ambas": "only prompts with commercial_ok = 1 and redistributable = 1 get in",
   "pool.nota_nsfw": "the sensitive-content flag depends on the labelling campaign, which has not run yet: `nsfw` is null across the whole corpus today, and the clause excludes zero rows",
-  "roteiro.P3b": "Rate and Review: score before and after, correction with a reason per change, and escalation to the admin.",
   "roteiro.P4": "Create mode: writing a prompt, a duplicate warning against the corpus, and review of the creation.",
   "roteiro.P5": "Per-annotator metrics, agreement over the gold tasks, and task generation. Its reports go out in English, like every delivery artifact.",
   "roteiro.P6": "Ingestion: the approved prompt crosses the pipeline and comes back in the corpus with a deterministic uid.",
@@ -1278,6 +1456,9 @@ const TEXTOS = {
   "a11y.abas_revisao": "O que revisar",
   "a11y.vistas": "Como escolher trabalho",
   "a11y.nota": "{criterio}: nota {valor}",
+  "a11y.escala_antes": "Avaliação do trabalho como ele chegou",
+  "a11y.escala_depois": "Avaliação do resultado depois das correções",
+  "a11y.decisao": "Decisão sobre o item escalado",
   "barra.como": "como",
   "barra.em": "em",
   "barra.sem_login": "Demonstração — sem login",
@@ -1329,6 +1510,10 @@ const TEXTOS = {
   "subaba.anotacoes.titulo": "Triagem — esperando revisão",
   "subaba.anotacoes.vazio": "Nada esperando revisão.",
   "subaba.anotacoes.linha": "Toda anotação submetida cai aqui. Você aprova ou devolve — e a devolução exige um comentário, que volta para quem anotou junto com o formulário preenchido.",
+  "subaba.avaliacao.nome": "Rate and Review",
+  "subaba.avaliacao.titulo": "Rate and Review — o que passou na triagem",
+  "subaba.avaliacao.vazio": "Nada esperando avaliação.",
+  "subaba.avaliacao.linha": "O que a triagem aprova cai aqui. Você avalia o trabalho como ele chegou, corrige o que dá para corrigir, avalia o resultado — e nada disso volta para quem anotou.",
   "subaba.criacoes.nome": "Criações",
   "subaba.criacoes.titulo": "Prompts escritos por anotadores",
   "subaba.criacoes.vazio": "Nenhum prompt novo esperando.",
@@ -1384,6 +1569,8 @@ const TEXTOS = {
   "botao.devolver_com_comentario": "Devolver com este comentário",
   "botao.aprovar_criacao": "Aprovar criação",
   "botao.recusar_criacao": "Recusar criação",
+  "botao.registrar_avaliacao": "Registrar a avaliação",
+  "botao.decidir": "Registrar a decisão",
   "ws.prompt_rotulo": "o pedido de quem escreveu",
   "ws.prov_demo": "pacote de demonstração",
   "ws.prov_demo_atribuicao": "escrito à mão para a demonstração da Bancada — não é prompt de ninguém",
@@ -1404,6 +1591,7 @@ const TEXTOS = {
   "ws.comentario_geral_ph": "comentário geral (opcional)",
   "ws.rascunho_recuperado": "Recuperamos o que você tinha escrito nesta tarefa.",
   "ws.devolvida_versao": "Devolvida para ajuste — versão {versao}",
+  "ws.devolvida_admin": "Devolvida pelo administrador — versão {versao}",
   "ws.modelos_summary": "Começar de um modelo (3 disponíveis)",
   "ws.modelos_nota": "O modelo entra como rascunho editável — ele existe para você não começar de uma página em branco, não para ser enviado como está.",
   "modelo.instrucao": "Instrução seguida",
@@ -1453,6 +1641,11 @@ const TEXTOS = {
   "falta.preferencia": "Escolha A, B ou empate",
   "falta.justificativa": "Faltam {n} caracteres na justificativa",
   "falta.devolucao": "Faltam {n} caracteres",
+  "falta.rr_antes": "Falta avaliar o trabalho como ele chegou",
+  "falta.rr_depois": "Falta avaliar o resultado",
+  "falta.rr_motivo_um": "1 mudança sem motivo",
+  "falta.rr_motivos": "{n} mudanças sem motivo",
+  "falta.decisao": "Escolha um dos três desfechos",
   "catalogo.titulo": "Escolher um prompt para {tipo}",
   "catalogo.contagem": "{n} de {total} no pool",
   "catalogo.busca_ph": "buscar no texto do prompt",
@@ -1479,6 +1672,7 @@ const TEXTOS = {
   "minhas.vazio_linha": "A fila entrega a próxima sozinha; o catálogo deixa você escolher.",
   "minhas.indisponivel": "este prompt saiu do corpus na última recarga",
   "minhas.devolvida": "Devolvida para ajuste",
+  "minhas.devolvida_admin": "Devolvida pelo administrador",
   "minhas.versao": "versão {n}",
   "minhas.da_fila": "da fila",
   "minhas.erro": "não deu para ler suas tarefas: {erro}",
@@ -1507,6 +1701,53 @@ const TEXTOS = {
   "triagem.minhas_excluidas": "{n} anotação(ões) sua(s) esperam triagem e não aparecem aqui: quem revisa nunca é quem anotou. Outro revisor as vê.",
   "triagem.criacoes_titulo": "O modo criar chega no P4.",
   "triagem.criacoes_linha": "Quando ele existir, o prompt escrito por um anotador aparece aqui antes de entrar no corpus, e aprovar grava o uid que a pipeline vai reproduzir.",
+  "rr.atalhos": "J/K andam · Ctrl+Enter registra",
+  "rr.nada_selecionado": "Nada selecionado.",
+  "rr.nada_selecionado_linha": "O item escolhido na fila abre aqui exatamente como o anotador o produziu — só que aqui os campos são seus para corrigir.",
+  "rr.abrindo": "abrindo…",
+  "rr.erro_abrir": "não deu para abrir este item.",
+  "rr.erro_fila": "não deu para ler a fila de avaliação: {erro}",
+  "rr.por": "por {nome}",
+  "rr.por_voce": "por você",
+  "rr.versao": "versão {n}",
+  "rr.triagem": "triado por {nome}",
+  "rr.triagem_comentario": "da triagem: {comentario}",
+  "rr.minhas_excluidas": "{n} anotação(ões) sua(s) esperam avaliação e não aparecem aqui: quem avalia nunca é quem anotou.",
+  "rr.rascunho": "Trouxemos de volta a avaliação que você tinha começado neste item.",
+  "rr.antes_titulo": "1 · O trabalho como ele chegou",
+  "rr.antes_nota": "Avalie antes de mexer em qualquer coisa. “Inutilizável” continua disponível mesmo tendo passado na triagem — é justamente esse caso que vale registrar, e ele mede a triagem, não quem anotou.",
+  "rr.antes.inutilizavel.nome": "Inutilizável",
+  "rr.antes.inutilizavel.ancora": "a triagem deixou passar; não há o que aproveitar aqui",
+  "rr.antes.ajustavel.nome": "Ajustável",
+  "rr.antes.ajustavel.ancora": "certo no essencial, errado no detalhe — vale corrigir",
+  "rr.antes.adequado.nome": "Adequado",
+  "rr.antes.adequado.ancora": "entrega o que a tarefa pediu",
+  "rr.antes.excepcional.nome": "Padrão ouro",
+  "rr.antes.excepcional.ancora": "é o que você mostraria como exemplo de como se faz",
+  "rr.corrigir_titulo": "2 · Corrija aqui mesmo",
+  "rr.corrigir_nota": "Todo campo é editável. O que você mudar fica registrado campo a campo, e cada mudança pede o próprio motivo curto. Nesta passagem o trabalho NÃO volta — quem avalia é quem conserta.",
+  "rr.motivo_ph": "por que esta mudança? (mínimo de {min} caracteres)",
+  "rr.motivo_rotulo": "motivo — {campo}",
+  "rr.diff_titulo": "O que você mudou",
+  "rr.diff_vazio": "Nada mudou até agora. Avaliar sem tocar em nada é um desfecho legítimo.",
+  "rr.diff_conta": "{n} mudança(s)",
+  "rr.diff_de": "era",
+  "rr.diff_para": "agora",
+  "rr.diff_nada": "(vazio)",
+  "rr.diff_sem_motivo": "sem motivo ainda",
+  "rr.depois_titulo": "3 · O resultado, depois das suas correções",
+  "rr.depois_nota": "É esta nota que decide o desfecho: duas encerram o item, uma escala para o administrador e uma descarta.",
+  "rr.depois.incorrigivel.nome": "Incorrigível",
+  "rr.depois.incorrigivel.ancora": "descartado — e não volta para quem anotou",
+  "rr.depois.borderline_admin.nome": "Borderline (admin)",
+  "rr.depois.borderline_admin.ancora": "escalado — o administrador decide e encerra",
+  "rr.depois.adequado.nome": "Adequado",
+  "rr.depois.adequado.ancora": "encerrado, e sai como está",
+  "rr.depois.excepcional.nome": "Padrão ouro",
+  "rr.depois.excepcional.ancora": "encerrado, e sai como referência",
+  "rr.just_titulo": "4 · Por que esta avaliação",
+  "rr.just_ph": "o que as duas notas querem dizer, num parágrafo (mínimo de {min} caracteres)",
+  "rr.just_nota": "Obrigatória sempre — inclusive quando você não mudou nada. Uma nota sem motivo é um número que ninguém consegue contestar nem aprender com.",
   "solo.titulo": "Modo solo",
   "solo.linha": "você está revisando trabalho seu.",
   "solo.contagem": "{n} de {total} item(ns) nesta página são seus. ",
@@ -1518,6 +1759,11 @@ const TEXTOS = {
   "recado.modelo_carregado": "modelo carregado — ajuste os critérios ao prompt",
   "recado.aprovada": "aprovada — segue para a avaliação",
   "recado.devolvida": "devolvida para ajuste — o comentário foi para quem anotou",
+  "recado.avaliada": "avaliação registrada — o item está encerrado",
+  "recado.escalada": "escalado — agora está na fila do administrador",
+  "recado.descartada": "registrado como incorrigível — descartado, e não volta para quem anotou",
+  "recado.decisao": "decisão registrada — o item está encerrado",
+  "recado.decisao_devolvida": "devolvido para quem anotou — seu comentário foi junto",
   "recado.admin_gera": "é o administrador quem gera tarefas para a fila",
   "recado.entrou_equipe": "{nome} entrou na equipe como {papel}",
   "recado.escala": "este critério vai de {min} a {max}",
@@ -1531,6 +1777,23 @@ const TEXTOS = {
   "semPersona.titulo": "Ninguém cadastrado como {papel}.",
   "semPersona.linha": "Use o “+ meu nome” na barra para entrar com um nome novo, ou rode `pf annotate seed` para trazer as seis personas da demonstração.",
   "admin.pool": "Estado do pool",
+  "admin.escalacao": "Escalações esperando por você",
+  "admin.escalacao_nota": "borderline na segunda passagem — você decide, e a decisão encerra o item",
+  "admin.escalacao_vazia": "Nada escalado.",
+  "admin.escalacao_vazia_linha": "Um item só cai aqui quando um revisor o marca como “Borderline (admin)” no Rate and Review. Aprovar encerra, devolver reabre a tarefa, descartar termina sem entrega.",
+  "admin.escalacao_por": "{rev} sobre trabalho de {aut}",
+  "admin.escalacao_escalas": "como chegou: {nota1} · resultado: {nota2}",
+  "admin.escalacao_edicoes": "{n} mudança(s), cada uma com motivo registrado",
+  "admin.escalacao_sem_edicoes": "nenhuma mudança foi feita — foi escalado como chegou",
+  "admin.escalacao_ph": "comentário (obrigatório para devolver — mínimo de {min} caracteres)",
+  "admin.escalacao_erro": "não deu para ler as escalações: {erro}",
+  "admin.escalacao_conta": "{n} esperando",
+  "admin.decisao.aprovada.nome": "Aprovar e encerrar",
+  "admin.decisao.aprovada.ancora": "o trabalho sai como o revisor o deixou",
+  "admin.decisao.devolvida.nome": "Devolver para quem anotou",
+  "admin.decisao.devolvida.ancora": "o único caminho de volta depois da triagem — e o seu comentário é o que chega lá",
+  "admin.decisao.descartada.nome": "Descartar",
+  "admin.decisao.descartada.ancora": "encerrado sem entrega, e não volta",
   "admin.projetos": "Projetos",
   "admin.projetos_nota": "o que é demonstração e o que é trabalho real",
   "admin.col_projeto": "Projeto",
@@ -1558,7 +1821,7 @@ const TEXTOS = {
   "admin.card_revisoes": "triagens feitas",
   "admin.card_revisoes_nota": "aprovar segue para a avaliação; devolver reabre a tarefa",
   "admin.card_avaliacoes": "avaliações (Rate and Review)",
-  "admin.card_avaliacoes_nota": "a passagem 2 chega no P3b",
+  "admin.card_avaliacoes_nota": "a passagem 2 — duas notas, correção com motivo por mudança",
   "admin.card_criacoes": "prompts escritos aqui",
   "admin.card_criacoes_nota": "o modo criar chega no P4",
   "admin.pool_origem": "origem",
@@ -1603,7 +1866,6 @@ const TEXTOS = {
   "pool.politica_redistribuivel": "só entra prompt com redistributable = 1",
   "pool.politica_ambas": "só entra prompt com commercial_ok = 1 e redistributable = 1",
   "pool.nota_nsfw": "a marcação de conteúdo sensível depende da campanha de rotulagem, que ainda não rodou: hoje `nsfw` é nulo no corpus inteiro e a cláusula exclui zero linhas",
-  "roteiro.P3b": "Rate and Review: escore antes e depois, correção com justificativa por mudança e escalação para o admin.",
   "roteiro.P4": "Modo criar: escrever um prompt, aviso de duplicata contra o corpus e revisão da criação.",
   "roteiro.P5": "Métricas por anotador, agreement das tarefas-ouro e geração de tarefas. Os relatórios dele saem em inglês, como todo artefato de entrega.",
   "roteiro.P6": "Ingestão: o prompt aprovado atravessa a pipeline e reaparece no corpus com uid determinístico.",
@@ -1779,17 +2041,48 @@ function nomeTipo(id) {
   return x ? t(x.nome) : String(id || "");
 }
 
+/* As TRÊS sub-abas do revisor, na ordem do fluxo: o que chega, o que passou, o
+   que os anotadores escreveram. A segunda é o Rate and Review — o nome fica em
+   inglês nas duas línguas porque é um nome próprio, não uma etiqueta. */
 const SUBABAS_REVISOR = [
   { id: "anotacoes", nome: "subaba.anotacoes.nome", titulo: "subaba.anotacoes.titulo",
     vazio: "subaba.anotacoes.vazio", linha: "subaba.anotacoes.linha" },
+  { id: "avaliacao", nome: "subaba.avaliacao.nome", titulo: "subaba.avaliacao.titulo",
+    vazio: "subaba.avaliacao.vazio", linha: "subaba.avaliacao.linha" },
   { id: "criacoes", nome: "subaba.criacoes.nome", titulo: "subaba.criacoes.titulo",
     vazio: "subaba.criacoes.vazio", linha: "subaba.criacoes.linha" },
+];
+
+/* AS DUAS ESCALAS DA PASSAGEM 2, como TABELA com a chave inteira — pelo mesmo
+   motivo de `TIPOS` e `PAPEIS`: `t("rr.antes." + id + ".nome")` seria invisível
+   para o teste de chave órfã, e o dicionário passaria a acumular entradas
+   mortas sem que ninguém percebesse.
+
+   `classe` pinta o DESFECHO, não a nota: na escala 2, descartar e escalar não
+   são a mesma coisa que encerrar, e a cor diz isso antes da leitura. */
+const ESCALA_ANTES = [
+  { id: "inutilizavel", nome: "rr.antes.inutilizavel.nome", ancora: "rr.antes.inutilizavel.ancora", classe: "grave" },
+  { id: "ajustavel", nome: "rr.antes.ajustavel.nome", ancora: "rr.antes.ajustavel.ancora", classe: "" },
+  { id: "adequado", nome: "rr.antes.adequado.nome", ancora: "rr.antes.adequado.ancora", classe: "" },
+  { id: "excepcional", nome: "rr.antes.excepcional.nome", ancora: "rr.antes.excepcional.ancora", classe: "boa" },
+];
+const ESCALA_DEPOIS = [
+  { id: "incorrigivel", nome: "rr.depois.incorrigivel.nome", ancora: "rr.depois.incorrigivel.ancora", classe: "grave" },
+  { id: "borderline_admin", nome: "rr.depois.borderline_admin.nome", ancora: "rr.depois.borderline_admin.ancora", classe: "grave" },
+  { id: "adequado", nome: "rr.depois.adequado.nome", ancora: "rr.depois.adequado.ancora", classe: "boa" },
+  { id: "excepcional", nome: "rr.depois.excepcional.nome", ancora: "rr.depois.excepcional.ancora", classe: "boa" },
+];
+
+/* E os três desfechos que o admin dá a um item escalado. */
+const DECISOES = [
+  { id: "aprovada", nome: "admin.decisao.aprovada.nome", ancora: "admin.decisao.aprovada.ancora", classe: "boa" },
+  { id: "devolvida", nome: "admin.decisao.devolvida.nome", ancora: "admin.decisao.devolvida.ancora", classe: "" },
+  { id: "descartada", nome: "admin.decisao.descartada.nome", ancora: "admin.decisao.descartada.ancora", classe: "grave" },
 ];
 
 /** O que falta, com o marco. Fica no painel do admin, à vista, em vez de
     virar surpresa em cada botão desabilitado. */
 const ROTEIRO = [
-  ["P3b", "roteiro.P3b"],
   ["P4", "roteiro.P4"],
   ["P5", "roteiro.P5"],
   ["P6", "roteiro.P6"],
@@ -1860,6 +2153,22 @@ const est = {
   // mora no estado, e não só no <textarea>, para que trocar de idioma no meio
   // de uma devolução não apague o que o revisor já escreveu.
   triagem: null,
+
+  /* ---- P3b: o Rate and Review ---- */
+  // {itens, total, sel, detalhe, triagemDoItem, original, form, antes, depois,
+  //  justificativa, motivos, foco, abertoEm, carregando, ...}.
+  //
+  // TUDO que o revisor digita e ainda não enviou mora aqui — as duas notas, o
+  // formulário corrigido, o motivo de cada mudança e a justificativa geral —,
+  // pela mesma razão do `triagem.comentario`: trocar de idioma redesenha a
+  // tela a partir de `est`, e o que só existisse no DOM sumiria.
+  //
+  // `original` é a cópia INTOCADA do formulário como ele chegou. É contra ela
+  // que o diff é calculado, e por isso ela nunca é editada nem regravada no
+  // rascunho — desfazer uma correção precisa de um ponto de referência estável.
+  rr: null,
+  // A fila de escalação do admin: {itens, total, sel, decisao, comentario}.
+  escalacao: null,
 };
 
 function guardarPersona() {
@@ -2118,8 +2427,18 @@ async function abrirApp() {
     await recarregarContagens();
     desenharAnotador();
   }
-  if (papel === "revisor") { est.triagem = null; await desenharRevisor(); }
-  if (papel === "admin") desenharAdmin();
+  if (papel === "revisor") {
+    // As duas filas são recarregadas do zero ao entrar na tela: elas mudam por
+    // fora (outra aba triando, o admin devolvendo) e um número velho aqui é
+    // uma fila que promete trabalho que já foi feito.
+    est.triagem = null;
+    est.rr = null;
+    await desenharRevisor();
+  }
+  if (papel === "admin") {
+    await carregarEscalacao();
+    desenharAdmin();
+  }
 }
 
 /** Papel sem ninguém cadastrado: bifurcação, não beco. */
@@ -2171,9 +2490,16 @@ function atualizarContagens() {
   }
   const rev = $("#revisor-conta");
   if (rev) {
-    const tri = est.triagem;
-    rev.textContent = !tri ? "…"
-      : tri.total === 0 ? t("revisor.conta_zero") : t("revisor.conta", { n: n(tri.total) });
+    // O contador é o da SUB-ABA em foco: com duas filas na mesma tela, um único
+    // número somando as duas não diria de qual trabalho ele fala.
+    const fonte = est.subaba === "avaliacao" ? est.rr : est.triagem;
+    rev.textContent = !fonte ? "…"
+      : fonte.total === 0 ? t("revisor.conta_zero") : t("revisor.conta", { n: n(fonte.total) });
+  }
+  const esc = $("#escalacao-conta");
+  if (esc) {
+    const fila = est.escalacao;
+    esc.textContent = !fila ? "…" : t("admin.escalacao_conta", { n: n(fila.total) });
   }
 }
 
@@ -2553,32 +2879,94 @@ function semMaterial(titulo, linha) {
     re-trabalho, reconhecer é mais barato que reconstruir de memória. */
 function blocoDevolucao(env) {
   const anterior = env.versao_anterior;
-  if (!anterior || anterior.veredito !== "devolvida") return null;
+  if (!anterior) return null;
+  // DOIS CAMINHOS DE VOLTA, e o anotador precisa saber por qual dele veio: a
+  // triagem devolve, e o admin também devolve ao decidir uma escalação. O
+  // segundo é raro — e some sem ninguém notar se a tela só olhar o primeiro.
+  const doAdmin = anterior.decisao_admin === "devolvida";
+  if (anterior.veredito !== "devolvida" && !doAdmin) return null;
   const caixa = el("div", "devolucao");
   juntar(caixa,
-    el("div", "devolucao-titulo", t("ws.devolvida_versao", { versao: anterior.versao })),
-    el("p", null, anterior.comentario_revisor || ""));
+    el("div", "devolucao-titulo", doAdmin
+      ? t("ws.devolvida_admin", { versao: anterior.versao })
+      : t("ws.devolvida_versao", { versao: anterior.versao })),
+    // `.dado`: o comentário sai na língua em que a pessoa o escreveu.
+    el("p", "dado", (doAdmin ? anterior.comentario_admin : anterior.comentario_revisor) || ""));
   return caixa;
 }
 
 /* O CONTEXTO DE UM WORKSPACE.
-   Os quatro `ws*` servem a DOIS leitores: quem anota (escreve) e quem tria
-   (lê). O revisor vê a submissão no MESMO layout em que ela foi produzida —
-   mesma rubrica, mesmas escalas, mesma ordem —, e a única forma honesta de
-   garantir isso é ser o mesmo código: um segundo desenho "de leitura" seria um
-   segundo lugar onde a rubrica pode divergir de si mesma.
+   Os quatro `ws*` servem a TRÊS leitores: quem anota (escreve), quem tria (lê)
+   e quem avalia no Rate and Review (escreve por cima do que outra pessoa
+   escreveu). Os três veem o MESMO layout — mesma rubrica, mesmas escalas,
+   mesma ordem —, e a única forma honesta de garantir isso é ser o mesmo
+   código: um segundo desenho "de revisão" seria um segundo lugar onde a
+   rubrica pode divergir de si mesma, e a divergência apareceria justamente no
+   item que está sendo julgado.
 
-   `ctx.form` é o estado do formulário; `ctx.leitura` desliga os ouvintes e
-   trava os campos. Nada é escondido nem reordenado no modo leitura. */
-function ctxEdicao() { return { form: est.form, leitura: false }; }
-function ctxLeitura(form) { return { form: form, leitura: true }; }
+   O contexto tem cinco coisas:
+   * `form`    — o estado do formulário que este workspace desenha;
+   * `leitura` — desliga os ouvintes e trava os campos;
+   * `aoDigitar` — cada tecla num campo de texto (barato: não redesenha);
+   * `aoMudar`   — mudança ESTRUTURAL (nota, preferência, critério a mais);
+   * `motivos`   — o gancho do P3b: devolve a caixa de motivo daquele pedaço do
+     payload, ou `null` para quem não precisa dela (anotador e triagem).
+
+   Antes do P3b os dois primeiros eram chamadas diretas a `salvarRascunho()` e
+   `salvarEDesenhar()` — funções do ANOTADOR. Com um terceiro leitor que edita
+   outro formulário e salva outro rascunho, deixá-las hardcoded faria o revisor
+   escrever no rascunho da tarefa que o anotador tem aberta. */
+const NADA = () => {};
+
+function ctxEdicao() {
+  return {
+    form: est.form,
+    leitura: false,
+    foco: est.foco,
+    aoFocar: (i) => { est.foco = i; },
+    aoDigitar: () => { salvarRascunho(); atualizarBotaoEnviar(); },
+    aoMudar: salvarEDesenhar,
+    motivos: null,
+  };
+}
+
+function ctxLeitura(form) {
+  return {
+    form: form, leitura: true, foco: -1,
+    aoFocar: NADA, aoDigitar: NADA, aoMudar: NADA, motivos: null,
+  };
+}
+
+/** O IRMÃO DE `ctxLeitura`: o mesmo workspace, destravado, para o revisor.
+
+    A diferença que importa não é a edição — é o `motivos`: cada campo que o
+    revisor altera revela, ali mesmo, o campo do motivo daquela alteração. Ver
+    `caixaDeMotivos`. */
+function ctxEdicaoRevisor() {
+  return {
+    form: est.rr.form,
+    leitura: false,
+    // Marca o terceiro leitor. O que ela desliga são as peças que pertencem a
+    // QUEM ANOTA: o aviso de rascunho recuperado, o comentário de devolução (a
+    // tela do revisor já o mostra no cabeçalho) e a barra de "Enviar e
+    // próxima" — a ação primária daqui é registrar a avaliação, e são coisas
+    // diferentes com o mesmo lugar na tela.
+    revisor: true,
+    foco: est.rr.foco,
+    aoFocar: (i) => { est.rr.foco = i; },
+    aoDigitar: rrDigitou,
+    aoMudar: rrMudou,
+    motivos: caixaDeMotivos,
+  };
+}
 
 function desenharWorkspace(env, ctx) {
   const c = ctx || ctxEdicao();
+  const meu = !c.leitura && !c.revisor;   // é o formulário de quem ANOTA?
   const caixa = el("div");
   if (c.leitura) caixa.className = "leitura-modo";
-  const aviso = c.leitura ? null : avisoRascunho();
-  const devolucao = c.leitura ? null : blocoDevolucao(env);
+  const aviso = meu ? avisoRascunho() : null;
+  const devolucao = meu ? blocoDevolucao(env) : null;
   const corpo = el("div", "painel-corpo");
   if (devolucao) corpo.appendChild(devolucao);
   if (aviso) corpo.appendChild(aviso);
@@ -2590,7 +2978,7 @@ function desenharWorkspace(env, ctx) {
   if (tipo === "escrever_rubrica") caixa.appendChild(wsEscrever(env, c));
   if (tipo === "sft_resposta") caixa.appendChild(wsSft(env, c));
   if (tipo === "comparar_ab") caixa.appendChild(wsComparar(env, c));
-  if (!c.leitura) caixa.appendChild(barraAcoes());
+  if (meu) caixa.appendChild(barraAcoes());
   return caixa;
 }
 
@@ -2629,7 +3017,7 @@ function wsAvaliar(env, ctx) {
     const escala = c.escala || { min: 1, max: 5, ancoras: [] };
     const nomeC = bi(c.nome_i18n, c.nome);
     const cartao = el("div", "criterio");
-    cartao.dataset.foco = String(!c0.leitura && est.foco === i);
+    cartao.dataset.foco = String(!c0.leitura && c0.foco === i);
     juntar(cartao,
       el("div", "criterio-nome", nomeC),
       el("div", "criterio-desc", bi(c.descricao_i18n, c.descricao)));
@@ -2641,13 +3029,13 @@ function wsAvaliar(env, ctx) {
       b.setAttribute("aria-pressed", String(form.notas[i] === v));
       b.setAttribute("aria-label", t("a11y.nota", { criterio: nomeC, valor: v }));
       if (c0.leitura) b.tabIndex = -1;
-      else b.addEventListener("click", () => { est.foco = i; graduar(i, v); });
+      else b.addEventListener("click", () => { c0.aoFocar(i); graduarEm(c0, i, v); });
       botoes.appendChild(b);
     }
     if (!c0.leitura) {
       const limpa = el("button", "botao discreta", t("botao.limpar"));
       limpa.type = "button";
-      limpa.addEventListener("click", () => graduar(i, null));
+      limpa.addEventListener("click", () => graduarEm(c0, i, null));
       botoes.appendChild(limpa);
     }
     cartao.appendChild(botoes);
@@ -2670,7 +3058,7 @@ function wsAvaliar(env, ctx) {
       if (!c0.leitura) {
         const pedir = el("button", "botao discreta", t("botao.justificar"));
         pedir.type = "button";
-        pedir.addEventListener("click", () => { form.justificativas[i] = ""; salvarEDesenhar(); });
+        pedir.addEventListener("click", () => { form.justificativas[i] = ""; c0.aoMudar(); });
         linhaJust.appendChild(pedir);
       }
     } else {
@@ -2680,12 +3068,16 @@ function wsAvaliar(env, ctx) {
       campo.placeholder = t("ws.just_ph");
       campo.value = form.justificativas[i];
       if (c0.leitura) campo.readOnly = true;
-      else campo.addEventListener("input", () => { form.justificativas[i] = campo.value; salvarRascunho(); });
+      else campo.addEventListener("input", () => { form.justificativas[i] = campo.value; c0.aoDigitar(); });
       linhaJust.appendChild(campo);
       if (!c0.leitura) linhaJust.appendChild(dicaLinguaMeta("lingua.meta"));
       linhaJust.style.display = "block";
     }
     cartao.appendChild(linhaJust);
+    // O MOTIVO DE CADA MUDANÇA, colado ao critério que mudou (P3b). O prefixo
+    // cobre a nota E a justificativa daquele critério — os dois são caminhos
+    // distintos no payload e cada um ganha o próprio motivo.
+    if (c0.motivos) cartao.appendChild(c0.motivos("notas." + i + "."));
     lista.appendChild(cartao);
   });
   bloco.appendChild(lista);
@@ -2698,9 +3090,10 @@ function wsAvaliar(env, ctx) {
     areaGeral.placeholder = t("ws.comentario_geral_ph");
     areaGeral.value = form.comentario_geral;
     if (c0.leitura) areaGeral.readOnly = true;
-    else areaGeral.addEventListener("input", () => { form.comentario_geral = areaGeral.value; salvarRascunho(); });
+    else areaGeral.addEventListener("input", () => { form.comentario_geral = areaGeral.value; c0.aoDigitar(); });
     juntar(geral, el("span", null, t("ws.comentario_geral")), areaGeral);
     if (!c0.leitura) geral.appendChild(dicaLinguaMeta("lingua.meta"));
+    if (c0.motivos) geral.appendChild(c0.motivos("comentario_geral"));
     bloco.appendChild(geral);
   }
 
@@ -2708,10 +3101,15 @@ function wsAvaliar(env, ctx) {
   return caixa;
 }
 
-function graduar(i, valor) {
-  est.form.notas[i] = valor;
-  salvarEDesenhar();
+/** Grada um critério DENTRO de um contexto. O anotador e o revisor graduam a
+    mesma rubrica, em formulários diferentes — e é o contexto que diz qual. */
+function graduarEm(c0, i, valor) {
+  c0.form.notas[i] = valor;
+  c0.aoMudar();
 }
+
+/** O atalho de quem anota (o teclado 1..9 chama por aqui). */
+function graduar(i, valor) { graduarEm(ctxEdicao(), i, valor); }
 
 /* ==========================================================================
    5.4 ESCREVER RUBRICA
@@ -2793,12 +3191,13 @@ function wsEscrever(env, ctx) {
   entrada.placeholder = t("ws.titulo_rubrica_ph");
   entrada.value = form.titulo;
   if (c0.leitura) entrada.readOnly = true;
-  else entrada.addEventListener("input", () => { form.titulo = entrada.value; salvarRascunho(); atualizarBotaoEnviar(); });
+  else entrada.addEventListener("input", () => { form.titulo = entrada.value; c0.aoDigitar(); });
   juntar(tituloCampo, el("span", null, t("ws.titulo_rubrica")), entrada);
   // UMA dica de língua para a rubrica inteira, no primeiro campo de texto dela:
   // repeti-la em cada um dos até oito critérios viraria ruído, e o texto já diz
   // que ela vale para a rubrica e para os critérios.
   if (!c0.leitura) tituloCampo.appendChild(dicaLinguaMeta("lingua.rubrica"));
+  if (c0.motivos) tituloCampo.appendChild(c0.motivos("titulo"));
   caixa.appendChild(tituloCampo);
 
   const lista = el("div", "criterios");
@@ -2813,7 +3212,7 @@ function wsEscrever(env, ctx) {
     mais.disabled = form.criterios.length >= lim("max_criterios_rubrica", 8);
     mais.addEventListener("click", () => {
       form.criterios.push({ nome: "", descricao: "", escala_min: 1, escala_max: 5, rotulo_min: "", rotulo_max: "" });
-      salvarEDesenhar();
+      c0.aoMudar();
     });
     juntar(rodape, mais, el("span", "fraco", t("ws.faixa_criterios", {
       min: lim("min_criterios_rubrica", 3), max: lim("max_criterios_rubrica", 8),
@@ -2831,7 +3230,7 @@ function editorCriterio(c, i, ctx) {
   if (!c0.leitura) {
     const tirar = el("button", "botao discreta", t("botao.remover"));
     tirar.type = "button";
-    tirar.addEventListener("click", () => { c0.form.criterios.splice(i, 1); salvarEDesenhar(); });
+    tirar.addEventListener("click", () => { c0.form.criterios.splice(i, 1); c0.aoMudar(); });
     cabeca.appendChild(tirar);
   }
   cartao.appendChild(cabeca);
@@ -2842,7 +3241,7 @@ function editorCriterio(c, i, ctx) {
   nome.placeholder = t("ws.criterio_nome_ph");
   nome.value = c.nome;
   if (c0.leitura) nome.readOnly = true;
-  else nome.addEventListener("input", () => { c.nome = nome.value; salvarRascunho(); atualizarBotaoEnviar(); });
+  else nome.addEventListener("input", () => { c.nome = nome.value; c0.aoDigitar(); });
   cartao.appendChild(nome);
 
   const desc = el("textarea");
@@ -2850,7 +3249,7 @@ function editorCriterio(c, i, ctx) {
   desc.placeholder = t("ws.criterio_desc_ph");
   desc.value = c.descricao;
   if (c0.leitura) desc.readOnly = true;
-  else desc.addEventListener("input", () => { c.descricao = desc.value; salvarRascunho(); atualizarBotaoEnviar(); });
+  else desc.addEventListener("input", () => { c.descricao = desc.value; c0.aoDigitar(); });
   cartao.appendChild(desc);
 
   const campos = el("div", "campos");
@@ -2865,7 +3264,7 @@ function editorCriterio(c, i, ctx) {
     entrada.className = "largo";
     entrada.value = c[chave];
     if (c0.leitura) entrada.readOnly = true;
-    else entrada.addEventListener("input", () => { c[chave] = entrada.value; salvarRascunho(); atualizarBotaoEnviar(); });
+    else entrada.addEventListener("input", () => { c[chave] = entrada.value; c0.aoDigitar(); });
     juntar(campo, el("span", null, t(rotulo)), entrada);
     campos.appendChild(campo);
   }
@@ -2878,10 +3277,13 @@ function editorCriterio(c, i, ctx) {
   }
   sel.value = String(c.escala_max);
   if (c0.leitura) sel.disabled = true;
-  else sel.addEventListener("change", () => { c.escala_max = Number(sel.value); salvarRascunho(); });
+  else sel.addEventListener("change", () => { c.escala_max = Number(sel.value); c0.aoDigitar(); });
   juntar(escala, el("span", null, t("ws.escala")), sel);
   campos.appendChild(escala);
   cartao.appendChild(campos);
+  // Um bloco de motivos por CRITÉRIO: o prefixo cobre nome, descrição, as duas
+  // pontas da escala e o tamanho dela — cinco caminhos, cada um com o seu.
+  if (c0.motivos) cartao.appendChild(c0.motivos("criterios." + i + "."));
   return cartao;
 }
 
@@ -2905,8 +3307,7 @@ function wsSft(env, ctx) {
   else campo.addEventListener("input", () => {
     form.resposta = campo.value;
     contadorSft.textContent = t("ws.contador_chars", { n: n(campo.value.trim().length) });
-    salvarRascunho();
-    atualizarBotaoEnviar();
+    c0.aoDigitar();
   });
   coluna.appendChild(campo);
   const contadorSft = el("div", "contador",
@@ -2916,6 +3317,7 @@ function wsSft(env, ctx) {
   // prompt, não na da interface. É o inverso de tudo o que está em volta dela, e
   // por isso a dica não é opcional aqui.
   if (!c0.leitura) coluna.appendChild(dicaLinguaDado(env.prompt.lang));
+  if (c0.motivos) coluna.appendChild(c0.motivos("resposta"));
   grade.appendChild(coluna);
 
   if (guia) {
@@ -2931,7 +3333,7 @@ function wsSft(env, ctx) {
       caixinha.type = "checkbox";
       caixinha.checked = !!form.checklist[i];
       if (c0.leitura) caixinha.disabled = true;
-      else caixinha.addEventListener("change", () => { form.checklist[i] = caixinha.checked; salvarRascunho(); });
+      else caixinha.addEventListener("change", () => { form.checklist[i] = caixinha.checked; c0.aoDigitar(); });
       const texto = el("span");
       juntar(texto,
         el("div", "criterio-nome", bi(c.nome_i18n, c.nome)),
@@ -2941,6 +3343,7 @@ function wsSft(env, ctx) {
     });
     lado.appendChild(marcaveis);
     lado.appendChild(el("p", "fraco", c0.leitura ? t("ws.guia_leitura") : t("ws.guia_edicao")));
+    if (c0.motivos) lado.appendChild(c0.motivos("checklist."));
     grade.appendChild(lado);
   }
   caixa.appendChild(grade);
@@ -2982,7 +3385,7 @@ function wsComparar(env, ctx) {
     texto.appendChild(el("div", "leitura", r.texto));
     juntar(coluna, cabeca, texto);
     if (c0.leitura) coluna.tabIndex = -1;
-    else coluna.addEventListener("click", () => escolherAB(r.rotulo));
+    else coluna.addEventListener("click", () => escolherABEm(c0, r.rotulo));
     areas.push(texto);
     grade.appendChild(coluna);
   });
@@ -2995,8 +3398,9 @@ function wsComparar(env, ctx) {
   bEmpate.setAttribute("aria-pressed", String(form.preferencia === "empate"));
   if (form.preferencia === "empate") bEmpate.classList.add("primaria");
   if (c0.leitura) bEmpate.tabIndex = -1;
-  else bEmpate.addEventListener("click", () => escolherAB("empate"));
+  else bEmpate.addEventListener("click", () => escolherABEm(c0, "empate"));
   juntar(empate, bEmpate, c0.leitura ? null : el("span", "atalho", "E"));
+  if (c0.motivos) empate.appendChild(c0.motivos("preferencia"));
   caixa.appendChild(empate);
 
   const minimo = lim("min_chars_justificativa", 30);
@@ -3010,8 +3414,7 @@ function wsComparar(env, ctx) {
   else area.addEventListener("input", () => {
     form.justificativa = area.value;
     contador.textContent = t("ws.contador_de", { n: n(area.value.trim().length), min: minimo });
-    salvarRascunho();
-    atualizarBotaoEnviar();
+    c0.aoDigitar();
   });
   juntar(campo,
     el("span", null, c0.leitura ? t("ws.just_ab_rotulo_leitura") : t("ws.just_ab_rotulo")),
@@ -3021,14 +3424,19 @@ function wsComparar(env, ctx) {
     : t("ws.contador_de", { n: n(form.justificativa.trim().length), min: minimo }));
   campo.appendChild(contador);
   if (!c0.leitura) campo.appendChild(dicaLinguaMeta("lingua.meta"));
+  if (c0.motivos) campo.appendChild(c0.motivos("justificativa"));
   caixa.appendChild(campo);
   return caixa;
 }
 
-function escolherAB(rotulo) {
-  est.form.preferencia = est.form.preferencia === rotulo ? null : rotulo;
-  salvarEDesenhar();
+/** Escolhe (ou desmarca) um lado do A/B DENTRO de um contexto. */
+function escolherABEm(c0, rotulo) {
+  c0.form.preferencia = c0.form.preferencia === rotulo ? null : rotulo;
+  c0.aoMudar();
 }
+
+/** O atalho de quem anota (as setas do teclado chamam por aqui). */
+function escolherAB(rotulo) { escolherABEm(ctxEdicao(), rotulo); }
 
 /** Rolagem sincronizada por PROPORÇÃO, não por pixel: as duas respostas quase
     nunca têm a mesma altura, e casar o scrollTop cru descasa os textos na
@@ -3094,9 +3502,19 @@ function formDoPayload(env, anterior) {
   }
   if (tipo === "sft_resposta") {
     const criterios = (env.rubrica && env.rubrica.criterios) || [];
+    // O CHECKLIST volta do payload, casado por NOME de critério — como as notas
+    // do avaliar_rubrica. Até o P3b ele voltava sempre todo desmarcado: a
+    // triagem mostrava "nada marcado" para quem tinha marcado tudo, e o Rate
+    // and Review acusaria como mudança do revisor uma caixa que o anotador já
+    // havia marcado. É a mesma casada por nome, e pelo mesmo motivo: a rubrica
+    // pode ter ganhado um critério entre a submissão e a leitura.
+    const marcados = (anterior && anterior.checklist) || [];
     return {
       resposta: (anterior && anterior.resposta) || "",
-      checklist: criterios.map(() => false),
+      checklist: criterios.map((c) => {
+        const achado = marcados.find((x) => x.criterio === c.nome);
+        return achado ? !!achado.atendido : false;
+      }),
     };
   }
   return {
@@ -3192,25 +3610,31 @@ function limparRascunho(id) {
 }
 
 /** Monta o payload no formato do contrato `<tipo>@1`. O servidor revalida tudo
-    contra o tipo que ELE leu do banco — isto aqui é conveniência, não garantia. */
-function montarPayload(env) {
+    contra o tipo que ELE leu do banco — isto aqui é conveniência, não garantia.
+
+    `form` é parâmetro desde o P3b: o Rate and Review monta DOIS payloads (o
+    original e o corrigido) para calcular o diff, e os dois têm de sair da mesma
+    função. Duas montagens diferentes produziriam diferenças que não existem — e
+    o revisor teria de justificar mudanças que ele não fez. */
+function montarPayload(env, form) {
+  const f = form || est.form;
   const tipo = env.tarefa.tipo;
   if (tipo === "avaliar_rubrica") {
     const criterios = env.rubrica.criterios;
     return {
       notas: criterios.map((c, i) => {
-        const nota = { criterio: c.nome, nota: est.form.notas[i] };
-        const just = est.form.justificativas[i];
+        const nota = { criterio: c.nome, nota: f.notas[i] };
+        const just = f.justificativas[i];
         if (just && just.trim()) nota.justificativa = just.trim();
         return nota;
       }),
-      comentario_geral: est.form.comentario_geral.trim() || null,
+      comentario_geral: f.comentario_geral.trim() || null,
     };
   }
   if (tipo === "escrever_rubrica") {
     return {
-      titulo: est.form.titulo.trim(),
-      criterios: est.form.criterios.map((c) => ({
+      titulo: f.titulo.trim(),
+      criterios: f.criterios.map((c) => ({
         nome: c.nome.trim(),
         descricao: c.descricao.trim(),
         escala_min: 1,
@@ -3221,14 +3645,14 @@ function montarPayload(env) {
     };
   }
   if (tipo === "sft_resposta") {
-    const corpo = { resposta: est.form.resposta.trim() };
+    const corpo = { resposta: f.resposta.trim() };
     const criterios = (env.rubrica && env.rubrica.criterios) || [];
     if (criterios.length) {
-      corpo.checklist = criterios.map((c, i) => ({ criterio: c.nome, atendido: !!est.form.checklist[i] }));
+      corpo.checklist = criterios.map((c, i) => ({ criterio: c.nome, atendido: !!f.checklist[i] }));
     }
     return corpo;
   }
-  return { preferencia: est.form.preferencia, justificativa: est.form.justificativa.trim() };
+  return { preferencia: f.preferencia, justificativa: f.justificativa.trim() };
 }
 
 async function enviar() {
@@ -3645,12 +4069,18 @@ function desenharMinhas(area) {
     // A DEVOLUÇÃO é o único item desta lista que exige ação, e por isso ela vem
     // com o comentário embutido: obrigar a abrir a tarefa para descobrir o que
     // o revisor escreveu é a fricção que faz uma devolução ser ignorada.
-    const devolvida = item.veredito === "devolvida" && item.comentario_revisor;
+    // OS DOIS caminhos de volta: a triagem e o admin decidindo uma escalação.
+    // O segundo é raro, e por isso é o que some sem ninguém notar — o admin
+    // escreveria um comentário obrigatório que o anotador nunca leria.
+    const doAdmin = item.decisao_admin === "devolvida" && item.comentario_admin;
+    const devolvida = (item.veredito === "devolvida" && item.comentario_revisor) || doAdmin;
     if (devolvida) {
       const dev = el("div", "devolucao");
       juntar(dev,
-        el("div", "devolucao-titulo", t("minhas.devolvida")),
-        el("p", null, item.comentario_revisor));
+        el("div", "devolucao-titulo",
+          doAdmin ? t("minhas.devolvida_admin") : t("minhas.devolvida")),
+        // `.dado`: o comentário sai na língua em que a pessoa o escreveu.
+        el("p", "dado", doAdmin ? item.comentario_admin : item.comentario_revisor));
       texto.appendChild(dev);
     }
     linha.appendChild(texto);
@@ -3762,6 +4192,7 @@ function teclado(ev) {
     "terminei de escrever" do anotador, e obrigar a sair do campo para clicar
     seria a mesma fricção do outro lado da mesa. */
 function tecladoRevisor(ev) {
+  if (est.subaba === "avaliacao") { tecladoRR(ev); return; }
   const tri = est.triagem;
   if (!tri || est.subaba !== "anotacoes") return;
   if (tri.devolvendo) {
@@ -3794,6 +4225,35 @@ function tecladoRevisor(ev) {
   if (ev.key === "r" || ev.key === "R") { ev.preventDefault(); abrirDevolucao(); }
 }
 
+/** Os atalhos do RATE AND REVIEW. `J`/`K` andam na fila, `Ctrl+Enter` registra.
+
+    Nada de `A`/`R` aqui, e não é esquecimento: a passagem 2 não tem duas
+    respostas rápidas — ela tem duas escalas de quatro posições e um diff a
+    justificar. Uma tecla que "aprova" seria a triagem outra vez, com outro
+    nome. As escalas andam pelas setas, dentro do radiogroup (ver `escalaRR`).
+
+    O `1..4` também ficou de fora de propósito: o workspace do revisor é
+    editável, e o mesmo `3` que graduaria uma escala está graduando um critério
+    da rubrica logo abaixo. Duas coisas na mesma tecla, na mesma tela. */
+function tecladoRR(ev) {
+  const rr = est.rr;
+  if (!rr) return;
+  // Ctrl+Enter vale DENTRO dos campos: é o "terminei de escrever", e obrigar a
+  // sair do campo antes de registrar seria a mesma fricção do outro lado.
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+    ev.preventDefault();
+    registrarAvaliacao();
+    return;
+  }
+  if (ehCampo(ev.target) || !rr.itens.length) return;
+  if (ev.key === "j" || ev.key === "J" || ev.key === "k" || ev.key === "K") {
+    const passo = (ev.key === "j" || ev.key === "J") ? 1 : -1;
+    const i = rr.itens.findIndex((x) => x.anotacao_id === rr.sel);
+    const alvo = rr.itens[Math.min(rr.itens.length - 1, Math.max(0, (i < 0 ? 0 : i) + passo))];
+    if (alvo) { ev.preventDefault(); abrirNoRR(alvo.anotacao_id); }
+  }
+}
+
 /* Navegação por setas dentro de um conjunto de abas (padrão de tablist). */
 function andarNasAbas(ev, itens, escolher, atual) {
   const i = itens.findIndex((x) => x.id === atual);
@@ -3819,8 +4279,10 @@ async function desenharRevisor() {
     b.type = "button";
     b.setAttribute("role", "tab");
     b.setAttribute("aria-selected", String(est.subaba === s.id));
-    const conta = s.id === "anotacoes" && est.triagem ? n(est.triagem.total) : "0";
-    b.appendChild(el("span", "conta", conta));
+    // "…" e não "0" quando a fila ainda não foi lida: são estados diferentes, e
+    // um zero inventado é a única leitura que faz alguém deixar de clicar.
+    const fonte = s.id === "anotacoes" ? est.triagem : s.id === "avaliacao" ? est.rr : null;
+    b.appendChild(el("span", "conta", fonte ? n(fonte.total) : (s.id === "criacoes" ? "0" : "…")));
     b.addEventListener("click", () => { est.subaba = s.id; desenharRevisor(); });
     b.addEventListener("keydown", (ev) => andarNasAbas(ev, SUBABAS_REVISOR, (id) => { est.subaba = id; desenharRevisor(); }, est.subaba));
     barra.appendChild(b);
@@ -3828,9 +4290,17 @@ async function desenharRevisor() {
 
   const s = SUBABAS_REVISOR.find((x) => x.id === est.subaba);
   $("#revisor-fila-titulo").textContent = t(s.titulo);
-  $("#revisor-atalhos").textContent = est.subaba === "anotacoes" ? t("revisor.atalhos") : "";
+  $("#revisor-atalhos").textContent = est.subaba === "anotacoes" ? t("revisor.atalhos")
+    : est.subaba === "avaliacao" ? t("rr.atalhos") : "";
 
-  if (est.subaba !== "anotacoes") { desenharCriacoesPendentes(s); return; }
+  if (est.subaba === "criacoes") { desenharCriacoesPendentes(s); return; }
+  if (est.subaba === "avaliacao") {
+    if (!est.rr) { await carregarRR(); return; }
+    desenharFilaRR(s);
+    desenharDetalheRR();
+    atualizarContagens();
+    return;
+  }
   if (!est.triagem) { await carregarTriagem(); return; }
   desenharFilaTriagem(s);
   desenharDetalheTriagem();
@@ -3904,19 +4374,25 @@ async function carregarTriagem(manterSel) {
     julgar) trabalho que ele mesmo escreveu. Um aviso que se fecha vira um
     aviso que ninguém viu na hora que importava, e esconder isso seria mentir
     sobre o QC — que é exatamente o que este projeto existe para não fazer. */
-function faixaSolo() {
-  const tri = est.triagem;
-  if (!tri || !tri.modo_solo) return null;
+function faixaSoloDe(estado) {
+  if (!estado || !estado.modo_solo) return null;
   const caixa = el("div", "faixa-solo");
   juntar(caixa,
     el("b", null, t("solo.titulo")),
     el("span", null, t("solo.linha")),
     el("span", "fraco",
-      (tri.minhas_na_fila
-        ? t("solo.contagem", { n: n(tri.minhas_na_fila), total: n(tri.itens.length) })
+      (estado.minhas_na_fila
+        ? t("solo.contagem", { n: n(estado.minhas_na_fila), total: n(estado.itens.length) })
         : t("solo.sem_meus"))
       + t("solo.nota")));
   return caixa;
+}
+
+/** A faixa da TRIAGEM. As duas passagens usam a mesma, e por isso ela é uma
+    função só com o estado por parâmetro: duas faixas seriam dois lugares onde a
+    declaração do modo solo pode divergir de si mesma. */
+function faixaSolo() {
+  return faixaSoloDe(est.triagem);
 }
 
 function desenharFilaTriagem(s) {
@@ -4128,6 +4604,12 @@ async function triar(veredito, comentario) {
       comentario: comentario || null,
     });
     recado(veredito === "aprovada" ? t("recado.aprovada") : t("recado.devolvida"));
+    // APROVAR ENCHE A OUTRA FILA. Sem invalidar aqui, a sub-aba do Rate and
+    // Review continuaria mostrando o que ela leu na última visita — e o item
+    // que acabou de ser aprovado só apareceria depois de sair da tela e voltar.
+    // `null` (e não uma recarga) porque recarregar agora desenharia a fila da
+    // passagem 2 por cima do detalhe da triagem que está aberto.
+    if (veredito === "aprovada") est.rr = null;
   } catch (e) {
     tri.carregando = false;
     recado(e.message, true);
@@ -4135,6 +4617,598 @@ async function triar(veredito, comentario) {
   }
   tri.carregando = false;
   await carregarTriagem(proximo ? proximo.anotacao_id : null);
+  await recarregarSaude();
+}
+
+/* ==========================================================================
+   6b. TELA DO REVISOR — PASSAGEM 2: O RATE AND REVIEW
+
+   A mesma fila à esquerda, o mesmo detalhe à direita, o MESMO workspace — só
+   que destravado. A tela conduz em quatro passos numerados, e a ordem é a
+   ordem da decisão:
+
+     1. avaliar o trabalho COMO CHEGOU (antes de tocar em qualquer coisa);
+     2. corrigir ali mesmo, com um motivo curto por mudança;
+     3. avaliar o RESULTADO;
+     4. escrever por que — obrigatório sempre.
+
+   UMA AÇÃO PRIMÁRIA, e ela diz o que falta antes do clique. A ordem em que
+   `rrOQueFalta` procura é a ordem visual: o botão aponta para a primeira coisa
+   pendente de cima para baixo, e não para a "mais importante" — quem lê o
+   botão está procurando onde continuar, não uma opinião.
+
+   O CRONÔMETRO É INVISÍVEL, como no anotador: `abertoEm` é um carimbo, não um
+   relógio na tela. Ele vai para `avaliacoes.tempo_ativo_ms` e de lá para o
+   painel do admin.
+   ========================================================================== */
+
+/** Achata um payload em `{caminho: folha}`. Espelho de `avaliacoes.achatar` no
+    servidor, e é a igualdade entre os dois que faz o botão desta tela concordar
+    com o 422 — o servidor recalcula o diff e exige os mesmos caminhos. */
+function achatar(valor, prefixo, saida) {
+  const plano = saida || {};
+  const folha = valor === null || typeof valor !== "object";
+  const vazio = !folha && (Array.isArray(valor) ? !valor.length : !Object.keys(valor).length);
+  if (folha || vazio) {
+    if (prefixo) plano[prefixo] = valor;
+    return plano;
+  }
+  const chaves = Array.isArray(valor) ? valor.map((_, i) => i) : Object.keys(valor);
+  for (const k of chaves) achatar(valor[k], prefixo ? prefixo + "." + k : String(k), plano);
+  return plano;
+}
+
+/** Os caminhos que mudaram entre dois payloads, na ordem do payload ORIGINAL.
+    Ordem alfabética misturaria o critério 10 com o 1; esta acompanha o
+    formulário, que é onde a pessoa está olhando. */
+function diffPayload(antes, depois) {
+  const a = achatar(antes, "");
+  const b = achatar(depois, "");
+  const tem = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const ordem = Object.keys(a).concat(Object.keys(b).filter((k) => !tem(a, k)));
+  const saida = [];
+  for (const campo of ordem) {
+    const va = tem(a, campo) ? a[campo] : null;
+    const vb = tem(b, campo) ? b[campo] : null;
+    if (JSON.stringify(va) === JSON.stringify(vb)) continue;
+    saida.push({ campo: campo, antes: va, depois: vb });
+  }
+  return saida;
+}
+
+/** Uma folha como texto, para o resumo e para o corpo do POST. */
+function comoTexto(v) {
+  if (v === null || v === undefined) return null;
+  return (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 2000);
+}
+
+/* ---- rascunho da avaliação, por ANOTAÇÃO ----
+   Separado do rascunho do anotador (`bancada.rascunho.<atribuicao>`) porque são
+   dois trabalhos diferentes sobre coisas diferentes: a mesma pessoa, no modo
+   solo, pode ter uma tarefa aberta e uma avaliação pela metade ao mesmo tempo. */
+function rrChave(id) { return CHAVE + "avaliacao." + id; }
+
+function salvarRascunhoRR() {
+  const rr = est.rr;
+  if (!rr || !rr.sel || !rr.form) return;
+  try {
+    localStorage.setItem(rrChave(rr.sel), JSON.stringify({
+      antes: rr.antes, depois: rr.depois, justificativa: rr.justificativa,
+      motivos: rr.motivos, form: rr.form,
+    }));
+  } catch (_) { /* modo privado ou cota cheia: funciona igual, só não lembra */ }
+}
+function lerRascunhoRR(id) {
+  try {
+    const bruto = localStorage.getItem(rrChave(id));
+    return bruto ? JSON.parse(bruto) : null;
+  } catch (_) { return null; }
+}
+function limparRascunhoRR(id) {
+  try { localStorage.removeItem(rrChave(id)); } catch (_) {}
+}
+
+async function carregarRR(manterSel) {
+  const anterior = manterSel === undefined ? (est.rr && est.rr.sel) : manterSel;
+  const vazia = {
+    itens: [], total: 0, minhas_excluidas: 0, minhas_na_fila: 0, modo_solo: false,
+    sel: null, detalhe: null, triagemDoItem: null, original: null, form: null,
+    antes: null, depois: null, justificativa: "", motivos: {}, diff: [], caixas: [],
+    foco: 0, abertoEm: 0, carregando: false, rascunhoRecuperado: false, minha: false,
+  };
+  try {
+    const r = await api(comParams("/api/avaliacao/fila",
+      paramsProjeto({ revisor_id: est.persona.id })));
+    est.rr = {
+      ...vazia,
+      itens: r.items || [],
+      total: r.total || 0,
+      minhas_excluidas: r.minhas_excluidas || 0,
+      minhas_na_fila: r.minhas_na_fila || 0,
+      modo_solo: !!r.modo_solo,
+    };
+  } catch (e) {
+    est.rr = { ...vazia, erro: e.message };
+    recado(t("rr.erro_fila", { erro: e.message }), true);
+  }
+  await desenharRevisor();
+  // Seleciona sozinho, como a triagem: uma fila com itens e nada aberto obriga
+  // um clique que não decide nada.
+  const itens = est.rr.itens;
+  if (!itens.length) return;
+  const alvo = itens.find((x) => x.anotacao_id === anterior) || itens[0];
+  await abrirNoRR(alvo.anotacao_id);
+}
+
+async function abrirNoRR(anotacaoId) {
+  const rr = est.rr;
+  if (!rr) return;
+  rr.sel = anotacaoId;
+  rr.carregando = true;
+  rr.detalhe = null;
+  rr.caixas = [];
+  desenharFilaRR(SUBABAS_REVISOR[1]);
+  desenharDetalheRR();
+  try {
+    const r = await api(comParams("/api/avaliacao/" + anotacaoId, { revisor_id: est.persona.id }));
+    rr.detalhe = r.tarefa;
+    rr.minha = !!r.minha;
+    rr.triagemDoItem = r.triagem || null;
+    // O ORIGINAL é a cópia intocada: o diff é contra ela, e desfazer uma
+    // correção precisa de um ponto de referência que não se mexe.
+    rr.original = formDoPayload(r.tarefa, r.tarefa.anotacao.payload);
+    rr.form = JSON.parse(JSON.stringify(rr.original));
+    rr.antes = null;
+    rr.depois = null;
+    rr.justificativa = "";
+    rr.motivos = {};
+    rr.foco = 0;
+    rr.rascunhoRecuperado = false;
+    const guardado = lerRascunhoRR(anotacaoId);
+    if (guardado) {
+      rr.antes = guardado.antes || null;
+      rr.depois = guardado.depois || null;
+      rr.justificativa = guardado.justificativa || "";
+      rr.motivos = guardado.motivos || {};
+      if (guardado.form) rr.form = guardado.form;
+      rr.rascunhoRecuperado = true;
+    }
+    // O relógio começa quando o item ABRE, não quando a fila carrega.
+    rr.abertoEm = Date.now();
+  } catch (e) {
+    rr.detalhe = null;
+    rr.form = null;
+    recado(e.message, true);
+  }
+  rr.carregando = false;
+  desenharDetalheRR();
+}
+
+function desenharFilaRR(s) {
+  const fila = $("#revisor-fila");
+  limpar(fila);
+  const rr = est.rr;
+  const solo = faixaSoloDe(rr);
+  if (solo) fila.appendChild(solo);
+  if (!rr.itens.length) {
+    const vazia = el("div", "fila-vazia");
+    juntar(vazia, el("div", "vazio-titulo", t(s.vazio)), el("p", "vazio-linha", t(s.linha)));
+    if (rr.minhas_excluidas) {
+      vazia.appendChild(el("p", "vazio-linha",
+        t("rr.minhas_excluidas", { n: n(rr.minhas_excluidas) })));
+    }
+    // ESTADO VAZIO COM SAÍDA: a fila da passagem 2 só enche quando a triagem
+    // aprova, e a saída real é ir triar.
+    const saidas = el("div", "vazio-saidas");
+    const irTriar = el("button", "botao primaria", t("subaba.anotacoes.nome"));
+    irTriar.type = "button";
+    irTriar.addEventListener("click", () => { est.subaba = "anotacoes"; desenharRevisor(); });
+    juntar(saidas, irTriar);
+    vazia.appendChild(saidas);
+    fila.appendChild(vazia);
+    return;
+  }
+  for (const item of rr.itens) {
+    const b = el("button", "fila-item");
+    b.type = "button";
+    b.setAttribute("aria-current", String(rr.sel === item.anotacao_id));
+    const topo = el("div", "fila-item-topo");
+    juntar(topo,
+      el("strong", null, nomeTipo(item.tipo)),
+      el("span", item.minha ? "eu" : null,
+        item.minha ? t("triagem.eu_sufixo", { nome: item.anotador }) : item.anotador),
+      el("span", "crescer"));
+    if (item.projeto) topo.appendChild(el("span", "fraco dado", item.projeto));
+    if (item.versao > 1) topo.appendChild(el("span", "etiqueta devolvido", "v" + item.versao));
+    b.appendChild(topo);
+    // QUEM TRIOU, na própria linha da fila. A métrica de QC mais interessante
+    // deste marco — "a triagem deixou passar" — precisa dos dois nomes juntos,
+    // e o revisor decide melhor sabendo quem já olhou aquilo.
+    if (item.triador) {
+      b.appendChild(el("div", "fila-item-topo",
+        t("rr.triagem", { nome: item.triador })));
+    }
+    b.appendChild(el("div", "fila-item-trecho",
+      item.disponivel ? item.prompt : t("triagem.prompt_sumiu")));
+    b.addEventListener("click", () => abrirNoRR(item.anotacao_id));
+    fila.appendChild(b);
+  }
+}
+
+/** UMA ESCALA: as quatro opções sempre visíveis, com a âncora ao lado.
+
+    Um `<select>` economizaria espaço e custaria a única coisa que uma escala
+    ancorada tem — a possibilidade de comparar as quatro descrições antes de
+    escolher uma. Teclado: as setas andam e selecionam, como num radiogroup de
+    verdade, e Tab entra e sai do grupo. */
+function escalaRR(opcoes, valor, ariaChave, aoEscolher) {
+  const caixa = el("div", "escala");
+  caixa.setAttribute("role", "radiogroup");
+  caixa.setAttribute("aria-label", t(ariaChave));
+  opcoes.forEach((o, i) => {
+    const b = el("button", "escala-opcao" + (o.classe ? " " + o.classe : ""));
+    b.type = "button";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(valor === o.id));
+    // Só o selecionado (ou o primeiro, quando nada está) fica na ordem do Tab:
+    // é o padrão de um radiogroup, e é o que evita quatro paradas de Tab por
+    // escala numa tela que já tem muitas.
+    b.tabIndex = (valor === o.id || (!valor && i === 0)) ? 0 : -1;
+    juntar(b, el("b", null, t(o.nome)), el("span", null, t(o.ancora)));
+    b.addEventListener("click", () => aoEscolher(o.id));
+    b.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp" &&
+          ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+      ev.preventDefault();
+      const passo = (ev.key === "ArrowDown" || ev.key === "ArrowRight") ? 1 : -1;
+      aoEscolher(opcoes[(i + passo + opcoes.length) % opcoes.length].id);
+    });
+    caixa.appendChild(b);
+  });
+  return caixa;
+}
+
+/** A caixa de motivos de um pedaço do payload. Ela nasce VAZIA e é preenchida
+    por `rrSincronizar` conforme os campos daquele prefixo mudam — é isso que
+    faz o motivo aparecer colado ao campo editado e sumir quando a edição é
+    desfeita, sem modal e sem redesenhar a tela a cada tecla. */
+function caixaDeMotivos(prefixo) {
+  const caixa = el("div", "motivos");
+  est.rr.caixas.push({ prefixo: prefixo, no: caixa, linhas: {} });
+  return caixa;
+}
+
+function linhaDeMotivo(campo) {
+  const piso = lim("min_chars_motivo_edicao", 10);
+  const linha = el("div", "motivo-linha");
+  const entrada = el("input");
+  entrada.type = "text";
+  entrada.maxLength = 600;
+  entrada.placeholder = t("rr.motivo_ph", { min: piso });
+  entrada.value = est.rr.motivos[campo] || "";
+  entrada.setAttribute("aria-label", t("rr.motivo_rotulo", { campo: campo }));
+  entrada.addEventListener("input", () => {
+    est.rr.motivos[campo] = entrada.value;
+    salvarRascunhoRR();
+    rrAtualizarResumo();
+    rrAtualizarBotao();
+  });
+  // O caminho do campo é o ENDEREÇO no payload, e é literalmente o que vai para
+  // `edicoes_avaliacao.campo`. Ele sai em mono e sem tradução: é vocabulário de
+  // máquina, e traduzi-lo faria a trilha de auditoria e a tela discordarem.
+  juntar(linha, el("label", null, t("rr.motivo_rotulo", { campo: campo })), entrada);
+  return linha;
+}
+
+/** Recalcula o diff e reconcilia as caixas de motivo — SEM redesenhar.
+
+    Reconstruir as caixas a cada tecla tiraria o foco do campo no meio da
+    palavra. Aqui só entra a linha que passou a existir e só sai a que deixou de
+    existir; quem estava sendo digitado permanece o mesmo nó. */
+function rrSincronizar() {
+  const rr = est.rr;
+  if (!rr || !rr.detalhe || !rr.form) return;
+  rr.diff = diffPayload(
+    montarPayload(rr.detalhe, rr.original), montarPayload(rr.detalhe, rr.form));
+  const ativos = {};
+  for (const d of rr.diff) ativos[d.campo] = true;
+
+  const colocados = {};
+  for (const caixa of rr.caixas) {
+    for (const campo of Object.keys(caixa.linhas)) {
+      if (ativos[campo]) colocados[campo] = true;
+    }
+  }
+  for (const caixa of rr.caixas) {
+    for (const d of rr.diff) {
+      if (colocados[d.campo]) continue;
+      if (d.campo.indexOf(caixa.prefixo) !== 0) continue;
+      const linha = linhaDeMotivo(d.campo);
+      caixa.linhas[d.campo] = linha;
+      caixa.no.appendChild(linha);
+      colocados[d.campo] = true;
+    }
+    for (const campo of Object.keys(caixa.linhas)) {
+      if (ativos[campo]) continue;
+      caixa.no.removeChild(caixa.linhas[campo]);
+      delete caixa.linhas[campo];
+    }
+  }
+  rrAtualizarResumo();
+  rrAtualizarBotao();
+}
+
+/** Uma tecla num campo do workspace do revisor. */
+function rrDigitou() {
+  salvarRascunhoRR();
+  rrSincronizar();
+}
+
+/** Uma mudança ESTRUTURAL (nota, preferência, critério a mais ou a menos).
+    Redesenha o detalhe inteiro, como o anotador faz — são cliques, e o foco não
+    está no meio de uma palavra. */
+function rrMudou() {
+  salvarRascunhoRR();
+  desenharDetalheRR();
+}
+
+/** O RESUMO DO DIFF: conferir o que mudou sem rolar a tela inteira de volta.
+
+    Só texto aqui dentro — nenhum campo editável —, e é por isso que ele pode
+    ser reconstruído a cada tecla sem custar foco. */
+function rrAtualizarResumo() {
+  const no = $("#rr-diff");
+  if (!no) return;
+  const rr = est.rr;
+  limpar(no);
+  const piso = lim("min_chars_motivo_edicao", 10);
+  const cabeca = el("div", "painel-cabeca");
+  cabeca.style.padding = "0 0 4px";
+  cabeca.style.border = "none";
+  juntar(cabeca,
+    el("h2", "rr-secao-titulo", t("rr.diff_titulo")),
+    el("span", "crescer"),
+    el("span", "etiqueta " + (rr.diff.length ? "devolvido" : "pendente"),
+      t("rr.diff_conta", { n: n(rr.diff.length) })));
+  no.appendChild(cabeca);
+  if (!rr.diff.length) {
+    no.appendChild(el("p", "rr-secao-nota", t("rr.diff_vazio")));
+    return;
+  }
+  const lista = el("div", "diff-lista");
+  for (const d of rr.diff) {
+    const item = el("div", "diff-item");
+    juntar(item, el("div", "diff-campo", d.campo));
+    const valores = el("div", "diff-valores");
+    juntar(valores,
+      el("span", "de", t("rr.diff_de") + ": "
+        + (comoTexto(d.antes) === null ? t("rr.diff_nada") : comoTexto(d.antes))),
+      el("span", "para", t("rr.diff_para") + ": "
+        + (comoTexto(d.depois) === null ? t("rr.diff_nada") : comoTexto(d.depois))));
+    item.appendChild(valores);
+    const motivo = (rr.motivos[d.campo] || "").trim();
+    item.appendChild(el("div", "diff-motivo" + (motivo.length < piso ? " pendente" : ""),
+      motivo.length < piso ? t("rr.diff_sem_motivo") : motivo));
+    lista.appendChild(item);
+  }
+  no.appendChild(lista);
+}
+
+/** O QUE FALTA, na ordem em que a tela pede — de cima para baixo. */
+function rrOQueFalta() {
+  const rr = est.rr;
+  if (!rr || !rr.detalhe || !rr.form) return t("falta.nada");
+  if (!rr.antes) return t("falta.rr_antes");
+  const piso = lim("min_chars_motivo_edicao", 10);
+  const sem = (rr.diff || [])
+    .filter((d) => (rr.motivos[d.campo] || "").trim().length < piso).length;
+  if (sem) return sem === 1 ? t("falta.rr_motivo_um") : t("falta.rr_motivos", { n: sem });
+  if (!rr.depois) return t("falta.rr_depois");
+  const minimo = lim("min_chars_avaliacao", 30);
+  const tem = (rr.justificativa || "").trim().length;
+  if (tem < minimo) return t("falta.justificativa", { n: minimo - tem });
+  return null;
+}
+
+function rrAtualizarBotao() {
+  const b = $("#rr-registrar");
+  if (!b) return;
+  const falta = rrOQueFalta();
+  b.textContent = falta ? falta : t("botao.registrar_avaliacao");
+  b.disabled = !!falta || est.rr.carregando;
+}
+
+function desenharDetalheRR() {
+  const det = $("#revisor-detalhe");
+  limpar(det);
+  const rr = est.rr;
+  if (!rr || !rr.sel) {
+    const caixa = el("div", "vazio");
+    juntar(caixa,
+      el("div", "vazio-titulo", t("rr.nada_selecionado")),
+      el("p", "vazio-linha", t("rr.nada_selecionado_linha")));
+    det.appendChild(caixa);
+    return;
+  }
+  if (rr.carregando || !rr.detalhe) {
+    det.appendChild(el("div", "vazio-linha",
+      rr.carregando ? t("rr.abrindo") : t("rr.erro_abrir")));
+    return;
+  }
+  const env = rr.detalhe;
+  const a = env.anotacao;
+  // As caixas de motivo são registradas DURANTE o desenho do workspace, então
+  // a lista tem de nascer vazia a cada redesenho — senão ela acumularia nós
+  // que já saíram do DOM e `rrSincronizar` escreveria em elementos órfãos.
+  rr.caixas = [];
+
+  const cabeca = el("div", "triagem-cabeca");
+  juntar(cabeca,
+    el("span", "etiqueta pendente", t("rr.versao", { n: a.versao })),
+    el("span", rr.minha ? "eu" : "fraco",
+      rr.minha ? t("rr.por_voce") : t("rr.por", { nome: a.anotador })),
+    el("span", "fraco", (a.submetida_em || "").slice(0, 19).replace("T", " ")),
+    el("span", "crescer"),
+    env.tarefa.projeto ? el("span", "fraco dado", env.tarefa.projeto + " · ") : null,
+    el("span", "fraco", a.payload_schema
+      + (a.versao_diretriz ? " · " + t("triagem.diretriz", { n: a.versao_diretriz }) : "")));
+  det.appendChild(cabeca);
+  if (rr.minha) {
+    const aviso = faixaSoloDe(rr);
+    if (aviso) det.appendChild(aviso);
+  }
+  // A PASSAGEM 1 À VISTA. "Quem aprovou isto, e com que comentário" é o que
+  // separa "a triagem errou" de "o anotador errou" — e é a diferença que a
+  // escala 1 registra.
+  if (rr.triagemDoItem) {
+    const tri = el("div", "painel-corpo");
+    juntar(tri, el("span", "fraco", t("rr.triagem", { nome: rr.triagemDoItem.revisor })));
+    if (rr.triagemDoItem.comentario) {
+      // `.dado`: o comentário foi escrito por uma pessoa e sai como ela o
+      // escreveu, na língua dela.
+      tri.appendChild(el("p", "secundario dado",
+        t("rr.triagem_comentario", { comentario: rr.triagemDoItem.comentario })));
+    }
+    det.appendChild(tri);
+  }
+  if (rr.rascunhoRecuperado) {
+    const aviso = el("div", "painel-corpo");
+    const caixa = el("div", "aviso-rascunho");
+    juntar(caixa, el("span", null, t("rr.rascunho")));
+    const descartar = el("button", "botao discreta", t("botao.descartar_rascunho"));
+    descartar.type = "button";
+    descartar.addEventListener("click", () => {
+      limparRascunhoRR(rr.sel);
+      rr.form = JSON.parse(JSON.stringify(rr.original));
+      rr.antes = null;
+      rr.depois = null;
+      rr.justificativa = "";
+      rr.motivos = {};
+      rr.rascunhoRecuperado = false;
+      desenharDetalheRR();
+    });
+    caixa.appendChild(descartar);
+    aviso.appendChild(caixa);
+    det.appendChild(aviso);
+  }
+
+  /* ---- 1. o trabalho como chegou ---- */
+  const antes = el("div", "rr-secao");
+  juntar(antes,
+    el("div", "rr-secao-titulo", t("rr.antes_titulo")),
+    el("p", "rr-secao-nota", t("rr.antes_nota")),
+    escalaRR(ESCALA_ANTES, rr.antes, "a11y.escala_antes", (id) => {
+      rr.antes = id;
+      salvarRascunhoRR();
+      desenharDetalheRR();
+    }));
+  det.appendChild(antes);
+
+  /* ---- 2. corrigir no lugar ---- */
+  const corrigir = el("div", "rr-secao");
+  juntar(corrigir,
+    el("div", "rr-secao-titulo", t("rr.corrigir_titulo")),
+    el("p", "rr-secao-nota", t("rr.corrigir_nota")));
+  det.appendChild(corrigir);
+  // O MESMO workspace do anotador, destravado. Ver `ctxEdicaoRevisor`.
+  det.appendChild(desenharWorkspace(env, ctxEdicaoRevisor()));
+  // A caixa de ÚLTIMO RECURSO: um caminho que nenhum prefixo reivindicou cai
+  // aqui em vez de virar uma mudança impossível de justificar (e um botão que
+  // nunca destrava). Ela é registrada por último de propósito.
+  det.appendChild(caixaDeMotivos(""));
+
+  /* ---- o resumo do diff ---- */
+  const resumo = el("div", "diff");
+  resumo.id = "rr-diff";
+  det.appendChild(resumo);
+
+  /* ---- 3. o resultado ---- */
+  const depois = el("div", "rr-secao");
+  juntar(depois,
+    el("div", "rr-secao-titulo", t("rr.depois_titulo")),
+    el("p", "rr-secao-nota", t("rr.depois_nota")),
+    escalaRR(ESCALA_DEPOIS, rr.depois, "a11y.escala_depois", (id) => {
+      rr.depois = id;
+      salvarRascunhoRR();
+      desenharDetalheRR();
+    }));
+  det.appendChild(depois);
+
+  /* ---- 4. por quê ---- */
+  const just = el("div", "rr-secao");
+  const minimo = lim("min_chars_avaliacao", 30);
+  juntar(just,
+    el("div", "rr-secao-titulo", t("rr.just_titulo")),
+    el("p", "rr-secao-nota", t("rr.just_nota")));
+  const area = el("textarea");
+  area.rows = 4;
+  area.className = "largo";
+  area.placeholder = t("rr.just_ph", { min: minimo });
+  area.value = rr.justificativa || "";
+  const contador = el("div", "contador",
+    t("ws.contador_de", { n: n((rr.justificativa || "").trim().length), min: minimo }));
+  area.addEventListener("input", () => {
+    rr.justificativa = area.value;
+    contador.textContent = t("ws.contador_de",
+      { n: n(area.value.trim().length), min: minimo });
+    salvarRascunhoRR();
+    rrAtualizarBotao();
+  });
+  juntar(just, area, contador, dicaLinguaMeta("lingua.meta"));
+  det.appendChild(just);
+
+  /* ---- a única ação primária ---- */
+  const acoes = el("div", "triagem-acoes");
+  const registrar = el("button", "botao primaria", "");
+  registrar.type = "button";
+  registrar.id = "rr-registrar";
+  registrar.addEventListener("click", registrarAvaliacao);
+  juntar(acoes, registrar, el("span", "atalho", "Ctrl+Enter"));
+  det.appendChild(acoes);
+
+  // Primeiro desenho do resumo e do botão, já com o rascunho recuperado dentro.
+  rrSincronizar();
+}
+
+async function registrarAvaliacao() {
+  const rr = est.rr;
+  if (!rr || !rr.sel || rr.carregando || rrOQueFalta()) return;
+  const alvo = rr.sel;
+  const i = rr.itens.findIndex((x) => x.anotacao_id === alvo);
+  const proximo = rr.itens[i + 1] || rr.itens[i - 1] || null;
+  const corpo = {
+    revisor_id: est.persona.id,
+    avaliacao_antes: rr.antes,
+    avaliacao_depois: rr.depois,
+    justificativa: (rr.justificativa || "").trim(),
+    edicoes: rr.diff.map((d) => ({
+      campo: d.campo,
+      valor_antes: comoTexto(d.antes),
+      valor_depois: comoTexto(d.depois),
+      motivo: (rr.motivos[d.campo] || "").trim(),
+    })),
+    // Medido e enviado — e invisível para quem avalia, como no anotador.
+    tempo_ativo_ms: Math.max(0, Date.now() - rr.abertoEm),
+  };
+  // Só quando houve mudança: mandar uma cópia idêntica do payload diria ao
+  // banco que houve correção onde não houve.
+  if (rr.diff.length) corpo.payload_corrigido = montarPayload(rr.detalhe, rr.form);
+  rr.carregando = true;
+  rrAtualizarBotao();
+  try {
+    const r = await postar("/api/avaliacao/" + alvo, corpo);
+    limparRascunhoRR(alvo);
+    recado(r.status === "escalada" ? t("recado.escalada")
+      : r.status === "descartada" ? t("recado.descartada") : t("recado.avaliada"));
+  } catch (e) {
+    rr.carregando = false;
+    recado(e.message, true);
+    rrAtualizarBotao();
+    return;
+  }
+  rr.carregando = false;
+  // FECHAR O LOOP: o próximo item assume o lugar sozinho.
+  await carregarRR(proximo ? proximo.anotacao_id : null);
   await recarregarSaude();
 }
 
@@ -4213,6 +5287,9 @@ function desenharAdmin() {
     linhas.appendChild(el("dd", classe, valor));
   }
 
+  /* ---- escalação ---- */
+  desenharEscalacao();
+
   /* ---- projetos ---- */
   desenharProjetosAdmin();
 
@@ -4259,6 +5336,169 @@ function desenharAdmin() {
     sel.appendChild(o);
   }
   if (escolhido) sel.value = escolhido;
+}
+
+/* ---- A ESCALAÇÃO (P3b) ------------------------------------------------------
+   `borderline_admin` no Rate and Review cria o item aqui, e a decisão do admin
+   ENCERRA — aprovando, devolvendo ou descartando. É o único caminho pelo qual
+   um item que passou da triagem volta ao anotador, e ele existe porque quem o
+   percorre é o admin, com o parecer do revisor em mãos: a passagem 2 não se
+   contradiz devolvendo o que ela mesma acabou de aprovar.
+
+   O parecer inteiro fica À VISTA no item — as duas notas, a justificativa e o
+   diff com o motivo de cada mudança. Mandar o admin abrir outra tela para ler
+   aquilo faria a escalação custar mais que o problema que ela resolve. */
+async function carregarEscalacao() {
+  try {
+    const r = await api(comParams("/api/escalacao/fila", { admin_id: est.persona.id }));
+    est.escalacao = {
+      itens: r.items || [], total: r.total || 0,
+      sel: est.escalacao && est.escalacao.sel, decisao: null, comentario: "",
+      carregando: false,
+    };
+  } catch (e) {
+    est.escalacao = { itens: [], total: 0, sel: null, decisao: null, comentario: "",
+                      carregando: false, erro: e.message };
+    recado(t("admin.escalacao_erro", { erro: e.message }), true);
+  }
+}
+
+function desenharEscalacao() {
+  const lista = $("#escalacao-lista");
+  if (!lista) return;
+  limpar(lista);
+  const fila = est.escalacao;
+  atualizarContagens();
+  if (!fila || !fila.itens.length) {
+    const vazia = el("div", "vazio");
+    juntar(vazia,
+      el("div", "vazio-titulo", t("admin.escalacao_vazia")),
+      el("p", "vazio-linha", t("admin.escalacao_vazia_linha")));
+    lista.appendChild(vazia);
+    return;
+  }
+  for (const item of fila.itens) {
+    lista.appendChild(cartaoEscalado(item));
+  }
+}
+
+function nomeDaEscala(opcoes, id) {
+  const achado = opcoes.find((o) => o.id === id);
+  return achado ? t(achado.nome) : String(id || "");
+}
+
+function cartaoEscalado(item) {
+  const fila = est.escalacao;
+  const cartao = el("div", "escalado");
+  const topo = el("div", "escalado-topo");
+  juntar(topo,
+    el("strong", null, nomeTipo(item.tipo)),
+    el("span", "fraco", t("admin.escalacao_por",
+      { rev: item.revisor, aut: item.anotador })),
+    el("span", "crescer"));
+  if (item.projeto) topo.appendChild(el("span", "fraco dado", item.projeto));
+  topo.appendChild(el("span", "etiqueta devolvido", t("admin.escalacao_escalas", {
+    nota1: nomeDaEscala(ESCALA_ANTES, item.avaliacao_antes),
+    nota2: nomeDaEscala(ESCALA_DEPOIS, item.avaliacao_depois),
+  })));
+  cartao.appendChild(topo);
+  cartao.appendChild(el("div", "escalado-trecho dado",
+    item.disponivel ? item.prompt : t("triagem.prompt_sumiu")));
+  // A justificativa do revisor é DADO: sai na língua em que foi escrita.
+  cartao.appendChild(el("div", "escalado-just dado", item.justificativa));
+  cartao.appendChild(el("div", "fraco", item.edicoes.length
+    ? t("admin.escalacao_edicoes", { n: n(item.edicoes.length) })
+    : t("admin.escalacao_sem_edicoes")));
+  for (const ed of item.edicoes) {
+    const linha = el("div", "diff-item");
+    juntar(linha, el("div", "diff-campo", ed.campo));
+    const valores = el("div", "diff-valores");
+    juntar(valores,
+      el("span", "de", t("rr.diff_de") + ": " + (ed.valor_antes === null ? t("rr.diff_nada") : ed.valor_antes)),
+      el("span", "para", t("rr.diff_para") + ": " + (ed.valor_depois === null ? t("rr.diff_nada") : ed.valor_depois)));
+    linha.appendChild(valores);
+    linha.appendChild(el("div", "diff-motivo dado", ed.motivo));
+    cartao.appendChild(linha);
+  }
+
+  const aberto = fila.sel === item.avaliacao_id;
+  const acoes = el("div", "escalado-acoes");
+  const piso = lim("min_chars_devolucao", 20);
+  const escolher = (id) => {
+    fila.sel = item.avaliacao_id;
+    fila.decisao = fila.decisao === id && aberto ? null : id;
+    if (fila.decisao !== "devolvida") fila.comentario = fila.comentario || "";
+    desenharEscalacao();
+  };
+  acoes.appendChild(escalaRR(DECISOES, aberto ? fila.decisao : null, "a11y.decisao", escolher));
+  cartao.appendChild(acoes);
+
+  if (!aberto || !fila.decisao) return cartao;
+
+  const area = el("textarea");
+  area.rows = 2;
+  area.placeholder = t("admin.escalacao_ph", { min: piso });
+  area.value = fila.comentario || "";
+  // Mora no ESTADO, como o comentário da triagem: trocar de idioma no meio de
+  // uma decisão redesenha o painel, e o que já foi escrito tem de continuar aqui.
+  area.addEventListener("input", () => {
+    fila.comentario = area.value;
+    rotular();
+  });
+  cartao.appendChild(area);
+  cartao.appendChild(dicaLinguaMeta("lingua.meta"));
+
+  const rodape = el("div", "escalado-acoes");
+  const enviar = el("button", "botao primaria", "");
+  enviar.type = "button";
+  const rotular = () => {
+    // A ÚNICA ação primária deste cartão, e ela diz o que falta antes do clique
+    // — o mesmo contrato do resto da plataforma.
+    const escrito = (fila.comentario || "").trim().length;
+    const falta = !fila.decisao ? t("falta.decisao")
+      : (fila.decisao === "devolvida" && escrito < piso)
+        ? t("falta.devolucao", { n: piso - escrito })
+        : null;
+    enviar.textContent = falta || t("botao.decidir");
+    enviar.disabled = !!falta || fila.carregando;
+  };
+  rotular();
+  enviar.addEventListener("click", () => decidirEscalacao(item.avaliacao_id));
+  const cancelar = el("button", "botao discreta", t("botao.cancelar"));
+  cancelar.type = "button";
+  cancelar.addEventListener("click", () => {
+    fila.decisao = null;
+    fila.comentario = "";
+    desenharEscalacao();
+  });
+  juntar(rodape, enviar, cancelar);
+  cartao.appendChild(rodape);
+  return cartao;
+}
+
+async function decidirEscalacao(avaliacaoId) {
+  const fila = est.escalacao;
+  if (!fila || !fila.decisao || fila.carregando) return;
+  fila.carregando = true;
+  try {
+    const r = await postar("/api/escalacao/" + avaliacaoId, {
+      admin_id: est.persona.id,
+      decisao: fila.decisao,
+      comentario: (fila.comentario || "").trim() || null,
+    });
+    recado(r.reabriu ? t("recado.decisao_devolvida") : t("recado.decisao"));
+  } catch (e) {
+    fila.carregando = false;
+    recado(e.message, true);
+    return;
+  }
+  fila.carregando = false;
+  fila.sel = null;
+  fila.decisao = null;
+  fila.comentario = "";
+  await carregarEscalacao();
+  await recarregarSaude();
+  desenharAdmin();
 }
 
 /** A separação entre demonstração e trabalho real, com número.

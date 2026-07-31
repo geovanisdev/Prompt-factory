@@ -609,7 +609,7 @@ def _annotate(args: argparse.Namespace) -> int:
         # A ÚNICA saída para um banco de schema divergente. Ele guarda trabalho
         # humano e não se recria a partir da pipeline — a migração reconstrói ao
         # lado, confere as contagens e as FKs, e só então troca o arquivo,
-        # deixando o antigo como `.v1.bak`.
+        # deixando o antigo como `.v<versão de origem>.bak`.
         from .annotate import migracao
 
         if not banco.is_file():
@@ -631,7 +631,7 @@ def _annotate(args: argparse.Namespace) -> int:
             return 0
         print(f"[annotate] {banco}: schema {rel['de']} -> {rel['para']}")
         print(f"[annotate] cópia do banco anterior em {rel['backup']}")
-        print(f"[annotate] {rel['diretrizes']} diretriz(es) versionada(s) inserida(s)")
+        print(f"[annotate] {rel['diretrizes']} diretriz(es) versionada(s)")
         for nome, pid in rel["projetos"].items():
             quantas = rel["alocacao"].get(nome, 0)
             print(f"[annotate] projeto {nome!r} (id {pid}): {quantas} tarefa(s)")

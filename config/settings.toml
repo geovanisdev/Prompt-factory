@@ -353,6 +353,17 @@ min_chars_sft = 40
 # trabalho sem devolver instrução, e o re-trabalho sai igual ao primeiro.
 min_chars_devolucao = 20
 
+# --- Rate and Review (P3b, passagem 2 da revisão) -----------------------------
+# Piso da JUSTIFICATIVA GERAL da avaliação, exigida sempre — inclusive quando o
+# revisor não mudou nada e achou tudo excepcional. Ela aparece ao lado do escore
+# no painel e no export: um número sem motivo ninguém contesta nem aprende com.
+min_chars_avaliacao = 30
+# Piso do motivo de CADA mudança do diff. Curto de propósito: o motivo de uma
+# alteração é uma nota de rodapé ("a nota 5 não cabe na escala deste critério"),
+# não um parecer. O parecer é a justificativa acima. Um motivo que precisa de
+# 300 caracteres é sinal de que aquilo era para ter sido devolvido na triagem.
+min_chars_motivo_edicao = 10
+
 # MODO SOLO. Com `false` (o default), o revisor NÃO vê as próprias submissões:
 # é a regra de QC de qualquer operação com equipe, e sem ela a taxa de
 # aprovação do painel do admin não mede coisa nenhuma.
