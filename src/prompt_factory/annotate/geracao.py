@@ -1076,9 +1076,13 @@ def _validar_respostas(
         rotulos.append(rotulo)
         texto = _texto(r.get("texto"))
         if len(texto) < piso:
+            # O piso é contra resposta VAZIA, não contra resposta CURTA: piada tem
+            # desfecho de 38 caracteres, pergunta factual tem resposta de 86, e nos
+            # dois casos a curta é a CORRETA. Piso alto codificaria "mais longo é
+            # melhor" — o viés de comprimento que a anotação existe para combater.
             erros.append(
                 f"uid {uid}, {rotulo}: resposta com {len(texto)} caracteres "
-                f"(mínimo {piso}) — resposta vazia não sustenta comparação"
+                f"(mínimo {piso}) — o modelo não devolveu resposta"
             )
             continue
         problema = conferir_lingua(texto, lang)

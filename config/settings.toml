@@ -472,9 +472,26 @@ max_tentativas = 3
 # que o da rotulagem (2 h) porque escrever duas respostas defensáveis para
 # dezenas de prompts é trabalho de horas, não de minutos.
 claim_ttl_horas = 6
-# Piso de uma resposta de modelo. Abaixo disso não há o que comparar num A/B —
-# e uma resposta curta demais vence ou perde pelo tamanho, não pelo conteúdo.
-min_chars_resposta = 200
+# Piso de uma resposta de modelo. Serve contra resposta VAZIA (o modelo calou, o
+# gerador entregou string em branco), não contra resposta CURTA.
+#
+# Estava em 200 e recusou três itens do mat_0004 — os três legítimos, e num deles
+# o melhor material do lote:
+#   · "O que é que uma impressora disse para a outra?" → "Nada — ficaram só a
+#     trocar impressões." (38 chars) é o desfecho da piada e é a resposta CORRETA;
+#     a de 394 chars explica solenemente que impressoras não falam, e esse é o
+#     defeito.
+#   · "Who was the very first American Idol winner?" → "That was Kelly Clarkson…"
+#     (86 chars) é a correta; a longa é burocracia ("Per the official broadcast
+#     records maintained by the producing network…"), que é `registro-errado`.
+#   · Uma classificação de oito termos cabe em 158 chars; o defeito ali era omitir
+#     um termo, não ser curta.
+#
+# Um piso alto codifica "mais longo é melhor" — que é exatamente o viés de
+# comprimento que envenena dataset de preferência, e que a anotação existe para
+# combater. Construí-lo no validador seria plantar dentro da ferramenta o defeito
+# que ela deve pegar. 12 caracteres separa "o modelo calou" de "a resposta é curta".
+min_chars_resposta = 12
 # Teto de critérios de uma rubrica GERADA. Menor que o `max_criterios_rubrica`
 # da plataforma (8): a rubrica gerada é aplicada por outra pessoa em seguida, e
 # 5 é o limite prático de quantas escalas alguém compara sem perder o fio. O
