@@ -182,11 +182,13 @@ Pegadinhas deste bloco:
 | `app/deps.py` | a conexão por request + a regra dura sobre `async def` |
 | `app/presenters.py` | linha do SQLite → JSON (bool de verdade, `license_class`, `attribution`) |
 | `app/main.py` | `criar_app()` (fábrica), lifespan, `idx_prompts_app`, mount do `static/` |
+| `app/static/index.html` | **a interface inteira**: um arquivo, CSS+JS inline, sem build e sem rede |
 | `export.py` | `REGISTRY` perfil×container, escritores JSONL/CSV, manifesto |
 
 Pegadinhas deste bloco:
 
-- **Nenhuma rota que toca o banco pode ser `async def`.** Medido: rota `def` + `get_conn` rodam na MESMA thread e funcionam com o `check_same_thread=True` padrão; trocar para `async def` põe a rota no event loop e a dependência no threadpool, e a primeira query morre com `sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread`. O conserto é **tirar o `async`**, nunca desligar o `check_same_thread` (isso troca um erro alto por corrupção silenciosa). `db.connect` ganhou o parâmetro só para o caso do gerador em threadpool — não use em rota.
+- **A conexão por request nasce com `check_same_thread=False`, e isso não é preguiça.** O FastAPI resolve uma dependência-gerador com `contextmanager_in_threadpool`: o `__enter__`, o corpo da rota e o `__exit__` são **três `anyio.to_thread.run_sync` independentes**, sem afinidade de thread (o `__exit__` usa até um `CapacityLimiter` próprio). Com UMA requisição em voo o pool reaproveita a thread ociosa e tudo parece funcionar — foi assim que a medição original ("4 de 4 na mesma thread") passou. Medido depois, com as mesmas 24 requisições: 1 em paralelo → 0 erros; **4 em paralelo → 15 respostas 500; 12 em paralelo → 24**, todas com `sqlite3.ProgrammingError` vindo do `conn.close()`. E 2+ em voo é o caso normal: a interface dispara `health`+`stats`+`collections` juntas no primeiro paint. Isto NÃO é o caso proibido do `db.connect` (conexão compartilhada entre usuários): aqui ela nasce, é usada e morre dentro de uma requisição, uma operação por vez. Regressão coberta por `tests/test_frontend.py::test_conexao_do_request_atravessa_threads`.
+- **Nenhuma rota que toca o banco pode ser `async def`** — agora por causa do bloqueio, não da thread: `sqlite3` é síncrono, e uma consulta de 200 ms no event loop trava o servidor inteiro (inclusive o download de export em curso).
 - **`nsfw = 0` perde as linhas NULL em silêncio.** Não rotulado é o estado normal (a campanha do M6/M7 não rodou: hoje é 100% do banco). Todo booleano anulável usa `IS 1` / `IS NOT 1`; o `nsfw=exclude` da API mantém os não rotulados de propósito. `quality_min`, esse sim, EXCLUI os sem rótulo — é o desejado, mas a interface tem de dizer.
 - **`MATERIALIZED` no CTE do FTS é 100x mais lento** (9,5 → 956 ms em 200k). A palavra não pode aparecer em `queries.py`; o SQLite inlina sozinho.
 - **`snippet()` do FTS5 custa o corpus se ficar dentro do CTE, e 2,3 ms se ficar fora.** Medido em 120k linhas com um termo de 97.541 hits: dentro do CTE 384 ms, restrito aos 50 rowids da página **2,3 ms**. Por isso o snippet sai numa SEGUNDA consulta (`sql_snippets`), depois de a página estar decidida. É o que torna viável devolver o trecho com o termo em vez do começo do texto — num prompt de 1 MB os dois não têm relação.
@@ -208,6 +210,21 @@ Pegadinhas deste bloco:
 - **O mount do `StaticFiles` vem POR ÚLTIMO.** Registrado antes dos routers, um mount em `/` engole `/api/*`.
 - **A app é uma FÁBRICA (`criar_app(db_file, exports_dir)`), não um `app` global.** Um `app = FastAPI()` de módulo leria `paths.DB_FILE` no import e tornaria impossível apontar teste (ou `--db`) para outro arquivo. `--reload` do uvicorn usa `factory=True`.
 - **`<mark>` do snippet viaja como texto no JSON.** A interface **tem** de escapar o resto do conteúdo antes de injetar como HTML: o corpus tem `<script>` de verdade dentro dos prompts.
+
+### A tela (`app/static/index.html`)
+
+Um arquivo de ~1.970 linhas, **sem build, sem framework, sem CDN** — CSS e JS inline, e nenhuma referência a host externo (provado por `tests/test_frontend.py::test_zero_referencia_externa`). Layout de 3 colunas: facetas · lista · mesa (seleção, coleção ativa, export). Escuro por padrão, claro no botão `tema`; o cromo é sans e **o texto do prompt é serifado** — o conteúdo é o produto, não pode ter a mesma voz da interface.
+
+- **Só `snippetSeguro()` produz HTML vindo do corpus.** Ela escapa tudo com `esc()` e reabre exatamente duas strings: `&lt;mark&gt;` e `&lt;/mark&gt;`. Todo o resto vai por `esc()` ou `textContent`, e o editor recebe o texto por `.value`. Verificado no navegador contra um prompt com `<script>alert(1)</script>`: 0 elementos `script`/`img` injetados na lista.
+- **A taxonomia NÃO está copiada no HTML.** As 32 classes e seus nomes legíveis vêm de `/api/stats`. Teste `test_a_taxonomia_nao_foi_copiada_para_a_tela` recusa qualquer chave da taxonomia como literal no JS.
+- **A seleção é um `Set` de uids no cliente**, persistido em `localStorage` junto com um mapa enxuto `uid → {license, license_class, redistributable, commercial_ok}` — é ele que permite calcular a composição de licença do export no modo "seleção" depois de um reload.
+- **`license → license_class` não é regra copiada.** A tela pergunta ao backend: um `GET /api/prompts?license=X&page_size=1` por licença no boot, e lê o `license_class` que `presenters` calculou. Nunca reimplemente `classe_da_licenca` em JS.
+- **"Adicionar os N do filtro" manda o objeto `est.f` inteiro para o `from-filter`** — o mesmo `Filtros` da listagem e das facetas. É o que garante que o número prometido na tela seja o número que entra na coleção.
+- **Texto: 400 caracteres no card, 120.000 no máximo ao expandir.** O corpus tem prompts de ~1 MB; jogar isso no DOM trava a aba. Ao expandir, a tela busca `GET /api/prompts/{uid}` e mostra os primeiros 120k com um aviso honesto de quanto ficou de fora — `copiar` leva o texto inteiro.
+- **`Shift+J/K` lê `e.shiftKey`, não a caixa da tecla.** Num teclado comum Shift+j chega como `key="J"`, mas layout/IME/remapeador podem mandar `key="j"` com `shiftKey=true`; testar só a maiúscula quebra em silêncio. Mesma ideia no espaço (`e.key === " " || e.code === "Space"`).
+- **Qualidade é 1..3** (`schema.QUALITY_VALUES`), não 1..5. Vale para a folha de atalhos, para os botões da fila de revisão e para o seletor do editor.
+- **`rotulagem_pendente` desabilita, nunca esconde.** Os grupos `task_type`/`domain` aparecem com as 16 classes zeradas e a explicação na barra lateral — sumir pareceria bug.
+- **O editor manda só o que mudou** (`PATCH` com os campos alterados). Limpar um rótulo é `null` explícito; não mexer é omitir a chave — é o que `exclude_unset` distingue do lado do backend.
 
 ## Camada raw (M2/M3)
 

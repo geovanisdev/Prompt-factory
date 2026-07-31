@@ -213,13 +213,14 @@ def connect(
     teste, por exemplo) deixa o ON DELETE CASCADE inerte e o teste passa em
     falso. Use sempre esta função.
 
-    ``check_same_thread=False`` existe para UM caso e só um: um gerador que o
-    Starlette itera num threadpool (o download de export), onde a conexão nasce
-    numa thread e é consumida em outra. **Não use isso para "resolver" um
-    ``ProgrammingError`` numa rota** — ali a causa é a rota ter sido escrita
-    ``async def`` consumindo uma dependência síncrona, e o conserto é tirar o
-    ``async`` (ver ``app/deps.py``). Desligar a checagem numa conexão realmente
-    compartilhada troca um erro alto por corrupção silenciosa.
+    ``check_same_thread=False`` só é legítimo quando a conexão pertence a UM
+    fluxo de cada vez e o que atravessa a fronteira de thread é só o bastão
+    entre etapas desse mesmo fluxo. São dois casos no projeto, ambos
+    documentados na origem: o gerador do download de export e a dependência
+    ``app.deps.get_conn`` (uma conexão por request, criada e fechada em
+    chamadas distintas do threadpool do AnyIO). Numa conexão de verdade
+    **compartilhada** entre usuários concorrentes, desligar a checagem troca um
+    erro alto por corrupção silenciosa — aí não.
     """
     if sqlite3.sqlite_version_info < MIN_SQLITE:
         alvo = ".".join(map(str, MIN_SQLITE))

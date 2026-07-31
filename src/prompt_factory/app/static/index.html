@@ -3,62 +3,1971 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prompt Factory</title>
 <!--
-  PLACEHOLDER DO M9 (backend). Este arquivo existe para provar que o
-  StaticFiles está montado e que a app responde na mesma origem da API.
+  INTERFACE LOCAL DE CURADORIA (M9).
 
-  A INTERFACE DE VERDADE é entrega de outro agente e substitui este arquivo
-  inteiro. O contrato que ela consome está em:
-    - src/prompt_factory/app/routes_prompts.py     (lista, item, PATCH, revert, facetas, stats)
-    - src/prompt_factory/app/routes_collections.py (coleções e from-filter)
-    - src/prompt_factory/app/routes_export.py      (export e histórico)
-    - http://127.0.0.1:8765/docs                   (OpenAPI gerado, sempre atual)
+  Um arquivo, sem build, sem framework, sem rede: CSS e JS inline, nenhuma
+  referência a host externo. A ferramenta precisa abrir offline, numa máquina
+  só, e continuar abrindo daqui a dois anos sem `npm install`.
 
-  Não há build step: um HTML, um CSS, um JS, tudo servido daqui.
+  Contrato consumido (a fonte da verdade é o código, e /docs é o espelho):
+    GET   /api/health                       estado do banco
+    GET   /api/stats                        panorama + taxonomia inteira
+    GET   /api/prompts                      listagem paginada (Filtros + sort/page)
+    GET   /api/prompts/{uid}                item completo (texto inteiro)
+    PATCH /api/prompts/{uid}                edita texto e/ou rótulos
+    POST  /api/prompts/{uid}/revert         desfaz a edição de texto
+    GET   /api/facets                       contagens SOB O FILTRO ATUAL
+    GET   /api/collections                  coleções
+    POST  /api/collections                  cria
+    PATCH /api/collections/{id}             renomeia
+    DELETE /api/collections/{id}            apaga
+    POST  /api/collections/{id}/items       adiciona uids
+    POST  /api/collections/{id}/items/remove
+    POST  /api/collections/{id}/items/from-filter        os N do filtro, de uma vez
+    POST  /api/collections/{id}/items/remove-from-filter
+    POST  /api/export                       gera arquivo + manifesto
+    GET   /api/exports                      histórico
+
+  REGRA DE SEGURANÇA DESTE ARQUIVO
+  Só UMA função produz HTML a partir de conteúdo do corpus: `snippetSeguro()`.
+  Todo o resto passa por `esc()` ou por `textContent`. O corpus tem `<script>`
+  de verdade dentro dos prompts — um innerHTML ingênuo aqui é XSS que o usuário
+  aplica em si mesmo.
+
+  A TAXONOMIA NÃO É COPIADA AQUI. As 16 tarefas e os 16 domínios chegam em
+  /api/stats (que os lê de labeling/taxonomy.json). Uma segunda cópia na tela
+  divergiria da primeira, e a que diverge é sempre a da tela.
 -->
 <style>
-  :root { color-scheme: light dark; }
-  body { font: 14px/1.5 ui-sans-serif, "Segoe UI", system-ui, sans-serif;
-         margin: 0 auto; max-width: 60ch; padding: 3rem 1.5rem; }
-  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
-  p  { color: GrayText; margin: .25rem 0 1.5rem; }
-  dl { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1rem; }
-  dt { font-weight: 600; }
-  dd { margin: 0; font-variant-numeric: tabular-nums; }
-  code, pre { font-family: ui-monospace, Consolas, monospace; font-size: .9em; }
-  a { color: inherit; }
+/* ==========================================================================
+   1. TOKENS
+   Escuro por padrão: a ferramenta fica aberta por horas, provavelmente à
+   noite. Fundo cinza-azulado profundo (preto puro vibra com texto claro) e
+   texto levemente creme. O acento (verde-limão dessaturado) significa UMA
+   coisa — foco e seleção — e nunca é usado para semântica de licença.
+   ========================================================================== */
+:root{
+  color-scheme: dark;
+  --fundo:#141922;
+  --fundo-2:#191f28;
+  --fundo-3:#1f2731;
+  --fundo-4:#27313c;
+  --item:#141922;
+  --item-focado:#1b232e;
+  --item-marcado:#1a2119;
+  --item-ambos:#202a1e;
+  --linha:#262f3b;
+  --linha-forte:#3a4653;
+  --texto:#e9e3d7;
+  --texto-2:#a2aab6;
+  --texto-3:#6d7683;
+  --acento:#bcd167;
+  --acento-escuro:#8fa347;
+  --acento-fraco:rgba(188,209,103,.13);
+  --acento-medio:rgba(188,209,103,.30);
+  --lic-livre:#8891a0;
+  --lic-viral:#d9a441;
+  --lic-nc:#e08a4e;
+  --lic-bloq:#e0575c;
+  --alerta:#e0575c;
+  --ok:#7fbd76;
+  --marca-fundo:#5a5216;
+  --marca-texto:#f6f0c6;
+  --fonte-ui:ui-sans-serif,"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  --fonte-leitura:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --fonte-mono:ui-monospace,"Cascadia Mono",Consolas,"DejaVu Sans Mono",monospace;
+  --w-facetas:246px;
+  --w-mesa:298px;
+}
+:root[data-tema="claro"]{
+  color-scheme: light;
+  --fundo:#f4f2ed;
+  --fundo-2:#eceae4;
+  --fundo-3:#e3e0d8;
+  --fundo-4:#d9d5cb;
+  --item:#f4f2ed;
+  --item-focado:#e8e5dd;
+  --item-marcado:#eaeedc;
+  --item-ambos:#e2e8cd;
+  --linha:#dcd8ce;
+  --linha-forte:#bdb8ab;
+  --texto:#1e2229;
+  --texto-2:#565e6a;
+  --texto-3:#7d858f;
+  --acento:#5d7412;
+  --acento-escuro:#41520a;
+  --acento-fraco:rgba(93,116,18,.12);
+  --acento-medio:rgba(93,116,18,.30);
+  --lic-livre:#6a7280;
+  --lic-viral:#9a6c05;
+  --lic-nc:#a4531b;
+  --lic-bloq:#b12a2f;
+  --alerta:#b12a2f;
+  --ok:#3d7a34;
+  --marca-fundo:#f0e79a;
+  --marca-texto:#2a2600;
+}
+
+/* ==========================================================================
+   2. BASE
+   ========================================================================== */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--fundo); color:var(--texto);
+  font:13px/1.45 var(--fonte-ui);
+  display:grid; grid-template-rows:auto 1fr; overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{
+  background:var(--fundo-3); border:1px solid var(--linha-forte); color:var(--texto-2);
+  padding:3px 8px; border-radius:3px; cursor:pointer; white-space:nowrap;
+}
+button:hover:not(:disabled){background:var(--fundo-4);color:var(--texto)}
+button:disabled{opacity:.42;cursor:not-allowed}
+button.primario{background:var(--acento-fraco);border-color:var(--acento-escuro);color:var(--acento)}
+button.primario:hover:not(:disabled){background:var(--acento-medio);color:var(--texto)}
+button.perigo:hover:not(:disabled){border-color:var(--alerta);color:var(--alerta)}
+button.nu{background:none;border-color:transparent;padding:2px 5px}
+button.nu:hover:not(:disabled){background:var(--fundo-3)}
+input,select,textarea{
+  background:var(--fundo-3); border:1px solid var(--linha-forte);
+  border-radius:3px; padding:3px 6px;
+}
+input[type=checkbox]{accent-color:var(--acento);cursor:pointer;margin:0}
+a{color:var(--acento)}
+h2,h3{margin:0;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--texto-3)}
+/* Números tabulares em TODA contagem: com proporcionais, uma coluna de
+   contagens dança a cada re-render e o olho perde a referência. */
+.num,td.num,.conta,#total{font-variant-numeric:tabular-nums}
+::selection{background:var(--acento-medio)}
+:focus-visible{outline:2px solid var(--acento);outline-offset:1px}
+.rolar{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+  scrollbar-color:var(--linha-forte) transparent}
+.oculto{display:none !important}
+.crescer{flex:1}
+.mono{font-family:var(--fonte-mono);font-size:11px}
+.fraco{color:var(--texto-3)}
+.aviso{color:var(--lic-nc)}
+.erro{color:var(--alerta)}
+
+/* ==========================================================================
+   3. BARRA SUPERIOR
+   ========================================================================== */
+#topo{
+  display:flex;align-items:center;gap:10px;padding:6px 10px;
+  background:var(--fundo-2);border-bottom:1px solid var(--linha);
+}
+#marca{font-weight:600;letter-spacing:.02em;color:var(--texto-2);white-space:nowrap}
+#marca b{color:var(--acento);font-weight:600}
+#form-busca{display:flex;align-items:center;gap:0;flex:1;max-width:560px}
+#busca{width:100%;padding:5px 9px;border-radius:3px 0 0 3px;border-right:none}
+#form-busca button{border-radius:0 3px 3px 0;padding:5px 10px}
+#topo label{color:var(--texto-3);display:flex;align-items:center;gap:4px;white-space:nowrap}
+#resumo{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+#total{font-size:17px;font-weight:600;color:var(--texto)}
+#resumo .rot{color:var(--texto-3)}
+#sel-topo{color:var(--acento);font-variant-numeric:tabular-nums}
+#topo .acoes{display:flex;gap:4px;margin-left:auto}
+
+/* ==========================================================================
+   4. GRADE DE 3 COLUNAS
+   ========================================================================== */
+#grade{display:grid;grid-template-columns:var(--w-facetas) minmax(0,1fr) var(--w-mesa);min-height:0}
+#facetas,#mesa{background:var(--fundo-2);min-height:0;padding:8px 9px 40px}
+#facetas{border-right:1px solid var(--linha)}
+#mesa{border-left:1px solid var(--linha)}
+#centro{display:grid;grid-template-rows:auto 1fr auto;min-height:0;min-width:0}
+
+/* ---- facetas ---- */
+.grupo{margin:0 0 12px}
+.grupo>header{display:flex;align-items:center;gap:6px;margin:0 0 3px}
+.grupo .nota{font-size:10.5px;color:var(--texto-3);line-height:1.35;margin:0 0 3px}
+.grupo.pendente{opacity:.72}
+.grupo.pendente>header h3{color:var(--lic-nc)}
+.opcao{
+  display:flex;align-items:center;gap:6px;width:100%;text-align:left;
+  background:none;border:1px solid transparent;border-radius:2px;
+  padding:2px 5px;color:var(--texto-2);
+}
+.opcao:hover:not(:disabled){background:var(--fundo-3);color:var(--texto)}
+.opcao[aria-pressed=true]{background:var(--acento-fraco);border-color:var(--acento-escuro);color:var(--acento)}
+.opcao .rot{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.opcao .conta{color:var(--texto-3);font-size:11px}
+.opcao[aria-pressed=true] .conta{color:var(--acento)}
+.opcao:disabled{opacity:.45}
+.linha-campo{display:flex;align-items:center;gap:5px;margin:3px 0;color:var(--texto-2)}
+.linha-campo input[type=number]{width:74px}
+.linha-campo select{flex:1;min-width:0}
+label.caixa{display:flex;align-items:flex-start;gap:6px;padding:2px 5px;cursor:pointer;color:var(--texto-2)}
+label.caixa:hover{color:var(--texto)}
+label.caixa input{margin-top:2px}
+
+/* ---- barra da lista + chips ---- */
+#barra{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:5px 10px;border-bottom:1px solid var(--linha);background:var(--fundo-2);
+}
+#chips{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.chip{
+  display:inline-flex;align-items:center;gap:5px;background:var(--fundo-3);
+  border:1px solid var(--linha-forte);border-radius:2px;padding:1px 4px 1px 6px;
+  color:var(--texto-2);font-size:11.5px;
+}
+.chip b{font-weight:600;color:var(--texto)}
+.chip button{background:none;border:none;padding:0 2px;color:var(--texto-3);line-height:1}
+.chip button:hover{color:var(--alerta);background:none}
+
+/* ---- lista ---- */
+#lista{min-height:0;padding:0 0 30vh}
+.item{
+  --f:var(--item);
+  background:var(--f);border-bottom:1px solid var(--linha);
+  padding:5px 10px 7px;cursor:default;
+}
+.item.focado{--f:var(--item-focado)}
+.item.marcado{--f:var(--item-marcado)}
+.item.marcado.focado{--f:var(--item-ambos)}
+.item.focado{box-shadow:inset 0 0 0 1px var(--acento-medio)}
+.cab{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--texto-3)}
+.cab .fonte{color:var(--texto-2);font-weight:600}
+.cab .sep{color:var(--linha-forte)}
+.cab .acoes{display:flex;gap:2px;margin-left:auto}
+.cab .acoes button{font-size:11px;padding:1px 6px}
+.selo{border:1px solid currentColor;border-radius:2px;padding:0 4px;font-size:10.5px;line-height:1.45}
+.lic-livre{color:var(--lic-livre)}
+.lic-viral{color:var(--lic-viral)}
+.lic-nao-comercial{color:var(--lic-nc)}
+.lic-bloqueada{color:var(--lic-bloq);background:rgba(224,87,92,.12)}
+.selo.dups{color:var(--texto-2)}
+.selo.dups.robo{color:var(--lic-nc);border-color:var(--lic-nc)}
+.selo.rev{color:var(--acento)}
+.selo.pii{color:var(--lic-nc)}
+.selo.nsfw{color:var(--lic-bloq)}
+.selo.chat,.selo.edit{color:var(--texto-2)}
+.rotulos{color:var(--texto-2)}
+.sem-rotulo{color:var(--texto-3);font-style:italic}
+.texto{
+  font-family:var(--fonte-leitura);font-size:14.5px;line-height:1.5;
+  color:var(--texto);white-space:pre-wrap;overflow-wrap:anywhere;
+  margin:3px 0 0 20px;
+}
+.texto.cortado{max-height:6.6em;overflow:hidden;position:relative}
+.texto.cortado::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:2.4em;
+  background:linear-gradient(to bottom,transparent,var(--f));pointer-events:none;
+}
+.texto.inteiro{max-height:52vh;overflow:auto}
+.trecho{
+  font-family:var(--fonte-leitura);font-size:14px;line-height:1.5;margin:3px 0 0 20px;
+  color:var(--texto-2);overflow-wrap:anywhere;
+}
+mark{background:var(--marca-fundo);color:var(--marca-texto);border-radius:1px;padding:0 1px}
+.mais{
+  margin:1px 0 0 20px;background:none;border:none;padding:1px 0;
+  color:var(--texto-3);font-size:11.5px;font-variant-numeric:tabular-nums;
+}
+.mais:hover{color:var(--acento);background:none}
+#paginacao{
+  display:flex;align-items:center;gap:8px;padding:5px 10px;
+  border-top:1px solid var(--linha);background:var(--fundo-2);font-variant-numeric:tabular-nums;
+}
+#vazio{padding:40px 20px;color:var(--texto-3);text-align:center;line-height:1.7}
+
+/* ---- mesa (direita) ---- */
+#mesa section{margin:0 0 14px}
+#mesa section>h3{margin-bottom:4px}
+#mesa .bloco{display:flex;flex-direction:column;gap:4px}
+#mesa .linha-btn{display:flex;gap:4px}
+#mesa .linha-btn button{flex:1}
+#contador-sel{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+#contador-sel.zerado{color:var(--texto-3)}
+#banco{font-size:11px;color:var(--texto-3);line-height:1.6}
+#banco b{color:var(--texto-2);font-weight:600}
+#hist{font-size:11px;line-height:1.5;max-height:150px}
+#hist div{padding:2px 0;border-bottom:1px solid var(--linha)}
+
+/* ==========================================================================
+   5. SOBREPOSIÇÕES
+   ========================================================================== */
+.sobre{
+  position:fixed;inset:0;background:rgba(8,11,15,.66);
+  display:flex;align-items:flex-start;justify-content:center;padding:26px 16px;z-index:20;
+}
+:root[data-tema="claro"] .sobre{background:rgba(60,58,52,.45)}
+.caixa-modal{
+  background:var(--fundo-2);border:1px solid var(--linha-forte);border-radius:4px;
+  width:100%;max-width:920px;max-height:calc(100vh - 52px);display:flex;flex-direction:column;
+  box-shadow:0 18px 48px rgba(0,0,0,.5);
+}
+.caixa-modal>header{
+  display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid var(--linha);
+}
+.caixa-modal>.corpo{padding:11px;min-height:0}
+.caixa-modal>footer{
+  display:flex;align-items:center;gap:6px;padding:7px 11px;border-top:1px solid var(--linha);
+}
+.larga{max-width:1080px}
+.estreita{max-width:620px}
+dl.meta{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:0;font-size:11.5px}
+dl.meta dt{color:var(--texto-3)}
+dl.meta dd{margin:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.texto-modal{
+  font-family:var(--fonte-leitura);font-size:15px;line-height:1.58;white-space:pre-wrap;
+  overflow-wrap:anywhere;background:var(--fundo);border:1px solid var(--linha);
+  border-radius:3px;padding:10px 12px;max-height:46vh;overflow:auto;margin:8px 0 0;
+}
+textarea.editor{
+  width:100%;min-height:230px;font-family:var(--fonte-leitura);font-size:14.5px;line-height:1.55;
+  resize:vertical;
+}
+.form-rotulos{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 0}
+.form-rotulos label{display:flex;align-items:center;gap:4px;color:var(--texto-3)}
+.segmento{display:inline-flex;border:1px solid var(--linha-forte);border-radius:3px;overflow:hidden}
+.segmento button{border:none;border-radius:0;border-right:1px solid var(--linha-forte)}
+.segmento button:last-child{border-right:none}
+.segmento button[aria-pressed=true]{background:var(--acento-fraco);color:var(--acento)}
+table.tab{width:100%;border-collapse:collapse;font-size:11.5px}
+table.tab th{text-align:left;color:var(--texto-3);font-weight:600;padding:2px 6px 2px 0}
+table.tab td{padding:1px 6px 1px 0;border-top:1px solid var(--linha)}
+table.tab td.num{text-align:right;font-variant-numeric:tabular-nums}
+.barra-lic{display:flex;height:13px;border-radius:2px;overflow:hidden;margin:6px 0;background:var(--fundo-3)}
+.barra-lic span{display:block;height:100%}
+.b-livre{background:var(--lic-livre)}
+.b-viral{background:var(--lic-viral)}
+.b-nao-comercial{background:var(--lic-nc)}
+.b-bloqueada{background:var(--lic-bloq)}
+.legenda{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;margin:4px 0 0}
+.legenda i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+
+/* folha de atalhos */
+table.atalhos{width:100%;border-collapse:collapse}
+table.atalhos td{padding:2px 8px 2px 0;vertical-align:baseline}
+table.atalhos td:first-child{width:118px;white-space:nowrap}
+kbd{
+  font-family:var(--fonte-mono);font-size:11px;background:var(--fundo-4);
+  border:1px solid var(--linha-forte);border-bottom-width:2px;border-radius:3px;padding:0 5px;
+}
+.colunas2{display:grid;grid-template-columns:1fr 1fr;gap:0 26px}
+
+/* fila de revisão: modo próprio, um item por vez */
+#revisao .caixa-modal{max-width:1000px;height:calc(100vh - 52px)}
+#rev-texto{
+  font-family:var(--fonte-leitura);font-size:16.5px;line-height:1.62;white-space:pre-wrap;
+  overflow-wrap:anywhere;flex:1;overflow:auto;background:var(--fundo);
+  border:1px solid var(--linha);border-radius:3px;padding:14px 16px;
+}
+#revisao .corpo{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+#rev-qualidade button{padding:5px 14px;font-size:14px}
+
+/* aviso flutuante */
+#recado{
+  position:fixed;left:12px;bottom:12px;z-index:40;background:var(--fundo-4);
+  border:1px solid var(--linha-forte);border-left:3px solid var(--acento);
+  border-radius:3px;padding:7px 12px;max-width:460px;box-shadow:0 6px 20px rgba(0,0,0,.45);
+}
+#recado.ruim{border-left-color:var(--alerta)}
+#carregando{position:fixed;top:0;left:0;right:0;height:2px;background:var(--acento);
+  transform:scaleX(0);transform-origin:left;transition:transform .2s linear;z-index:50}
+#carregando.ativo{transform:scaleX(.75)}
+
+@media (max-width:1240px){ #grade{grid-template-columns:var(--w-facetas) minmax(0,1fr)} #mesa{display:none} }
+@media (max-width:900px){ #grade{grid-template-columns:minmax(0,1fr)} #facetas{display:none} }
+@media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
 </style>
 
-<h1>Prompt Factory</h1>
-<p>Backend do M9 no ar. Esta página é um marcador — a interface entra aqui.</p>
+<div id="carregando"></div>
 
-<dl id="painel"><dt>estado</dt><dd id="estado">consultando…</dd></dl>
+<header id="topo">
+  <div id="marca">prompt<b>factory</b></div>
+  <form id="form-busca" autocomplete="off">
+    <input id="busca" type="search" placeholder="buscar no texto…   (tecla / )" aria-label="Busca textual">
+    <button type="submit">buscar</button>
+  </form>
+  <label>ordem
+    <select id="ordem">
+      <option value="relevance">relevância</option>
+      <option value="newest">mais novo</option>
+      <option value="oldest">mais antigo</option>
+      <option value="shortest">mais curto</option>
+      <option value="longest">mais longo</option>
+      <option value="dups">mais duplicado</option>
+      <option value="random">aleatório</option>
+    </select>
+  </label>
+  <div id="resumo">
+    <span id="total" class="num">—</span><span class="rot">no filtro</span>
+    <span id="sel-topo"></span>
+  </div>
+  <div class="acoes">
+    <button id="btn-revisao" type="button">fila de revisão</button>
+    <button id="btn-tema" type="button" title="alternar claro/escuro">tema</button>
+    <button id="btn-atalhos" type="button" title="folha de atalhos (?)">?</button>
+  </div>
+</header>
 
-<p><a href="/docs">/docs</a> — contrato completo da API (OpenAPI).</p>
+<div id="grade">
+  <aside id="facetas" class="rolar"></aside>
+
+  <section id="centro">
+    <div id="barra">
+      <div id="chips"></div>
+      <span class="crescer"></span>
+      <button id="btn-marcar-pagina" type="button">marcar página</button>
+      <label class="fraco">por página
+        <select id="tamanho-pagina">
+          <option>25</option><option selected>50</option><option>100</option><option>200</option>
+        </select>
+      </label>
+    </div>
+    <div id="lista" class="rolar"></div>
+    <nav id="paginacao"></nav>
+  </section>
+
+  <aside id="mesa" class="rolar">
+    <section>
+      <h3>seleção</h3>
+      <div class="bloco">
+        <div><span id="contador-sel" class="zerado">0</span> <span class="fraco">itens marcados</span></div>
+        <div class="fraco" style="font-size:11px;line-height:1.4">
+          A seleção atravessa páginas e mudanças de filtro.
+        </div>
+        <div class="linha-btn">
+          <button id="btn-limpar-sel" type="button">limpar</button>
+          <button id="btn-desmarcar-pagina" type="button">tirar página</button>
+        </div>
+        <div class="linha-btn">
+          <button id="btn-sel-colecao" type="button" class="primario">jogar na coleção (c)</button>
+        </div>
+        <div class="linha-btn">
+          <button id="btn-sel-fora" type="button">tirar da coleção</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3>coleção ativa</h3>
+      <div class="bloco">
+        <select id="colecao-ativa"></select>
+        <div class="linha-btn">
+          <button id="btn-nova-colecao" type="button">nova</button>
+          <button id="btn-renomear-colecao" type="button">renomear</button>
+          <button id="btn-apagar-colecao" type="button" class="perigo">apagar</button>
+        </div>
+        <label class="caixa"><input type="checkbox" id="filtrar-colecao">
+          <span>ver só os itens desta coleção</span></label>
+        <div class="fraco" style="font-size:11px;margin-top:4px">
+          em massa — usa o <b>filtro atual</b>, não a seleção:
+        </div>
+        <button id="btn-filtro-mais" type="button" class="primario">adicionar os N do filtro</button>
+        <button id="btn-filtro-menos" type="button">remover os N do filtro</button>
+      </div>
+    </section>
+
+    <section>
+      <h3>exportar</h3>
+      <div class="bloco">
+        <button id="btn-export" type="button" class="primario">abrir exportação…</button>
+        <div id="hist" class="rolar"></div>
+      </div>
+    </section>
+
+    <section>
+      <h3>banco</h3>
+      <div id="banco"></div>
+    </section>
+  </aside>
+</div>
+
+<!-- ---------- item: detalhe e edição ---------- -->
+<div id="painel-item" class="sobre oculto">
+  <div class="caixa-modal larga">
+    <header>
+      <strong id="item-titulo">item</strong>
+      <span id="item-selos" style="display:flex;gap:5px;flex-wrap:wrap"></span>
+      <span class="crescer"></span>
+      <button type="button" data-fechar>fechar (Esc)</button>
+    </header>
+    <div class="corpo rolar" id="item-corpo"></div>
+    <footer id="item-acoes"></footer>
+  </div>
+</div>
+
+<!-- ---------- folha de atalhos ---------- -->
+<div id="painel-atalhos" class="sobre oculto">
+  <div class="caixa-modal estreita">
+    <header><strong>atalhos de teclado</strong><span class="crescer"></span>
+      <button type="button" data-fechar>fechar (Esc)</button></header>
+    <div class="corpo rolar">
+      <div class="colunas2">
+        <table class="atalhos">
+          <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>próximo / anterior</td></tr>
+          <tr><td><kbd>espaço</kbd></td><td>marca / desmarca o item em foco</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>J</kbd>/<kbd>K</kbd></td><td>estende a seleção</td></tr>
+          <tr><td><kbd>a</kbd></td><td>marca a página inteira</td></tr>
+          <tr><td><kbd>x</kbd></td><td>abre / fecha o texto completo</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>abre o painel do item</td></tr>
+          <tr><td><kbd>e</kbd></td><td>editar o item em foco</td></tr>
+          <tr><td><kbd>y</kbd></td><td>copiar o texto do item em foco</td></tr>
+        </table>
+        <table class="atalhos">
+          <tr><td><kbd>c</kbd></td><td>joga a seleção na coleção ativa</td></tr>
+          <tr><td><kbd>/</kbd></td><td>foco na busca</td></tr>
+          <tr><td><kbd>n</kbd> / <kbd>p</kbd></td><td>próxima / página anterior</td></tr>
+          <tr><td><kbd>g</kbd> / <kbd>G</kbd></td><td>primeiro / último da página</td></tr>
+          <tr><td><kbd>r</kbd></td><td>abre a fila de revisão</td></tr>
+          <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>qualidade — só na fila de revisão</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>fecha o que estiver aberto</td></tr>
+          <tr><td><kbd>?</kbd></td><td>esta folha</td></tr>
+        </table>
+      </div>
+      <p class="fraco" style="margin:12px 0 0;line-height:1.6">
+        Dentro de um campo de texto os atalhos ficam desligados: só <kbd>Esc</kbd> (sair)
+        e <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (salvar) valem.
+        A qualidade vai de <b>1</b> (ruim) a <b>3</b> (bom) — é o que a taxonomia define.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- exportação ---------- -->
+<div id="painel-export" class="sobre oculto">
+  <div class="caixa-modal">
+    <header><strong>exportar</strong><span class="crescer"></span>
+      <button type="button" data-fechar>fechar (Esc)</button></header>
+    <div class="corpo rolar" id="export-corpo"></div>
+    <footer id="export-acoes"></footer>
+  </div>
+</div>
+
+<!-- ---------- fila de revisão ---------- -->
+<div id="revisao" class="sobre oculto">
+  <div class="caixa-modal">
+    <header>
+      <strong>fila de revisão</strong>
+      <span id="rev-posicao" class="fraco num"></span>
+      <span class="crescer"></span>
+      <button type="button" data-fechar>sair (Esc)</button>
+    </header>
+    <div class="corpo" id="rev-corpo"></div>
+  </div>
+</div>
+
+<div id="recado" class="oculto"></div>
 
 <script>
-  const painel = document.getElementById("painel");
-  const numero = new Intl.NumberFormat("pt-BR");
+"use strict";
+/* ==========================================================================
+   0. FERRAMENTAS
+   ========================================================================== */
+const NUM = new Intl.NumberFormat("pt-BR");
+const n = (v) => NUM.format(Number(v) || 0);
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
 
-  function linha(rotulo, valor) {
-    const dt = document.createElement("dt");
-    dt.textContent = rotulo;
-    const dd = document.createElement("dd");
-    // textContent, nunca innerHTML: o corpus contém HTML de verdade.
-    dd.textContent = valor;
-    painel.append(dt, dd);
+const MAPA_ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+/** Escapa TUDO que vem do corpus antes de virar HTML. Sem exceção. */
+function esc(v) {
+  return String(v === null || v === undefined ? "" : v).replace(/[&<>"']/g, (c) => MAPA_ESC[c]);
+}
+/**
+ * A ÚNICA função que devolve HTML derivado do corpus.
+ * O backend devolve o snippet do FTS5 já com <mark> em volta do termo; o resto
+ * do trecho é texto cru do prompt — e o corpus tem <script> de verdade. Então:
+ * escapa tudo primeiro e reabre SÓ as marcas que o SQLite inseriu.
+ * (Se o próprio prompt contiver a string "<mark>", ela vira destaque em vez de
+ * texto. É a única troca aceita: <mark> não executa nada.)
+ */
+function snippetSeguro(bruto) {
+  return esc(bruto).split("&lt;mark&gt;").join("<mark>").split("&lt;/mark&gt;").join("</mark>");
+}
+
+/** Recado de 1 s no canto (confirmação de cópia, erro de rede, etc.). */
+let temporizadorRecado = null;
+function recado(msg, ruim = false, ms = 2200) {
+  const el = $("#recado");
+  el.textContent = msg;
+  el.classList.toggle("ruim", !!ruim);
+  el.classList.remove("oculto");
+  clearTimeout(temporizadorRecado);
+  temporizadorRecado = setTimeout(() => el.classList.add("oculto"), ms);
+}
+
+/* ---------------------------- API ---------------------------- */
+let pendentes = 0;
+function ocupado(delta) {
+  pendentes = Math.max(0, pendentes + delta);
+  $("#carregando").classList.toggle("ativo", pendentes > 0);
+}
+async function api(caminho, opcoes) {
+  ocupado(1);
+  try {
+    const r = await fetch(caminho, opcoes);
+    const txt = await r.text();
+    let corpo = null;
+    try { corpo = txt ? JSON.parse(txt) : null; } catch (_) { corpo = null; }
+    if (!r.ok) throw new Error(detalhe(corpo) || ("HTTP " + r.status));
+    return corpo;
+  } finally { ocupado(-1); }
+}
+/** O `detail` do FastAPI é string em HTTPException e lista de dicts em 422. */
+function detalhe(corpo) {
+  const d = corpo && corpo.detail;
+  if (!d) return "";
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) {
+    return d.map((e) => (e.loc ? e.loc.slice(1).join(".") + ": " : "") + (e.msg || "")).join(" · ");
+  }
+  return JSON.stringify(d);
+}
+const JSONH = { "Content-Type": "application/json" };
+const postar = (c, corpo) => api(c, { method: "POST", headers: JSONH, body: JSON.stringify(corpo) });
+const remendar = (c, corpo) => api(c, { method: "PATCH", headers: JSONH, body: JSON.stringify(corpo) });
+
+/* ==========================================================================
+   1. ESTADO
+   `est.f` é EXATAMENTE o objeto `Filtros` do backend (models.py) — os mesmos
+   nomes de campo, porque o mesmo objeto vai para a listagem, para as facetas,
+   para o from-filter e para o export. Um vocabulário só em toda a app é o que
+   garante que a contagem prometida pela faceta seja a que entra na coleção.
+   ========================================================================== */
+const est = {
+  f: { nsfw: "exclude" },
+  sort: "relevance", seed: 42, page: 1, page_size: 50,
+  dados: null, facetas: null, stats: null, saude: null,
+  rotulagemPendente: false,
+  sel: new Set(),
+  meta: new Map(),        // uid -> {license, license_class, redistributable, commercial_ok}
+  foco: -1, ancora: -1,
+  expandidos: new Set(),
+  textos: new Map(),      // uid -> texto inteiro já buscado
+  colecoes: [], ativa: null,
+  itemAberto: null, editando: false,
+  revisao: null,
+  classePorLicenca: {},   // license -> license_class, vindo do próprio backend
+};
+const CHAVE = "pf.m9.";
+function guardar() {
+  try {
+    localStorage.setItem(CHAVE + "sel", JSON.stringify(Array.from(est.sel)));
+    localStorage.setItem(CHAVE + "ativa", String(est.ativa ?? ""));
+    localStorage.setItem(CHAVE + "pagina", String(est.page_size));
+    const m = {};
+    for (const uid of est.sel) if (est.meta.has(uid)) m[uid] = est.meta.get(uid);
+    localStorage.setItem(CHAVE + "meta", JSON.stringify(m));
+  } catch (_) { /* modo privado / cota: a ferramenta continua funcionando */ }
+}
+function restaurar() {
+  try {
+    const s = JSON.parse(localStorage.getItem(CHAVE + "sel") || "[]");
+    if (Array.isArray(s)) est.sel = new Set(s);
+    const m = JSON.parse(localStorage.getItem(CHAVE + "meta") || "{}");
+    for (const [uid, v] of Object.entries(m || {})) est.meta.set(uid, v);
+    const a = localStorage.getItem(CHAVE + "ativa");
+    if (a) est.ativa = Number(a);
+    const p = Number(localStorage.getItem(CHAVE + "pagina"));
+    if ([25, 50, 100, 200].includes(p)) est.page_size = p;
+    const t = localStorage.getItem(CHAVE + "tema");
+    if (t) document.documentElement.dataset.tema = t;
+  } catch (_) { /* idem */ }
+}
+
+/* ==========================================================================
+   2. FILTROS → QUERY STRING
+   `extra="forbid"` no backend: mandar uma chave que não existe em `Filtros`
+   devolve 422. Por isso só campos do modelo entram aqui, e nada de `null`.
+   ========================================================================== */
+function paramsFiltro(f) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(f)) {
+    if (v === null || v === undefined || v === "") continue;
+    if (Array.isArray(v)) { for (const x of v) p.append(k, String(x)); }
+    else p.append(k, String(v));
+  }
+  return p;
+}
+function ligar(campo, valor) {                    // alterna um valor de lista
+  const atual = est.f[campo] || [];
+  const i = atual.findIndex((x) => String(x) === String(valor));
+  const novo = i >= 0 ? atual.filter((_, j) => j !== i) : atual.concat([valor]);
+  if (novo.length) est.f[campo] = novo; else delete est.f[campo];
+}
+function por(campo, valor) {                      // define ou remove um escalar
+  if (valor === null || valor === undefined || valor === "") delete est.f[campo];
+  else est.f[campo] = valor;
+}
+//: Campos onde `false` É um filtro ("mostre só os que NÃO precisam de revisão"),
+//: e não a ausência de filtro. Nos demais, `false` é o default e não conta.
+const BOOL_TRIPLO = new Set(["needs_review", "edited"]);
+function filtrosAtivos() {
+  const fora = [];
+  for (const [k, v] of Object.entries(est.f)) {
+    if (k === "nsfw" && v === "exclude") continue;
+    if (k === "pii" && v === "any") continue;
+    if (v === null || v === undefined || v === "") continue;
+    if (v === false && !BOOL_TRIPLO.has(k)) continue;
+    if (Array.isArray(v) && !v.length) continue;
+    fora.push([k, v]);
+  }
+  return fora;
+}
+
+/* ==========================================================================
+   3. CARGA
+   ========================================================================== */
+async function carregar(manterFoco = false) {
+  const p = paramsFiltro(est.f);
+  p.set("sort", est.sort);
+  p.set("seed", String(est.seed));
+  p.set("page", String(est.page));
+  p.set("page_size", String(est.page_size));
+  let lista, facetas;
+  try {
+    [lista, facetas] = await Promise.all([
+      api("/api/prompts?" + p.toString()),
+      api("/api/facets?" + paramsFiltro(est.f).toString()),
+    ]);
+  } catch (erro) {
+    recado(String(erro.message || erro), true, 6000);
+    if (est.page > 1) { est.page = 1; return carregar(); }
+    return;
+  }
+  est.dados = lista;
+  est.facetas = facetas;
+  est.rotulagemPendente = !!facetas.rotulagem_pendente;
+  for (const it of lista.items) {
+    est.meta.set(it.uid, {
+      license: it.license, license_class: it.license_class,
+      redistributable: it.redistributable, commercial_ok: it.commercial_ok,
+    });
+  }
+  if (!manterFoco) est.foco = lista.items.length ? 0 : -1;
+  else est.foco = Math.min(est.foco, lista.items.length - 1);
+  est.ancora = est.foco;
+  desenharTudo();
+}
+function desenharTudo() {
+  desenharTopo();
+  desenharFacetas();
+  desenharChips();
+  desenharLista();
+  desenharPaginacao();
+  desenharMesa();
+}
+
+/* ==========================================================================
+   4. TOPO
+   ========================================================================== */
+function desenharTopo() {
+  const d = est.dados;
+  $("#total").textContent = d ? n(d.total) : "—";
+  const t = $("#sel-topo");
+  t.textContent = est.sel.size ? "· " + n(est.sel.size) + " marcados" : "";
+  $("#ordem").value = est.sort;
+  // O backend devolve `sort_efetivo`: "relevância" sem busca não existe e vira
+  // "mais novo". Dizer o que ORDENOU de verdade evita a interface mentir.
+  if (d && d.sort_efetivo !== d.sort) {
+    $("#ordem").title = "pedido: " + d.sort + " · valendo: " + d.sort_efetivo +
+      " (relevância exige busca textual)";
+  } else { $("#ordem").title = ""; }
+}
+
+/* ==========================================================================
+   5. FACETAS
+   Contagens SOB O FILTRO ATUAL, com o filtro da própria dimensão removido —
+   por isso uma dimensão filtrada soma mais que o total, e isso é correto.
+   ========================================================================== */
+const TITULO_FACETA = {
+  lang: "idioma", lang_variant: "variante do português", source: "fonte",
+  license: "licença", task_type: "tipo de tarefa", domain: "domínio",
+  quality: "qualidade", nsfw: "conteúdo sensível", needs_review: "revisão",
+  edited: "edição manual", pii_found: "dados pessoais", n_chars_bucket: "tamanho",
+};
+const NOTA_FACETA = {
+  quality: "1 ruim · 2 usável · 3 bom. Filtrar por qualidade esconde os não rotulados.",
+  nsfw: "“esconder” mantém os não rotulados (null ≠ false).",
+  n_chars_bucket: "faixas de nº de caracteres.",
+};
+
+function desenharFacetas() {
+  const alvo = $("#facetas");
+  const fac = est.facetas ? est.facetas.facets : {};
+  const partes = [];
+
+  const ativos = filtrosAtivos().length;
+  partes.push(
+    '<div class="grupo"><header><h3>filtro</h3><span class="crescer"></span>' +
+    '<button type="button" class="nu" data-acao="limpar-tudo"' + (ativos ? "" : " disabled") +
+    ">limpar (" + ativos + ")</button></header></div>"
+  );
+
+  for (const nome of Object.keys(TITULO_FACETA)) {
+    const opcoes = fac[nome];
+    if (!opcoes) continue;
+    const pendente = est.rotulagemPendente && (nome === "task_type" || nome === "domain");
+    partes.push('<div class="grupo' + (pendente ? " pendente" : "") + '"><header><h3>' +
+      esc(TITULO_FACETA[nome]) + "</h3></header>");
+    if (pendente) {
+      partes.push('<p class="nota">rotulagem pendente — a campanha de classificação ' +
+        "ainda não rodou, então todas as classes estão zeradas. As opções ficam " +
+        "à mostra de propósito: sumir pareceria bug.</p>");
+    } else if (NOTA_FACETA[nome]) {
+      partes.push('<p class="nota">' + esc(NOTA_FACETA[nome]) + "</p>");
+    }
+    for (const o of opcoes) {
+      const desligada = pendente || o.count === 0 || !acionavel(nome, o.value);
+      partes.push(
+        '<button type="button" class="opcao" data-faceta="' + esc(nome) +
+        '" data-valor="' + esc(JSON.stringify(o.value)) + '" aria-pressed="' +
+        (o.selected ? "true" : "false") + '"' + (desligada ? " disabled" : "") +
+        ' title="' + esc(dicaOpcao(nome, o)) + '">' +
+        '<span class="rot">' + esc(o.label) + '</span>' +
+        '<span class="conta">' + n(o.count) + "</span></button>"
+      );
+    }
+    partes.push("</div>");
   }
 
-  fetch("/api/health")
-    .then((r) => r.json())
-    .then((d) => {
-      document.getElementById("estado").textContent = d.status;
-      linha("prompts", numero.format(d.n_rows));
-      linha("build do banco", d.db_build_id ?? "(sem build_id)");
-      linha("taxonomia", d.taxonomy_version);
-      linha("rotulagem", d.rotulagem_pendente ? "PENDENTE (task_type nulo em tudo)" : "aplicada");
-      linha("pf", d.pf_version);
-    })
-    .catch((e) => {
-      document.getElementById("estado").textContent = "falhou: " + e;
-    });
+  // Controles que não vêm de /api/facets porque não são dimensões contáveis.
+  partes.push(
+    '<div class="grupo"><header><h3>duplicatas</h3></header>' +
+    '<p class="nota">~34% do português do WildChat é UM robô só. ' +
+    "O corte por cópias exatas é o que tira a família inteira de uma vez.</p>" +
+    '<label class="caixa"><input type="checkbox" id="so-originais"' +
+    (est.f.max_dups === 0 ? " checked" : "") + "><span>só originais (sem cópia exata)</span></label>" +
+    '<div class="linha-campo"><span>no máximo</span>' +
+    '<input type="number" min="0" id="max-dups" class="num" value="' +
+    (est.f.max_dups === undefined ? "" : est.f.max_dups) + '"><span>cópias</span></div></div>'
+  );
+  partes.push(
+    '<div class="grupo"><header><h3>tamanho exato</h3></header>' +
+    '<div class="linha-campo"><span>de</span>' +
+    '<input type="number" min="0" id="chars-min" class="num" value="' + (est.f.n_chars_min ?? "") + '">' +
+    "<span>até</span>" +
+    '<input type="number" min="0" id="chars-max" class="num" value="' + (est.f.n_chars_max ?? "") + '">' +
+    "</div></div>"
+  );
+  partes.push(
+    '<div class="grupo"><header><h3>licença e uso</h3></header>' +
+    '<label class="caixa"><input type="checkbox" id="so-redistribuivel"' +
+    (est.f.redistributable_only ? " checked" : "") +
+    "><span>só o que pode ser redistribuído</span></label>" +
+    '<label class="caixa"><input type="checkbox" id="so-comercial"' +
+    (est.f.commercial_only ? " checked" : "") +
+    "><span>só o que permite uso comercial</span></label>" +
+    '<div class="linha-campo"><span>qualidade ≥</span><select id="qualidade-min">' +
+    '<option value="">—</option><option value="1">1</option><option value="2">2</option>' +
+    "<option value=\"3\">3</option></select></div>" +
+    '<p class="nota">qualidade mínima EXCLUI os não rotulados (null não é ≥ 1).</p></div>'
+  );
+  alvo.innerHTML = partes.join("");
+  const qm = $("#qualidade-min");
+  if (qm) qm.value = est.f.quality_min ? String(est.f.quality_min) : "";
+}
+/**
+ * Nem toda opção de faceta vira filtro. A linha "não rotulado" existe para o
+ * usuário LER a contagem (é a informação mais importante do banco de hoje), mas
+ * só `nsfw` tem um filtro que corresponde a ela (`nsfw=include`). Nas outras
+ * dimensões a opção fica desabilitada em vez de sumir.
+ */
+function acionavel(nome, valor) {
+  if (valor === null) return nome === "nsfw";
+  return true;
+}
+function dicaOpcao(nome, o) {
+  if (o.value === null && nome !== "nsfw") return "sem filtro para “não rotulado” nesta dimensão";
+  if (nome === "license") return o.value + " · classe: " + (est.classePorLicenca[o.value] || "—");
+  return n(o.count) + " item(ns) sob o filtro atual";
+}
+
+function clicarFaceta(nome, valor) {
+  if (nome === "nsfw") {
+    if (valor === true) por("nsfw", est.f.nsfw === "only" ? "exclude" : "only");
+    else if (valor === null) por("nsfw", est.f.nsfw === "include" ? "exclude" : "include");
+    else por("nsfw", "exclude");
+    est.f.nsfw = est.f.nsfw || "exclude";
+  } else if (nome === "pii_found") {
+    if (valor === true) por("pii", est.f.pii === "only" ? "any" : "only");
+    else por("pii", est.f.pii === "none" ? "any" : "none");
+  } else if (nome === "needs_review" || nome === "edited") {
+    if (est.f[nome] === valor) delete est.f[nome]; else est.f[nome] = valor;
+  } else if (nome === "n_chars_bucket") {
+    const faixa = (est.facetas.facets.n_chars_bucket.find((o) => o.value === valor) || {}).filter || {};
+    const igual = String(est.f.n_chars_min ?? "") === String(faixa.n_chars_min ?? "") &&
+                  String(est.f.n_chars_max ?? "") === String(faixa.n_chars_max ?? "");
+    delete est.f.n_chars_min; delete est.f.n_chars_max;
+    if (!igual) { por("n_chars_min", faixa.n_chars_min); por("n_chars_max", faixa.n_chars_max); }
+  } else {
+    ligar(nome, valor);
+  }
+  est.page = 1;
+  carregar();
+}
+
+/* ---- chips do filtro ativo ---- */
+const ROT_CAMPO = {
+  q: "busca", lang: "idioma", lang_variant: "variante", source: "fonte", license: "licença",
+  task_type: "tarefa", domain: "domínio", quality: "qualidade", quality_min: "qualidade ≥",
+  nsfw: "sensível", pii: "dados pessoais", needs_review: "revisão", edited: "editado",
+  commercial_only: "só comercial", redistributable_only: "só redistribuível",
+  max_dups: "máx. cópias", n_chars_min: "≥ caracteres", n_chars_max: "≤ caracteres",
+  collection_id: "coleção",
+};
+const VALOR_NSFW = { only: "só os marcados", include: "incluindo os marcados" };
+const VALOR_PII = { only: "só quem tem", none: "só quem não tem" };
+function desenharChips() {
+  const ativos = filtrosAtivos();
+  $("#chips").innerHTML = ativos.length
+    ? ativos.map(([k, v]) => {
+        let mostra = Array.isArray(v) ? v.join(", ") : String(v);
+        if (v === true) mostra = "sim";
+        else if (v === false) mostra = "não";
+        // `nsfw`/`pii` viajam com o vocabulário da API ("only", "include"…).
+        // Mostrar isso cru na tela faria o usuário ler o modelo Pydantic.
+        if (k === "nsfw") mostra = VALOR_NSFW[String(v)] || mostra;
+        else if (k === "pii") mostra = VALOR_PII[String(v)] || mostra;
+        if (k === "collection_id") {
+          const c = est.colecoes.find((x) => x.id === Number(v));
+          mostra = c ? c.name : v;
+        }
+        return '<span class="chip"><b>' + esc(ROT_CAMPO[k] || k) + "</b> " + esc(mostra) +
+          '<button type="button" data-tirar="' + esc(k) + '" title="tirar este filtro">×</button></span>';
+      }).join("")
+    : '<span class="fraco">sem filtro — o corpus inteiro</span>';
+}
+
+/* ==========================================================================
+   6. LISTA
+   ========================================================================== */
+const CORTE_CARD = 400;        // brief: ~400 caracteres no card
+const CORTE_INTEIRO = 120000;  // teto do que vai ao DOM ao expandir 1 MB
+
+function desenharLista() {
+  const alvo = $("#lista");
+  const d = est.dados;
+  if (!d) { alvo.innerHTML = ""; return; }
+  if (!d.items.length) {
+    alvo.innerHTML = '<div id="vazio">Nenhum item sob este filtro.' +
+      (d.q ? "<br>A expressão que foi ao índice: <span class=\"mono\">" + esc(d.q_fts || "(vazia)") +
+        "</span>" : "") +
+      '<br><button type="button" data-acao="limpar-tudo" style="margin-top:12px">limpar filtros</button></div>';
+    return;
+  }
+  alvo.innerHTML = d.items.map((it, i) => cardHTML(it, i)).join("");
+  aplicarFoco(false);
+}
+
+function cardHTML(it, i) {
+  const marcado = est.sel.has(it.uid);
+  const aberto = est.expandidos.has(it.uid);
+  const cab = [];
+  cab.push('<input type="checkbox" data-acao="marcar"' + (marcado ? " checked" : "") +
+    ' aria-label="marcar item">');
+  cab.push('<span class="fonte">' + esc(it.source) + "</span>");
+  cab.push('<span class="sep">·</span><span>' + esc(it.lang) +
+    (it.lang_variant ? " " + esc(it.lang_variant) : "") + "</span>");
+  cab.push('<span class="selo lic-' + esc(it.license_class) + '" title="' +
+    esc(dicaLicenca(it)) + '">' + esc(it.license) + "</span>");
+  if (it.n_exact_dups > 0) {
+    cab.push('<span class="selo dups' + (it.n_exact_dups >= 20 ? " robo" : "") +
+      '" title="' + n(it.n_exact_dups) + ' cópia(s) exata(s) a mais no corpus">×' +
+      n(it.n_exact_dups + 1) + "</span>");
+  }
+  cab.push('<span class="' + (it.task_type ? "rotulos" : "sem-rotulo") + '">' +
+    (it.task_type ? esc(it.task_type) + (it.domain ? " · " + esc(it.domain) : "") +
+      (it.quality ? " · q" + it.quality : "")
+    : "sem rótulo") + "</span>");
+  if (it.needs_review) cab.push('<span class="selo rev">revisar</span>');
+  if (it.nsfw) cab.push('<span class="selo nsfw">NSFW</span>');
+  if (it.pii_found) cab.push('<span class="selo pii">PII</span>');
+  if (it.has_chat_markers) cab.push('<span class="selo chat" title="tem User:/Assistant: dentro do próprio prompt">conversa colada</span>');
+  if (it.edited) cab.push('<span class="selo edit">editado</span>');
+  cab.push('<span class="crescer"></span>');
+  cab.push('<span class="num fraco">' + n(it.n_chars) + " car</span>");
+  cab.push('<span class="mono fraco">' + esc(it.uid) + "</span>");
+  cab.push('<span class="acoes">' +
+    '<button type="button" data-acao="copiar">copiar</button>' +
+    '<button type="button" data-acao="abrir">abrir</button>' +
+    "</span>");
+
+  let corpo;
+  if (it.snippet && !aberto) {
+    // Na busca o card mostra o TRECHO com o termo, não o começo do texto: num
+    // prompt de 1 MB os dois não têm relação nenhuma.
+    corpo = '<div class="trecho">' + snippetSeguro(it.snippet) + "</div>";
+  } else if (aberto) {
+    const inteiro = est.textos.get(it.uid);
+    if (inteiro === undefined) corpo = '<div class="texto fraco">buscando o texto inteiro…</div>';
+    else corpo = '<div class="texto inteiro">' + esc(inteiro.slice(0, CORTE_INTEIRO)) +
+      (inteiro.length > CORTE_INTEIRO
+        ? '<div class="fraco" style="margin-top:8px">— mostrando os primeiros ' +
+          n(CORTE_INTEIRO) + " de " + n(inteiro.length) +
+          " caracteres. Use “copiar” para levar o texto inteiro. —</div>"
+        : "") + "</div>";
+  } else {
+    const trecho = it.text.slice(0, CORTE_CARD);
+    corpo = '<div class="texto' + (it.text.length > CORTE_CARD || it.text_truncated ? " cortado" : "") +
+      '">' + esc(trecho) + "</div>";
+  }
+  let mais = "";
+  const sobra = it.n_chars - Math.min(it.n_chars, aberto ? it.n_chars : CORTE_CARD);
+  if (!aberto && sobra > 0) {
+    mais = '<button type="button" class="mais" data-acao="expandir">… +' + n(sobra) +
+      " caracteres — abrir (x)</button>";
+  } else if (aberto) {
+    mais = '<button type="button" class="mais" data-acao="expandir">fechar (x)</button>';
+  }
+  return '<article class="item' + (marcado ? " marcado" : "") + '" data-uid="' + esc(it.uid) +
+    '" data-i="' + i + '"><div class="cab">' + cab.join("") + "</div>" + corpo + mais + "</article>";
+}
+function dicaLicenca(it) {
+  const c = it.license_class;
+  const explica = {
+    livre: "redistribuível e comercial",
+    viral: "ShareAlike: o derivado herda a licença",
+    "nao-comercial": "não pode ser vendido nem usado comercialmente",
+    bloqueada: "NÃO redistribuível — fica fora do export por padrão",
+  }[c] || "";
+  return it.license + " — " + explica;
+}
+
+/* ---- foco ---- */
+function aplicarFoco(rolar = true) {
+  $$("#lista .item").forEach((el, i) => el.classList.toggle("focado", i === est.foco));
+  if (rolar && est.foco >= 0) {
+    const el = $('#lista .item[data-i="' + est.foco + '"]');
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }
+}
+function itemFocado() {
+  if (!est.dados || est.foco < 0) return null;
+  return est.dados.items[est.foco] || null;
+}
+function moverFoco(delta) {
+  if (!est.dados || !est.dados.items.length) return;
+  est.foco = Math.max(0, Math.min(est.dados.items.length - 1, est.foco + delta));
+  aplicarFoco();
+}
+
+/* ---- seleção ---- */
+function alternarMarca(uid) {
+  if (est.sel.has(uid)) est.sel.delete(uid); else est.sel.add(uid);
+  guardar();
+  const el = $('#lista .item[data-uid="' + CSS.escape(uid) + '"]');
+  if (el) {
+    el.classList.toggle("marcado", est.sel.has(uid));
+    const cx = el.querySelector('input[type=checkbox]');
+    if (cx) cx.checked = est.sel.has(uid);
+  }
+  desenharTopo(); desenharMesa();
+}
+function estenderSelecao(delta) {
+  if (!est.dados || !est.dados.items.length) return;
+  if (est.ancora < 0) est.ancora = est.foco;
+  moverFoco(delta);
+  const a = Math.min(est.ancora, est.foco), b = Math.max(est.ancora, est.foco);
+  for (let i = a; i <= b; i++) est.sel.add(est.dados.items[i].uid);
+  guardar();
+  desenharLista(); aplicarFoco(); desenharTopo(); desenharMesa();
+}
+function marcarPagina(marcar) {
+  if (!est.dados) return;
+  for (const it of est.dados.items) { if (marcar) est.sel.add(it.uid); else est.sel.delete(it.uid); }
+  guardar(); desenharLista(); aplicarFoco(); desenharTopo(); desenharMesa();
+}
+
+/* ---- expandir ---- */
+async function alternarExpandir(uid) {
+  if (est.expandidos.has(uid)) { est.expandidos.delete(uid); desenharLista(); aplicarFoco(); return; }
+  est.expandidos.add(uid);
+  if (!est.textos.has(uid)) {
+    desenharLista(); aplicarFoco();
+    try {
+      const item = await api("/api/prompts/" + encodeURIComponent(uid));
+      est.textos.set(uid, item.text);
+    } catch (e) { est.textos.set(uid, "[falha ao buscar o texto: " + e.message + "]"); }
+  }
+  desenharLista(); aplicarFoco();
+}
+
+/* ---- copiar ---- */
+async function copiar(uid) {
+  let texto = est.textos.get(uid);
+  if (texto === undefined) {
+    const item = await api("/api/prompts/" + encodeURIComponent(uid));
+    texto = item.text;
+    est.textos.set(uid, texto);
+  }
+  try {
+    await navigator.clipboard.writeText(texto);
+  } catch (_) {
+    const ta = document.createElement("textarea");
+    ta.value = texto; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  recado("copiado — " + n(texto.length) + " caracteres", false, 1000);
+}
+
+/* ==========================================================================
+   7. PAGINAÇÃO
+   ========================================================================== */
+function desenharPaginacao() {
+  const d = est.dados;
+  const nav = $("#paginacao");
+  if (!d) { nav.innerHTML = ""; return; }
+  const partes = [];
+  partes.push('<button type="button" data-pag="1"' + (d.page <= 1 ? " disabled" : "") + ">« primeira</button>");
+  partes.push('<button type="button" data-pag="' + (d.page - 1) + '"' + (d.page <= 1 ? " disabled" : "") +
+    ">‹ anterior (p)</button>");
+  partes.push('<span class="num">página ' + n(d.page) + " de " + n(Math.max(1, d.pages)) + "</span>");
+  partes.push('<button type="button" data-pag="' + (d.page + 1) + '"' +
+    (d.page >= d.pages ? " disabled" : "") + ">próxima (n) ›</button>");
+  partes.push('<span class="crescer"></span>');
+  if (d.q) {
+    partes.push('<span class="fraco">busca no índice: <span class="mono">' +
+      esc(d.q_fts || "(vazia — só pontuação?)") + "</span></span>");
+  }
+  partes.push('<span class="fraco num">ordenado por ' + esc(d.sort_efetivo) +
+    (d.sort_efetivo === "random" ? " (semente " + d.seed + ")" : "") + "</span>");
+  nav.innerHTML = partes.join("");
+}
+
+/* ==========================================================================
+   8. MESA (coleções, seleção em massa, export, estado do banco)
+   ========================================================================== */
+function colecaoAtiva() { return est.colecoes.find((c) => c.id === est.ativa) || null; }
+function desenharMesa() {
+  const c = $("#contador-sel");
+  c.textContent = n(est.sel.size);
+  c.classList.toggle("zerado", est.sel.size === 0);
+
+  const sel = $("#colecao-ativa");
+  sel.innerHTML = est.colecoes.length
+    ? est.colecoes.map((x) => '<option value="' + x.id + '"' + (x.id === est.ativa ? " selected" : "") +
+        ">" + esc(x.name) + " (" + n(x.n_items) + ")</option>").join("")
+    : '<option value="">— nenhuma coleção ainda —</option>';
+  $("#filtrar-colecao").checked = est.f.collection_id !== undefined;
+
+  const total = est.dados ? est.dados.total : 0;
+  const temColecao = !!colecaoAtiva();
+  $("#btn-filtro-mais").textContent = "adicionar os " + n(total) + " do filtro";
+  $("#btn-filtro-menos").textContent = "remover os " + n(total) + " do filtro";
+  for (const id of ["#btn-filtro-mais", "#btn-filtro-menos", "#btn-renomear-colecao",
+                    "#btn-apagar-colecao", "#filtrar-colecao"]) {
+    $(id).disabled = !temColecao;
+  }
+  $("#btn-sel-colecao").disabled = !temColecao || !est.sel.size;
+  $("#btn-sel-fora").disabled = !temColecao || !est.sel.size;
+  $("#btn-limpar-sel").disabled = !est.sel.size;
+
+  const s = est.saude || {};
+  $("#banco").innerHTML =
+    "<b>" + n(s.n_rows) + "</b> prompts<br>" +
+    "build <b>" + esc(s.db_build_id || "—") + "</b><br>" +
+    "taxonomia <b>" + esc(s.taxonomy_version || "—") + "</b>" +
+    (s.taxonomy_version_app && s.taxonomy_version_app !== s.taxonomy_version
+      ? ' <span class="aviso">(código fala ' + esc(s.taxonomy_version_app) + ")</span>" : "") + "<br>" +
+    "rotulagem <b" + (est.rotulagemPendente ? ' class="aviso"' : "") + ">" +
+    (est.rotulagemPendente ? "PENDENTE" : "aplicada") + "</b><br>" +
+    "pf " + esc(s.pf_version || "—") + " · sqlite " + esc(s.sqlite_version || "—");
+}
+
+async function recarregarColecoes() {
+  const r = await api("/api/collections");
+  est.colecoes = r.items;
+  if (!est.colecoes.find((c) => c.id === est.ativa)) est.ativa = est.colecoes.length ? est.colecoes[0].id : null;
+  guardar();
+  desenharMesa();
+}
+async function jogarSelecao(remover) {
+  const c = colecaoAtiva();
+  if (!c || !est.sel.size) return;
+  const uids = Array.from(est.sel);
+  const rota = "/api/collections/" + c.id + "/items" + (remover ? "/remove" : "");
+  try {
+    const r = await postar(rota, { uids });
+    await recarregarColecoes();
+    recado(remover
+      ? n(r.removed) + " tirados de “" + c.name + "” — a coleção tem " + n(r.n_items)
+      : n(r.added) + " adicionados a “" + c.name + "”" +
+        (r.already_present ? " (" + n(r.already_present) + " já estavam)" : "") +
+        " — a coleção tem " + n(r.n_items));
+  } catch (e) { recado(e.message, true, 6000); }
+}
+async function massaPorFiltro(remover) {
+  const c = colecaoAtiva();
+  if (!c || !est.dados) return;
+  const total = est.dados.total;
+  const verbo = remover ? "REMOVER de" : "adicionar a";
+  if (!confirm(verbo + " “" + c.name + "” os " + n(total) + " itens do filtro atual?")) return;
+  const rota = "/api/collections/" + c.id + "/items/" + (remover ? "remove-from-filter" : "from-filter");
+  try {
+    // O MESMO objeto Filtros da listagem: é isso que garante que o número
+    // prometido na tela seja o número que entra (ou sai) da coleção.
+    const r = await postar(rota, { filter: est.f, sort: "newest" });
+    await recarregarColecoes();
+    recado((remover ? n(r.removed) + " removidos" : n(r.added) + " adicionados") +
+      " de " + n(r.matched) + " encontrados — a coleção tem " + n(r.n_items));
+    if (est.f.collection_id !== undefined) carregar(true);
+  } catch (e) { recado(e.message, true, 6000); }
+}
+
+/* ==========================================================================
+   9. PAINEL DO ITEM (detalhe + edição)
+   ========================================================================== */
+async function abrirItem(uid, editar = false) {
+  const painel = $("#painel-item");
+  painel.classList.remove("oculto");
+  $("#item-corpo").innerHTML = '<p class="fraco">carregando…</p>';
+  $("#item-acoes").innerHTML = "";
+  try {
+    const it = await api("/api/prompts/" + encodeURIComponent(uid));
+    est.itemAberto = it;
+    est.textos.set(uid, it.text);
+    est.editando = editar;
+    desenharItem();
+  } catch (e) {
+    $("#item-corpo").innerHTML = '<p class="erro">' + esc(e.message) + "</p>";
+  }
+}
+function fecharItem() {
+  $("#painel-item").classList.add("oculto");
+  est.itemAberto = null; est.editando = false;
+}
+function opcoesTaxonomia(lista, atual) {
+  return '<option value="">(sem rótulo)</option>' + lista.map((o) =>
+    '<option value="' + esc(o.value) + '"' + (o.value === atual ? " selected" : "") + ">" +
+    esc(o.label) + "</option>").join("");
+}
+function desenharItem() {
+  const it = est.itemAberto;
+  if (!it) return;
+  $("#item-titulo").innerHTML = '<span class="mono">' + esc(it.uid) + "</span>";
+  const selos = ['<span class="selo lic-' + esc(it.license_class) + '" title="' + esc(dicaLicenca(it)) +
+    '">' + esc(it.license) + " · " + esc(it.license_class) + "</span>"];
+  if (it.edited) selos.push('<span class="selo edit">editado à mão</span>');
+  if (it.needs_review) selos.push('<span class="selo rev">na fila de revisão</span>');
+  if (it.pii_found) selos.push('<span class="selo pii">PII</span>');
+  if (it.nsfw) selos.push('<span class="selo nsfw">NSFW</span>');
+  $("#item-selos").innerHTML = selos.join("");
+
+  const tax = (est.stats && est.stats.taxonomia) || { task_type: [], domain: [] };
+  const meta = [
+    ["fonte", it.source + (it.source_split ? " · " + it.source_split : "")],
+    ["id na fonte", it.source_id],
+    ["atribuição", it.attribution || "(sem crédito no sources.toml)"],
+    ["idioma", it.lang + (it.lang_variant ? " · " + it.lang_variant : "") +
+      (it.variant_confidence != null ? " (conf. " + it.variant_confidence + ")" : "")],
+    ["tamanho", n(it.n_chars) + " caracteres · " + n(it.n_words) + " palavras"],
+    ["duplicatas", n(it.n_exact_dups) + " exatas · " + n(it.n_near_dups) + " próximas"],
+    ["rótulos", (it.task_type || "—") + " · " + (it.domain || "—") +
+      " · qualidade " + (it.quality ?? "—") + " · nsfw " + rotuloBool(it.nsfw)],
+    ["origem do rótulo", (it.label_method || "—") +
+      (it.label_confidence != null ? " (conf. " + it.label_confidence + ")" : "")],
+    ["criado em", it.created_ts || "—"],
+    ["ingerido em", it.ingested_at || "—"],
+    ["atualizado em", it.updated_at || "—"],
+    ["hash", it.hash_norm],
+    ["coleções", it.collections.length ? it.collections.map((c) => c.name).join(", ") : "(nenhuma)"],
+  ];
+  if (it.country) meta.push(["país", it.country]);
+  if (it.model_family) meta.push(["modelo", it.model_family]);
+  if (it.native_category) meta.push(["categoria da fonte", it.native_category]);
+
+  let corpo = '<dl class="meta">' + meta.map(([k, v]) =>
+    "<dt>" + esc(k) + "</dt><dd>" + esc(v) + "</dd>").join("") + "</dl>";
+
+  if (est.editando) {
+    corpo += '<div style="margin-top:10px"><h3>texto</h3>' +
+      '<textarea class="editor" id="editor-texto"></textarea>' +
+      '<p class="fraco" style="margin:4px 0 0">A primeira edição guarda o original; ' +
+      "o botão de reverter aparece enquanto houver um original guardado. " +
+      "<kbd>Ctrl</kbd>+<kbd>Enter</kbd> salva, <kbd>Esc</kbd> cancela.</p>" +
+      '<div class="form-rotulos">' +
+      "<label>tarefa <select id=\"ed-task\">" + opcoesTaxonomia(tax.task_type, it.task_type) + "</select></label>" +
+      "<label>domínio <select id=\"ed-domain\">" + opcoesTaxonomia(tax.domain, it.domain) + "</select></label>" +
+      "<label>qualidade <select id=\"ed-quality\">" +
+        ["", "1", "2", "3"].map((v) => '<option value="' + v + '"' +
+          (String(it.quality ?? "") === v ? " selected" : "") + ">" + (v || "—") + "</option>").join("") +
+      "</select></label>" +
+      "<label>nsfw <select id=\"ed-nsfw\">" +
+        [["", "—"], ["1", "sim"], ["0", "não"]].map(([v, r]) => '<option value="' + v + '"' +
+          (String(it.nsfw === null || it.nsfw === undefined ? "" : (it.nsfw ? 1 : 0)) === v ? " selected" : "") +
+          ">" + r + "</option>").join("") +
+      "</select></label>" +
+      '<label><input type="checkbox" id="ed-review"' + (it.needs_review ? " checked" : "") +
+      "> precisa de revisão</label></div></div>";
+  } else {
+    corpo += '<div style="margin-top:10px"><h3>texto ' +
+      (it.text.length > CORTE_INTEIRO ? "(primeiros " + n(CORTE_INTEIRO) + " caracteres)" : "") +
+      '</h3><div class="texto-modal">' + esc(it.text.slice(0, CORTE_INTEIRO)) + "</div></div>";
+    if (it.text_original) {
+      corpo += '<details style="margin-top:8px"><summary class="fraco">texto ORIGINAL preservado ' +
+        "(" + n(it.text_original.length) + " caracteres)</summary>" +
+        '<div class="texto-modal">' + esc(it.text_original.slice(0, CORTE_INTEIRO)) + "</div></details>";
+    }
+    if (it.meta && Object.keys(it.meta).length) {
+      corpo += '<details style="margin-top:8px"><summary class="fraco">meta da fonte</summary>' +
+        '<div class="texto-modal mono" style="font-size:11.5px">' +
+        esc(JSON.stringify(it.meta, null, 2)) + "</div></details>";
+    }
+  }
+  $("#item-corpo").innerHTML = corpo;
+  if (est.editando) {
+    const ta = $("#editor-texto");
+    ta.value = it.text;           // value, nunca innerHTML
+    ta.focus();
+    ta.setSelectionRange(0, 0);
+  }
+
+  const acoes = [];
+  if (est.editando) {
+    acoes.push('<button type="button" class="primario" data-acao="salvar">salvar (Ctrl+Enter)</button>');
+    acoes.push('<button type="button" data-acao="cancelar">cancelar</button>');
+  } else {
+    acoes.push('<button type="button" class="primario" data-acao="editar">editar (e)</button>');
+    acoes.push('<button type="button" data-acao="copiar-item">copiar texto</button>');
+    acoes.push('<button type="button" data-acao="marcar-item">' +
+      (est.sel.has(it.uid) ? "desmarcar" : "marcar") + "</button>");
+    if (it.edited) {
+      acoes.push('<button type="button" class="perigo" data-acao="reverter">reverter ao original</button>');
+    }
+  }
+  acoes.push('<span class="crescer"></span>');
+  acoes.push('<span class="fraco">' + (it.edited ? "este item foi editado à mão" :
+    "texto exatamente como veio da fonte (depois da normalização e do scrub de PII)") + "</span>");
+  $("#item-acoes").innerHTML = acoes.join("");
+}
+function rotuloBool(v) { return v === null || v === undefined ? "não rotulado" : (v ? "sim" : "não"); }
+
+async function salvarItem() {
+  const it = est.itemAberto;
+  if (!it) return;
+  const corpo = {};
+  const texto = $("#editor-texto").value;
+  if (texto !== it.text) {
+    if (!texto.trim()) { recado("texto vazio não é curadoria — use reverter", true); return; }
+    corpo.text = texto;
+  }
+  const t = $("#ed-task").value || null;
+  const d = $("#ed-domain").value || null;
+  const q = $("#ed-quality").value === "" ? null : Number($("#ed-quality").value);
+  const nv = $("#ed-nsfw").value === "" ? null : $("#ed-nsfw").value === "1";
+  const rv = $("#ed-review").checked;
+  if (t !== it.task_type) corpo.task_type = t;
+  if (d !== it.domain) corpo.domain = d;
+  if (q !== (it.quality ?? null)) corpo.quality = q;
+  if (nv !== (it.nsfw ?? null)) corpo.nsfw = nv;
+  if (rv !== !!it.needs_review) corpo.needs_review = rv;
+  if (!Object.keys(corpo).length) { est.editando = false; desenharItem(); return; }
+  try {
+    const novo = await remendar("/api/prompts/" + encodeURIComponent(it.uid), corpo);
+    est.itemAberto = novo;
+    est.textos.set(novo.uid, novo.text);
+    est.editando = false;
+    desenharItem();
+    recado("salvo");
+    carregar(true);
+  } catch (e) { recado(e.message, true, 7000); }
+}
+async function reverterItem() {
+  const it = est.itemAberto;
+  if (!it) return;
+  try {
+    const novo = await postar("/api/prompts/" + encodeURIComponent(it.uid) + "/revert", {});
+    est.itemAberto = novo;
+    est.textos.set(novo.uid, novo.text);
+    desenharItem();
+    recado("revertido ao texto original");
+    carregar(true);
+  } catch (e) { recado(e.message, true, 7000); }
+}
+
+/* ==========================================================================
+   10. EXPORTAÇÃO
+   A composição por licença aparece ANTES de gerar. Os números vêm do próprio
+   backend (facetas + contagens sob o mesmo filtro), nunca de uma regra de
+   licença copiada para cá.
+   ========================================================================== */
+const CLASSES_LIC = ["livre", "viral", "nao-comercial", "bloqueada"];
+const EXPLICA_CLASSE = {
+  livre: "redistribuível e comercial",
+  viral: "ShareAlike — o derivado herda a licença",
+  "nao-comercial": "CC-BY-NC — o derivado não pode ser vendido",
+  bloqueada: "NÃO redistribuível — fica FORA do arquivo por padrão",
+};
+const exp = { modo: "filter", formato: "jsonl", incluirBloqueadas: false, incluirOriginal: false, nome: "" };
+
+async function abrirExport() {
+  $("#painel-export").classList.remove("oculto");
+  await desenharExport();
+}
+function filtroDoEscopo() {
+  if (exp.modo === "collection") {
+    const c = colecaoAtiva();
+    return c ? { collection_id: c.id, nsfw: "include" } : null;
+  }
+  return est.f;
+}
+async function composicao() {
+  if (exp.modo === "uids") {
+    const conta = {}; let semMeta = 0;
+    for (const uid of est.sel) {
+      const m = est.meta.get(uid);
+      if (!m) { semMeta++; continue; }
+      conta[m.license_class] = (conta[m.license_class] || 0) + 1;
+    }
+    return { classes: conta, licencas: [], total: est.sel.size, semMeta, entram: null };
+  }
+  const f = filtroDoEscopo();
+  if (!f) return null;
+  const [fac, red] = await Promise.all([
+    api("/api/facets?" + paramsFiltro(f).toString()),
+    api("/api/prompts?" + paramsFiltro({ ...f, redistributable_only: true }).toString() + "&page_size=1"),
+  ]);
+  const licencas = fac.facets.license.filter((o) => o.count > 0);
+  const conta = {};
+  for (const o of licencas) {
+    const cl = est.classePorLicenca[o.value] || "livre";
+    conta[cl] = (conta[cl] || 0) + o.count;
+  }
+  return { classes: conta, licencas, total: fac.total, semMeta: 0, entram: red.total };
+}
+async function desenharExport() {
+  const alvo = $("#export-corpo");
+  alvo.innerHTML = '<p class="fraco">calculando a composição…</p>';
+  const c = colecaoAtiva();
+  const escopos = [
+    ["filter", "filtro atual", est.dados ? est.dados.total : 0, true],
+    ["collection", c ? "coleção “" + c.name + "”" : "coleção (nenhuma ativa)", c ? c.n_items : 0, !!c],
+    ["uids", "seleção marcada", est.sel.size, est.sel.size > 0],
+  ];
+  let comp = null;
+  try { comp = await composicao(); } catch (e) { recado(e.message, true, 6000); }
+
+  const partes = [];
+  partes.push('<div class="grupo"><h3>o que exportar</h3><div class="segmento" style="margin-top:4px">' +
+    escopos.map(([v, r, q, ok]) => '<button type="button" data-escopo="' + v + '" aria-pressed="' +
+      (exp.modo === v ? "true" : "false") + '"' + (ok ? "" : " disabled") + ">" + esc(r) +
+      ' <span class="num">' + n(q) + "</span></button>").join("") + "</div></div>");
+
+  if (comp) {
+    const total = CLASSES_LIC.reduce((s, k) => s + (comp.classes[k] || 0), 0) || 1;
+    partes.push('<div class="grupo" style="margin-top:12px"><h3>composição por licença</h3>' +
+      '<div class="barra-lic">' + CLASSES_LIC.map((k) => {
+        const v = comp.classes[k] || 0;
+        return v ? '<span class="b-' + k + '" style="width:' + ((v / total) * 100).toFixed(3) +
+          '%" title="' + esc(k + ": " + n(v)) + '"></span>' : "";
+      }).join("") + "</div>" +
+      '<table class="tab"><tbody>' + CLASSES_LIC.map((k) =>
+        "<tr><td><i class=\"b-" + k + "\" style=\"display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px\"></i>" +
+        esc(k) + '</td><td class="num">' + n(comp.classes[k] || 0) + "</td><td class=\"fraco\">" +
+        esc(EXPLICA_CLASSE[k]) + "</td></tr>").join("") + "</tbody></table>");
+    if (comp.licencas.length) {
+      partes.push('<p class="fraco" style="margin:6px 0 0">por licença: ' +
+        comp.licencas.map((o) => esc(o.value) + " " + n(o.count)).join(" · ") + "</p>");
+    }
+    if (comp.semMeta) {
+      partes.push('<p class="aviso">' + n(comp.semMeta) + " item(ns) da seleção sem metadado em cache " +
+        "(marcados numa sessão anterior): a composição acima os ignora. O manifesto do arquivo gerado é exato.</p>");
+    }
+    const bloq = comp.classes.bloqueada || 0;
+    if (bloq) {
+      partes.push('<p class="aviso" style="margin-top:8px"><b>' + n(bloq) +
+        "</b> linha(s) NÃO redistribuível(is) ficam de fora do arquivo. " +
+        (comp.entram !== null ? "Entram <b>" + n(comp.entram) + "</b> linhas." : "") + "</p>");
+    } else {
+      partes.push('<p class="fraco" style="margin-top:8px">Nada é excluído por licença neste recorte.</p>');
+    }
+    partes.push('<label class="caixa"><input type="checkbox" id="exp-bloqueadas"' +
+      (exp.incluirBloqueadas ? " checked" : "") + "><span>incluir as não redistribuíveis mesmo assim " +
+      "<span class=\"fraco\">(uso local; o manifesto carimba um WARNING dizendo para não publicar)</span></span></label>");
+    partes.push("</div>");
+  }
+
+  partes.push('<div class="grupo" style="margin-top:12px"><h3>formato</h3>' +
+    '<div class="segmento" style="margin-top:4px">' +
+    ["jsonl", "csv"].map((v) => '<button type="button" data-formato="' + v + '" aria-pressed="' +
+      (exp.formato === v ? "true" : "false") + '">' + v + "</button>").join("") + "</div>" +
+    '<p class="nota fraco" style="margin-top:5px">' +
+    (exp.formato === "csv"
+      ? "CSV: o módulo csv do Python recusa célula acima de 131.072 caracteres e o Excel corta em 32.767. " +
+        "Para textos longos, JSONL."
+      : "JSONL, uma linha por prompt, com licença e atribuição em cada linha.") + "</p>" +
+    '<label class="caixa"><input type="checkbox" id="exp-original"' +
+    (exp.incluirOriginal ? " checked" : "") + "><span>incluir também o texto original dos itens editados</span></label>" +
+    '<div class="linha-campo"><span>nome do arquivo</span>' +
+    '<input id="exp-nome" placeholder="(carimbo de tempo)" value="' + esc(exp.nome) + '"></div></div>');
+
+  alvo.innerHTML = partes.join("");
+  $("#export-acoes").innerHTML =
+    '<button type="button" class="primario" data-acao="gerar">gerar arquivo</button>' +
+    '<span class="crescer"></span><span class="fraco">o arquivo é escrito em data/exports/ ' +
+    "e só então servido — o sha256 do manifesto é o do arquivo que você baixa</span>";
+}
+async function gerar() {
+  const corpo = {
+    mode: exp.modo, format: exp.formato, profile: "flat",
+    include_nonredistributable: exp.incluirBloqueadas,
+    include_text_original: exp.incluirOriginal,
+  };
+  if (exp.nome) corpo.name = exp.nome;
+  if (exp.modo === "filter") corpo.filter = est.f;
+  else if (exp.modo === "collection") corpo.collection_id = est.ativa;
+  else corpo.uids = Array.from(est.sel);
+  try {
+    const r = await postar("/api/export", corpo);
+    const m = r.manifest || {};
+    $("#export-corpo").innerHTML =
+      "<h3>arquivo gerado</h3>" +
+      '<dl class="meta" style="margin-top:6px">' +
+      ["file", "row_count", "bytes", "sha256", "format", "profile", "encoding",
+       "excluded_nonredistributable_count", "nao_comercial_count", "nsfw_incluidos",
+       "pii_found", "editados", "maior_texto_chars", "taxonomy_version"]
+        .filter((k) => m[k] !== undefined)
+        .map((k) => "<dt>" + esc(k) + "</dt><dd>" +
+          esc(typeof m[k] === "number" ? n(m[k]) : m[k]) + "</dd>").join("") +
+      "</dl>" +
+      (m.WARNING ? '<p class="erro" style="margin-top:8px">' + esc(m.WARNING) + "</p>" : "") +
+      (m.NOTA_COMERCIAL ? '<p class="aviso" style="margin-top:6px">' + esc(m.NOTA_COMERCIAL) + "</p>" : "") +
+      (m.NOTA_CSV ? '<p class="aviso" style="margin-top:6px">' + esc(m.NOTA_CSV) + "</p>" : "") +
+      (m.attributions && Object.keys(m.attributions).length
+        ? "<h3 style=\"margin-top:10px\">atribuição exigida pelas licenças</h3><dl class=\"meta\">" +
+          Object.entries(m.attributions).map(([k, v]) =>
+            "<dt>" + esc(k) + "</dt><dd>" + esc(v) + "</dd>").join("") + "</dl>"
+        : "") +
+      '<p style="margin-top:10px"><a href="' + esc(r.download_url) + '" download>baixar ' +
+      esc(r.file) + "</a></p>";
+    $("#export-acoes").innerHTML =
+      '<button type="button" data-acao="novo-export">exportar outro</button>' +
+      '<span class="crescer"></span><span class="fraco mono">' + esc(r.path) + "</span>";
+    carregarHistorico();
+    recado("export pronto: " + n(r.row_count) + " linhas");
+  } catch (e) { recado(e.message, true, 8000); }
+}
+async function carregarHistorico() {
+  try {
+    const r = await api("/api/exports");
+    $("#hist").innerHTML = r.items.length
+      ? r.items.slice(0, 12).map((x) =>
+          '<div><a href="' + esc(x.download_url) + '" download>' + esc(x.file) + "</a><br>" +
+          '<span class="fraco num">' + n(x.row_count) + " linhas · " + esc((x.created_at || "").slice(0, 16)) +
+          (x.exists ? "" : ' · <span class="erro">arquivo sumiu</span>') + "</span></div>").join("")
+      : '<div class="fraco">nenhum export ainda</div>';
+  } catch (_) { /* histórico é acessório */ }
+}
+
+/* ==========================================================================
+   11. FILA DE REVISÃO — um modo, não uma faceta
+   ========================================================================== */
+async function abrirRevisao() {
+  $("#revisao").classList.remove("oculto");
+  $("#rev-corpo").innerHTML = '<p class="fraco">carregando a fila…</p>';
+  await recarregarFila();
+}
+async function recarregarFila() {
+  try {
+    const p = paramsFiltro({ needs_review: true, nsfw: "include" });
+    p.set("sort", "oldest"); p.set("page_size", "50");
+    const r = await api("/api/prompts?" + p.toString());
+    est.revisao = { itens: r.items, i: 0, total: r.total };
+    desenharRevisao();
+  } catch (e) { $("#rev-corpo").innerHTML = '<p class="erro">' + esc(e.message) + "</p>"; }
+}
+function itemRevisao() {
+  const r = est.revisao;
+  return r && r.itens[r.i] ? r.itens[r.i] : null;
+}
+function desenharRevisao() {
+  const r = est.revisao;
+  const it = itemRevisao();
+  $("#rev-posicao").textContent = r ? " · " + n(r.i + 1) + " de " + n(r.itens.length) +
+    " carregados (" + n(r.total) + " na fila)" : "";
+  if (!it) {
+    $("#rev-corpo").innerHTML = '<p class="fraco" style="padding:30px;text-align:center;line-height:1.8">' +
+      "Fila vazia — nada esperando revisão sob os filtros da fila.<br>" +
+      "Rotular à mão tira o item da fila automaticamente.</p>";
+    return;
+  }
+  const tax = (est.stats && est.stats.taxonomia) || { task_type: [], domain: [] };
+  const texto = est.textos.get(it.uid) || it.text;
+  $("#rev-corpo").innerHTML =
+    '<div class="cab">' +
+      '<span class="fonte">' + esc(it.source) + "</span><span class=\"sep\">·</span>" +
+      "<span>" + esc(it.lang) + (it.lang_variant ? " " + esc(it.lang_variant) : "") + "</span>" +
+      '<span class="selo lic-' + esc(it.license_class) + '">' + esc(it.license) + "</span>" +
+      (it.n_exact_dups ? '<span class="selo dups">×' + n(it.n_exact_dups + 1) + "</span>" : "") +
+      '<span class="num fraco">' + n(it.n_chars) + " car</span>" +
+      '<span class="mono fraco">' + esc(it.uid) + "</span>" +
+      '<span class="crescer"></span>' +
+      '<button type="button" data-acao="rev-abrir">abrir o item</button>' +
+    "</div>" +
+    '<div id="rev-texto">' + esc(texto.slice(0, CORTE_INTEIRO)) +
+      (it.text_truncated ? '\n\n<span class="fraco">[trecho — abra o item para o texto inteiro]</span>' : "") +
+    "</div>" +
+    '<div class="form-rotulos">' +
+      '<span class="fraco">qualidade</span><span class="segmento" id="rev-qualidade">' +
+      [[1, "1 ruim"], [2, "2 usável"], [3, "3 bom"]].map(([v, r2]) =>
+        '<button type="button" data-qualidade="' + v + '" aria-pressed="' +
+        (it.quality === v ? "true" : "false") + '">' + esc(r2) + "</button>").join("") +
+      "</span>" +
+      "<label>tarefa <select id=\"rev-task\">" + opcoesTaxonomia(tax.task_type, it.task_type) + "</select></label>" +
+      "<label>domínio <select id=\"rev-domain\">" + opcoesTaxonomia(tax.domain, it.domain) + "</select></label>" +
+      '<span class="crescer"></span>' +
+      '<button type="button" data-acao="rev-anterior">‹ anterior (k)</button>' +
+      '<button type="button" data-acao="rev-proximo">pular (j) ›</button>' +
+    "</div>";
+}
+async function graduar(q) {
+  const it = itemRevisao();
+  if (!it) return;
+  try {
+    // Mexer em rótulo carimba label_method='manual' e tira o item da fila:
+    // é o backend que decide isso, a tela só reflete.
+    await remendar("/api/prompts/" + encodeURIComponent(it.uid), { quality: q });
+    recado("qualidade " + q + " — item fora da fila");
+    andarRevisao(1);
+  } catch (e) { recado(e.message, true, 6000); }
+}
+function andarRevisao(d) {
+  const r = est.revisao;
+  if (!r) return;
+  r.i = Math.max(0, Math.min(r.itens.length - 1, r.i + d));
+  desenharRevisao();
+}
+async function rotularRevisao(campo, valor) {
+  const it = itemRevisao();
+  if (!it) return;
+  try {
+    const novo = await remendar("/api/prompts/" + encodeURIComponent(it.uid), { [campo]: valor || null });
+    est.revisao.itens[est.revisao.i] = { ...it, ...novo };
+    desenharRevisao();
+  } catch (e) { recado(e.message, true, 6000); }
+}
+
+/* ==========================================================================
+   12. SOBREPOSIÇÕES E TECLADO
+   ========================================================================== */
+function algoAberto() {
+  return $$(".sobre").find((el) => !el.classList.contains("oculto")) || null;
+}
+function fecharTopoDaPilha() {
+  const el = algoAberto();
+  if (!el) return false;
+  if (el.id === "painel-item") fecharItem();
+  else el.classList.add("oculto");
+  return true;
+}
+function ehCampo(alvo) {
+  const t = (alvo.tagName || "").toLowerCase();
+  return t === "input" || t === "textarea" || t === "select" || alvo.isContentEditable;
+}
+
+document.addEventListener("keydown", (e) => {
+  const campo = ehCampo(e.target);
+  if (e.key === "Escape") {
+    if (campo && e.target.id === "busca") { e.target.blur(); return; }
+    if (est.editando && $("#painel-item").classList.contains("oculto") === false) {
+      est.editando = false; desenharItem(); return;
+    }
+    if (fecharTopoDaPilha()) return;
+    if (campo) e.target.blur();
+    return;
+  }
+  if (campo) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && est.editando) { e.preventDefault(); salvarItem(); }
+    return;
+  }
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+  // fila de revisão tem mapa próprio
+  if (!$("#revisao").classList.contains("oculto")) {
+    if (e.key === "1" || e.key === "2" || e.key === "3") { e.preventDefault(); graduar(Number(e.key)); return; }
+    if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); andarRevisao(1); return; }
+    if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); andarRevisao(-1); return; }
+    if (e.key === "?") { e.preventDefault(); $("#painel-atalhos").classList.remove("oculto"); return; }
+    return;
+  }
+  if (algoAberto()) {
+    if (e.key === "e" && est.itemAberto && !est.editando) { e.preventDefault(); est.editando = true; desenharItem(); }
+    if (e.key === "?") { e.preventDefault(); $("#painel-atalhos").classList.remove("oculto"); }
+    return;
+  }
+
+  const it = itemFocado();
+  // Shift é lido de `e.shiftKey`, e não de "a tecla veio maiúscula": num teclado
+  // comum Shift+j chega como key="J", mas layout, IME e remapeador podem mandar
+  // key="j" com shiftKey=true. Testar o modificador cobre os dois — e dá
+  // Shift+Seta de brinde.
+  const desce = e.key === "j" || e.key === "J" || e.key === "ArrowDown";
+  const sobe = e.key === "k" || e.key === "K" || e.key === "ArrowUp";
+  if (desce || sobe) {
+    e.preventDefault();
+    const passo = desce ? 1 : -1;
+    if (e.shiftKey) estenderSelecao(passo);
+    else { moverFoco(passo); est.ancora = est.foco; }
+    return;
+  }
+  // `e.code === "Space"` como rede: em alguns layouts o `key` da barra de
+  // espaço não é " ".
+  if (e.key === " " || e.code === "Space") {
+    if (it) { e.preventDefault(); est.ancora = est.foco; alternarMarca(it.uid); }
+    return;
+  }
+  switch (e.key) {
+    case "/": e.preventDefault(); $("#busca").focus(); $("#busca").select(); break;
+    case "a": e.preventDefault(); marcarPagina(true); break;
+    case "x": if (it) { e.preventDefault(); alternarExpandir(it.uid); } break;
+    case "Enter": if (it) { e.preventDefault(); abrirItem(it.uid); } break;
+    case "e": if (it) { e.preventDefault(); abrirItem(it.uid, true); } break;
+    case "y": if (it) { e.preventDefault(); copiar(it.uid); } break;
+    case "c": e.preventDefault(); jogarSelecao(false); break;
+    case "n": e.preventDefault(); irPara(est.page + 1); break;
+    case "p": e.preventDefault(); irPara(est.page - 1); break;
+    case "g": e.preventDefault(); est.foco = 0; est.ancora = 0; aplicarFoco(); break;
+    case "G": if (est.dados) { e.preventDefault(); est.foco = est.dados.items.length - 1; est.ancora = est.foco; aplicarFoco(); } break;
+    case "r": e.preventDefault(); abrirRevisao(); break;
+    case "?": e.preventDefault(); $("#painel-atalhos").classList.remove("oculto"); break;
+  }
+});
+
+function irPara(p) {
+  if (!est.dados) return;
+  const alvo = Math.max(1, Math.min(est.dados.pages || 1, p));
+  if (alvo === est.page) return;
+  est.page = alvo;
+  carregar();
+  $("#lista").scrollTop = 0;
+}
+
+/* ==========================================================================
+   13. CLIQUES
+   ========================================================================== */
+function ligarCliques() {
+  $("#form-busca").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = $("#busca").value.trim();
+    por("q", v || null);
+    est.page = 1;
+    carregar();
+  });
+  $("#ordem").addEventListener("change", (e) => {
+    est.sort = e.target.value;
+    if (est.sort === "random") est.seed = 1 + Math.floor(Math.random() * 2147483646);
+    est.page = 1; carregar();
+  });
+  $("#tamanho-pagina").addEventListener("change", (e) => {
+    est.page_size = Number(e.target.value); est.page = 1; guardar(); carregar();
+  });
+  $("#btn-tema").addEventListener("click", () => {
+    const claro = document.documentElement.dataset.tema === "claro";
+    document.documentElement.dataset.tema = claro ? "escuro" : "claro";
+    try { localStorage.setItem(CHAVE + "tema", claro ? "escuro" : "claro"); } catch (_) {}
+  });
+  $("#btn-atalhos").addEventListener("click", () => $("#painel-atalhos").classList.remove("oculto"));
+  $("#btn-revisao").addEventListener("click", abrirRevisao);
+  $("#btn-marcar-pagina").addEventListener("click", () => marcarPagina(true));
+  $("#btn-desmarcar-pagina").addEventListener("click", () => marcarPagina(false));
+  $("#btn-limpar-sel").addEventListener("click", () => {
+    est.sel.clear(); guardar(); desenharLista(); aplicarFoco(); desenharTopo(); desenharMesa();
+  });
+  $("#btn-sel-colecao").addEventListener("click", () => jogarSelecao(false));
+  $("#btn-sel-fora").addEventListener("click", () => jogarSelecao(true));
+  $("#btn-filtro-mais").addEventListener("click", () => massaPorFiltro(false));
+  $("#btn-filtro-menos").addEventListener("click", () => massaPorFiltro(true));
+  $("#btn-export").addEventListener("click", abrirExport);
+  $("#colecao-ativa").addEventListener("change", (e) => {
+    est.ativa = Number(e.target.value) || null;
+    if (est.f.collection_id !== undefined) { por("collection_id", est.ativa); est.page = 1; carregar(); }
+    guardar(); desenharMesa();
+  });
+  $("#filtrar-colecao").addEventListener("change", (e) => {
+    por("collection_id", e.target.checked ? est.ativa : null);
+    est.page = 1; carregar();
+  });
+  $("#btn-nova-colecao").addEventListener("click", async () => {
+    const nome = prompt("nome da nova coleção:");
+    if (!nome) return;
+    try {
+      const c = await postar("/api/collections", { name: nome.trim() });
+      est.ativa = c.id;
+      await recarregarColecoes();
+      recado("coleção “" + c.name + "” criada");
+    } catch (e) { recado(e.message, true, 6000); }
+  });
+  $("#btn-renomear-colecao").addEventListener("click", async () => {
+    const c = colecaoAtiva(); if (!c) return;
+    const nome = prompt("novo nome:", c.name);
+    if (!nome || nome === c.name) return;
+    try { await remendar("/api/collections/" + c.id, { name: nome.trim() }); await recarregarColecoes(); }
+    catch (e) { recado(e.message, true, 6000); }
+  });
+  $("#btn-apagar-colecao").addEventListener("click", async () => {
+    const c = colecaoAtiva(); if (!c) return;
+    if (!confirm("apagar a coleção “" + c.name + "” (" + n(c.n_items) +
+      " itens)? Os prompts NÃO são apagados — coleção é um recorte.")) return;
+    try {
+      await api("/api/collections/" + c.id, { method: "DELETE" });
+      if (est.f.collection_id === c.id) { delete est.f.collection_id; est.page = 1; }
+      est.ativa = null;
+      await recarregarColecoes();
+      carregar();
+    } catch (e) { recado(e.message, true, 6000); }
+  });
+
+  // facetas (delegação)
+  $("#facetas").addEventListener("click", (e) => {
+    const op = e.target.closest("[data-faceta]");
+    if (op) { clicarFaceta(op.dataset.faceta, JSON.parse(op.dataset.valor)); return; }
+    if (e.target.closest('[data-acao="limpar-tudo"]')) limparTudo();
+  });
+  $("#facetas").addEventListener("change", (e) => {
+    const id = e.target.id;
+    if (id === "so-originais") por("max_dups", e.target.checked ? 0 : null);
+    else if (id === "max-dups") por("max_dups", e.target.value === "" ? null : Number(e.target.value));
+    else if (id === "chars-min") por("n_chars_min", e.target.value === "" ? null : Number(e.target.value));
+    else if (id === "chars-max") por("n_chars_max", e.target.value === "" ? null : Number(e.target.value));
+    else if (id === "so-redistribuivel") por("redistributable_only", e.target.checked || null);
+    else if (id === "so-comercial") por("commercial_only", e.target.checked || null);
+    else if (id === "qualidade-min") por("quality_min", e.target.value ? Number(e.target.value) : null);
+    else return;
+    est.page = 1; carregar();
+  });
+
+  // chips
+  $("#chips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tirar]");
+    if (!b) return;
+    const k = b.dataset.tirar;
+    if (k === "nsfw") est.f.nsfw = "exclude";
+    else if (k === "pii") est.f.pii = "any";
+    else delete est.f[k];
+    if (k === "q") $("#busca").value = "";
+    est.page = 1; carregar();
+  });
+
+  // lista
+  $("#lista").addEventListener("click", (e) => {
+    const art = e.target.closest(".item");
+    if (!art) {
+      if (e.target.closest('[data-acao="limpar-tudo"]')) limparTudo();
+      return;
+    }
+    est.foco = Number(art.dataset.i); est.ancora = est.foco; aplicarFoco(false);
+    const uid = art.dataset.uid;
+    const b = e.target.closest("[data-acao]");
+    if (!b) return;
+    const acao = b.dataset.acao;
+    if (acao === "marcar") alternarMarca(uid);
+    else if (acao === "expandir") alternarExpandir(uid);
+    else if (acao === "abrir") abrirItem(uid);
+    else if (acao === "copiar") copiar(uid);
+  });
+
+  // paginação
+  $("#paginacao").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-pag]");
+    if (b) irPara(Number(b.dataset.pag));
+  });
+
+  // painéis
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-fechar]")) { fecharTopoDaPilha(); return; }
+    // clicar no fundo escuro fecha
+    if (e.target.classList && e.target.classList.contains("sobre")) {
+      if (e.target.id === "painel-item" && est.editando) return;  // não perder edição por clique fora
+      fecharTopoDaPilha();
+    }
+  });
+  $("#item-acoes").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-acao]"); if (!b) return;
+    const a = b.dataset.acao;
+    if (a === "editar") { est.editando = true; desenharItem(); }
+    else if (a === "cancelar") { est.editando = false; desenharItem(); }
+    else if (a === "salvar") salvarItem();
+    else if (a === "reverter") reverterItem();
+    else if (a === "copiar-item") copiar(est.itemAberto.uid);
+    else if (a === "marcar-item") { alternarMarca(est.itemAberto.uid); desenharItem(); }
+  });
+  $("#painel-export").addEventListener("click", async (e) => {
+    const esc0 = e.target.closest("[data-escopo]");
+    if (esc0) { exp.modo = esc0.dataset.escopo; return desenharExport(); }
+    const fmt = e.target.closest("[data-formato]");
+    if (fmt) { exp.formato = fmt.dataset.formato; return desenharExport(); }
+    const b = e.target.closest("[data-acao]");
+    if (!b) return;
+    if (b.dataset.acao === "gerar") gerar();
+    if (b.dataset.acao === "novo-export") desenharExport();
+  });
+  $("#painel-export").addEventListener("change", (e) => {
+    if (e.target.id === "exp-bloqueadas") { exp.incluirBloqueadas = e.target.checked; }
+    else if (e.target.id === "exp-original") { exp.incluirOriginal = e.target.checked; }
+    else if (e.target.id === "exp-nome") { exp.nome = e.target.value.trim(); }
+  });
+  $("#revisao").addEventListener("click", (e) => {
+    const q = e.target.closest("[data-qualidade]");
+    if (q) return graduar(Number(q.dataset.qualidade));
+    const b = e.target.closest("[data-acao]");
+    if (!b) return;
+    if (b.dataset.acao === "rev-proximo") andarRevisao(1);
+    else if (b.dataset.acao === "rev-anterior") andarRevisao(-1);
+    else if (b.dataset.acao === "rev-abrir") { const it = itemRevisao(); if (it) abrirItem(it.uid); }
+  });
+  $("#revisao").addEventListener("change", (e) => {
+    if (e.target.id === "rev-task") rotularRevisao("task_type", e.target.value);
+    else if (e.target.id === "rev-domain") rotularRevisao("domain", e.target.value);
+  });
+}
+function limparTudo() {
+  est.f = { nsfw: "exclude" };
+  $("#busca").value = "";
+  est.page = 1;
+  carregar();
+}
+
+/* ==========================================================================
+   14. PARTIDA
+   ========================================================================== */
+/**
+ * license -> license_class SEM copiar a regra do backend: pergunta ao próprio
+ * /api/prompts um item de cada licença e lê o `license_class` que ele devolve.
+ * A autoridade continua sendo `presenters.classe_da_licenca`.
+ */
+async function mapearLicencas() {
+  const licencas = ((est.stats && est.stats.por_license) || []).map((x) => x.value).filter(Boolean);
+  await Promise.all(licencas.map(async (lic) => {
+    try {
+      const r = await api("/api/prompts?license=" + encodeURIComponent(lic) +
+        "&page_size=1&nsfw=include&pii=any");
+      if (r.items.length) est.classePorLicenca[lic] = r.items[0].license_class;
+    } catch (_) { /* uma licença sem amostra não impede a tela de abrir */ }
+  }));
+}
+
+async function iniciar() {
+  restaurar();
+  ligarCliques();
+  $("#tamanho-pagina").value = String(est.page_size);
+  try {
+    const [saude, stats, cols] = await Promise.all([
+      api("/api/health"), api("/api/stats"), api("/api/collections"),
+    ]);
+    est.saude = saude;
+    est.stats = stats;
+    est.colecoes = cols.items;
+    est.rotulagemPendente = !!saude.rotulagem_pendente;
+    if (!est.colecoes.find((c) => c.id === est.ativa)) {
+      est.ativa = est.colecoes.length ? est.colecoes[0].id : null;
+    }
+  } catch (e) {
+    document.body.innerHTML = '<p style="padding:40px;font:14px var(--fonte-ui)">' +
+      "A API não respondeu: " + esc(e.message) + "</p>";
+    return;
+  }
+  await mapearLicencas();
+  await carregar();
+  carregarHistorico();
+}
+iniciar();
 </script>

@@ -1,28 +1,19 @@
 """Dependências das rotas: a conexão por request e as guardas compartilhadas.
 
-REGRA DURA, MEDIDA, NÃO NEGOCIÁVEL
-==================================
+REGRA DURA, NÃO NEGOCIÁVEL
+==========================
 **Nenhuma rota que toca o banco pode ser ``async def``.**
 
-O ``sqlite3`` amarra a conexão à thread que a criou. Uma rota ``def``
-(síncrona) e a dependência ``get_conn`` rodam na MESMA thread do threadpool —
-verificado, 4 de 4 execuções — e portanto funcionam com o
-``check_same_thread=True`` que ``db.connect`` usa por padrão. Trocar a rota para
-``async def`` põe a rota no event loop e a dependência síncrona no threadpool:
-threads diferentes, e a primeira query morre com
+Uma rota ``async def`` roda no event loop; o ``sqlite3`` é síncrono e bloqueante,
+e uma consulta de 200 ms ali dentro trava o servidor inteiro (inclusive as outras
+abas e o download de export). Rota que toca o banco é ``def``, sempre, e o
+Starlette a joga no threadpool.
 
-    sqlite3.ProgrammingError: SQLite objects created in a thread can only be
-    used in that same thread
-
-Este é um bug que só aparece quando alguém "otimiza" a rota para async, e ele
-não aparece em revisão de código porque o diff parece uma melhoria. Se você veio
-parar aqui atrás desse erro: **tire o ``async``, não desligue o
-``check_same_thread``.** Desligar troca uma exceção alta por corrupção
-silenciosa sob concorrência.
-
-(O único lugar do projeto que legitimamente usa ``check_same_thread=False`` é o
-download de export, onde o Starlette itera o gerador num threadpool que pode
-não ser o da rota. Lá a conexão nasce e morre dentro do próprio gerador.)
+O corolário sobre THREADS está em ``get_conn``, abaixo, e é onde mora a medição:
+a dependência-gerador tem o ``__enter__``, o corpo da rota e o ``__exit__``
+espalhados por chamadas independentes de ``anyio.to_thread.run_sync``, sem
+garantia de afinidade de thread entre elas. Por isso a conexão por request nasce
+com ``check_same_thread=False`` — leia o porquê lá antes de "consertar" isso.
 """
 
 from __future__ import annotations
@@ -46,8 +37,51 @@ def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
     ``db.connect`` já aplica WAL, ``busy_timeout``, ``foreign_keys=ON`` (que é
     PRAGMA **por conexão** — sem ele o ON DELETE CASCADE das coleções fica
     inerte) e ``row_factory``. Não reimplemente nada disso aqui.
+
+    POR QUE ``check_same_thread=False`` AQUI (e por que isto NÃO é o caso
+    proibido do ``db.connect``)
+    ==========================================================================
+    O FastAPI resolve uma dependência que é **gerador síncrono** com
+    ``contextmanager_in_threadpool``: o ``__enter__`` (que cria a conexão), o
+    corpo da rota e o ``__exit__`` (que a fecha) são **três chamadas separadas**
+    de ``anyio.to_thread.run_sync`` — e o AnyIO não promete a mesma worker
+    thread entre chamadas distintas. Pior: o ``__exit__`` usa um
+    ``CapacityLimiter`` próprio, então nem compartilha a fila das outras duas.
+
+    Com **uma** requisição em voo o pool reaproveita a única thread ociosa e tudo
+    parece funcionar — foi assim que a medição original ("4 de 4 na mesma
+    thread") passou. Com duas ou mais em voo, não. E duas ou mais é o caso
+    NORMAL: a interface dispara ``/api/health`` + ``/api/stats`` +
+    ``/api/collections`` juntas no primeiro paint, e ``/api/prompts`` +
+    ``/api/facets`` juntas a cada filtro.
+
+    Medido contra esta app (24 requisições, mesmas rotas):
+
+    ========================  ==========
+    requisições em paralelo   respostas 500
+    ========================  ==========
+    1                          0
+    4                         15
+    12                        24
+    ========================  ==========
+
+    sempre com ``sqlite3.ProgrammingError: SQLite objects created in a thread
+    can only be used in that same thread`` vindo do ``conn.close()`` daqui de
+    baixo. Ou seja: a interface não abria de jeito nenhum.
+
+    O que o ``db.connect`` proíbe é desligar a checagem numa conexão
+    **realmente compartilhada** entre requisições concorrentes — ali a checagem
+    é o que separa um erro alto de corrupção silenciosa. Aqui não há
+    compartilhamento nenhum: a conexão nasce, é usada e morre dentro de UMA
+    requisição, uma operação de cada vez. O que atravessa a fronteira de thread
+    é só o bastão entre as etapas dessa mesma requisição, e o módulo ``sqlite3``
+    do CPython é compilado em modo serializado — esse repasse é seguro.
+
+    A regra de "nenhuma rota do banco pode ser ``async def``" **continua
+    valendo**, agora por outro motivo: uma rota ``async def`` rodaria SQL
+    síncrono direto no event loop e travaria o servidor inteiro a cada consulta.
     """
-    conn = dbmod.connect(request.app.state.db_file)
+    conn = dbmod.connect(request.app.state.db_file, check_same_thread=False)
     try:
         yield conn
     finally:
