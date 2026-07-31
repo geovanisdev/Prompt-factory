@@ -56,6 +56,17 @@ LABELS: Path = LABELING / "labels"        # respostas validadas, 1 jsonl por lot
 SEED: Path = LABELING / "seed"            # s07: seed.parquet + strata.txt
 MAPPINGS: Path = LABELING / "mappings"
 
+#: Campanha de GERAÇÃO da Bancada (P4c). Árvore própria, ao lado de
+#: ``labeling/`` e pelo mesmo motivo: o livro-caixa é o que torna a campanha
+#: retomável entre sessões, e ele não pode morar em ``data/`` — aquela árvore é
+#: regenerável por um ``pf run`` e esta guarda o estado de trabalho que já foi
+#: entregue a agentes. Versionado é só o ``manifest.json``; os lotes carregam o
+#: texto dos prompts e as respostas carregam o material gerado.
+GERACAO: Path = ROOT / "geracao"
+GERACAO_MANIFEST: Path = GERACAO / "manifest.json"
+GERACAO_LOTES: Path = GERACAO / "lotes"        # o que vai para o agente
+GERACAO_RESPOSTAS: Path = GERACAO / "respostas"  # o que voltou, já importado
+
 SCRIPTS: Path = ROOT / "scripts"
 TESTS: Path = ROOT / "tests"
 
@@ -82,6 +93,10 @@ __all__ = [
     "EMB",
     "EXPORTS",
     "FINAL",
+    "GERACAO",
+    "GERACAO_LOTES",
+    "GERACAO_MANIFEST",
+    "GERACAO_RESPOSTAS",
     "INTERIM",
     "LABELING",
     "LABELING_DIRS",

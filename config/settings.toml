@@ -387,3 +387,58 @@ permitir_autorrevisao = false
 # quem, em vez de somar fixture com autoria na mesma coluna.
 projeto_padrao = "Portfólio"
 projeto_demonstracao = "Demonstração"
+
+# --- anotações sintéticas (P4c, campanha B) -----------------------------------
+# A DISTRIBUIÇÃO DE QUALIDADE-ALVO das anotações que a campanha gera. Ela existe
+# por causa de um problema que só aparece quando tudo dá certo: se o dono anotar
+# BEM — e vai, é o portfólio dele —, as escalas do Rate and Review nunca são
+# exercitadas. Tudo cairia em "adequado"/"excepcional" e a tela mais sofisticada
+# da plataforma mostraria dois dos quatro botões nunca usados.
+#
+# As chaves são exatamente `db.AVALIACOES_ANTES` (a escala 1 da passagem 2); uma
+# chave fora dela para a campanha com erro de configuração, em vez de gerar um
+# alvo que a tela não sabe representar. Os pesos são normalizados, então dá para
+# escrevê-los em porcentagem, fração ou contagem — o que for mais legível.
+#
+# O default pende para `ajustavel` de propósito: é a faixa que produz o trabalho
+# mais interessante para o revisor (dá para corrigir no lugar, que é o que a
+# passagem 2 faz), e é a que menos aparece sozinha num conjunto pequeno.
+sinteticas_distribuicao = { excepcional = 0.15, adequado = 0.30, ajustavel = 0.40, inutilizavel = 0.15 }
+
+# Onde a sintética ENTRA no funil: `pendente_triagem` (o caminho completo, o
+# dono tria e só depois avalia) ou `pendente_avaliacao` (vai direto para o Rate
+# and Review). Escolhível porque ele vai querer exercitar os dois; o default é a
+# triagem, porque pular a passagem 1 numa demonstração de QC seria esconder
+# metade do aparato. `pf annotate gerar importar --status <X>` sobrepõe.
+sinteticas_status = "pendente_triagem"
+
+# ==============================================================================
+# [geracao] — a campanha de geração da Bancada (Trilha B, P4c)
+# ==============================================================================
+# O livro-caixa em si mora em `geracao/manifest.json`, ao lado de
+# `labeling/manifest.json` e pelo mesmo motivo. Aqui ficam só os limiares.
+[geracao]
+# Quantas falhas de VALIDAÇÃO um lote aguenta antes de ir para `failed`. Falha
+# de validação não muda o estado (o lote segue `claimed` e o maestro faz um
+# retry dirigido, como no `pf labels submit`); o que muda é esta contagem. O
+# teto existe para não travar o ciclo num lote só.
+max_tentativas = 3
+# Validade de um claim. Uma sessão que morreu deixa lotes reivindicados e nunca
+# importados; sem o TTL eles ficariam presos e o `preparar` seguinte escolheria
+# prompts NOVOS, deixando um buraco permanente no meio da campanha. Mais longo
+# que o da rotulagem (2 h) porque escrever duas respostas defensáveis para
+# dezenas de prompts é trabalho de horas, não de minutos.
+claim_ttl_horas = 6
+# Piso de uma resposta de modelo. Abaixo disso não há o que comparar num A/B —
+# e uma resposta curta demais vence ou perde pelo tamanho, não pelo conteúdo.
+min_chars_resposta = 200
+# Teto de critérios de uma rubrica GERADA. Menor que o `max_criterios_rubrica`
+# da plataforma (8): a rubrica gerada é aplicada por outra pessoa em seguida, e
+# 5 é o limite prático de quantas escalas alguém compara sem perder o fio. O
+# piso é o mesmo da plataforma (`min_criterios_rubrica`).
+max_criterios_material = 5
+# Confiança mínima do detector para RECUSAR uma resposta por idioma. Abaixo
+# dela, silêncio: recusar exige certeza, deixar passar não. O corpus deste
+# projeto já provou que texto técnico e documento bilíngue enganam detector, e
+# um falso positivo aqui joga fora o trabalho de um lote inteiro.
+lang_confianca_min = 0.50

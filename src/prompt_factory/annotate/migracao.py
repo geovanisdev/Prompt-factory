@@ -24,14 +24,14 @@ faz ``os.replace``. Três propriedades que ``ALTER TABLE`` não daria:
 O arquivo antigo **não é apagado**: vira ``<nome>.v<N>.bak`` ao lado. Custo: um
 arquivo de alguns MB. Benefício: a operação inteira é reversível com um ``mv``.
 
-DUAS ORIGENS, UM DESTINO
-========================
+N ORIGENS, UM DESTINO
+=====================
 O destino é **sempre** o schema corrente, e o arquivo novo nasce do ``db.DDL``
-— nunca de uma sequência de remendos encadeados. Não há "migrar 1→2 e depois
-2→3": há ``_da_v1`` e ``_da_v2``, cada um copiando o que aquele schema tinha
-para dentro de um banco já na versão de hoje. Encadear passos exigiria manter
-vivo o DDL de cada versão intermediária, e o teste que compara ``sqlite_master``
-com um banco novo deixaria de valer no meio da cadeia.
+— nunca de uma sequência de remendos encadeados. Não há "migrar 1→2, 2→3 e
+3→4": há ``_da_v1``, ``_da_v2`` e ``_da_v3``, cada um copiando o que aquele
+schema tinha para dentro de um banco já na versão de hoje. Encadear passos
+exigiria manter vivo o DDL de cada versão intermediária, e o teste que compara
+``sqlite_master`` com um banco novo deixaria de valer no meio da cadeia.
 
 O QUE MUDA NOS DADOS, VINDO DA v1 (P1/P2)
 =========================================
@@ -58,6 +58,16 @@ sintética. Projetos, diretrizes, avaliações, edições e decisões vêm como 
 ``semear`` sobre a v2 recusaria (com razão) reescrever uma diretriz que já
 gravou trabalho, e porque os **ids** de projeto são referenciados por
 ``tarefas.projeto_id``.
+
+O QUE MUDA NOS DADOS, VINDO DA v3 (P3b)
+=======================================
+Nada, e nem o formato de nenhuma tabela. A v4 acrescenta um VALOR ao CHECK de
+``rubricas.origem`` (``'importada'``). É o caso mais fácil de subestimar: como
+não há coluna nova, a tentação é não migrar — só que ``CREATE TABLE IF NOT
+EXISTS`` não reescreve o CHECK de uma tabela que já existe, e o banco do dono
+continuaria recusando o INSERT da campanha com uma regra que nenhum arquivo do
+repositório mostra mais. **Um CHECK velho não parece quebrado: ele parece um
+bug do código que está tentando escrever.**
 """
 
 from __future__ import annotations
@@ -197,9 +207,55 @@ COPIA_V2_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = (
                  "criado_em")),
 )
 
+#: A cópia vinda da **v3**. Diferente das duas anteriores, aqui NENHUMA tabela
+#: muda de forma: a v4 só alarga um CHECK. Por isso ``anotacoes`` deixa de ser
+#: caso especial e entra na lista, agora com ``gabarito_avaliacao_json`` — que
+#: na v3 já existe e pode estar PREENCHIDA (uma campanha do P4c rodada antes
+#: desta migração), e deixá-la de fora apagaria em silêncio exatamente o alvo
+#: escondido que dá valor às sintéticas.
+#:
+#: Escrita por extenso, e não fatiada de ``COPIA_V2_ANTES``: a regra 3 do
+#: cabeçalho vale aqui também. Uma lista derivada por índice quebraria calada no
+#: dia em que alguém inserisse uma tabela no meio da outra.
+COPIA_V3_ANTES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("projetos", ("id", "nome", "cliente", "descricao", "status", "criado_em")),
+    ("diretrizes", ("id", "tipo", "versao", "texto_json", "criada_em")),
+    ("anotadores", ("id", "nome", "papel", "ativo", "qualificacoes_json", "criado_em")),
+    ("prompts_demo", ("uid", "text", "lang", "criado_em")),
+    (
+        "tarefas",
+        ("id", "tipo", "prompt_uid", "origem", "projeto_id", "payload_json", "gabarito_json",
+         "n_anotacoes_alvo", "prioridade", "status", "db_build_id", "criado_em"),
+    ),
+    (
+        "atribuicoes",
+        ("id", "tarefa_id", "anotador_id", "status", "iniciada_em", "expira_em", "terminada_em"),
+    ),
+    (
+        "anotacoes",
+        ("id", "atribuicao_id", "versao", "payload_schema", "versao_diretriz", "payload_json",
+         "gabarito_avaliacao_json", "tempo_ativo_ms", "iniciada_em", "submetida_em", "status"),
+    ),
+    (
+        "respostas_modelo",
+        ("id", "prompt_uid", "rotulo_modelo", "texto", "origem", "meta_json", "criada_em"),
+    ),
+    (
+        "criacoes",
+        ("id", "autor_id", "texto", "lang", "task_type_sugerido", "domain_sugerido", "brief",
+         "hash_norm", "duplicata_corpus", "status", "revisor_id", "comentario_revisao",
+         "revisada_em", "uid_previsto", "exportada_em", "criada_em"),
+    ),
+    ("pool", ("uid", "ordem")),
+)
+
+#: E o resto, que depende de ``anotacoes`` já existir — as mesmas da v2, porque
+#: nenhuma delas mudou de forma.
+COPIA_V3_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = COPIA_V2_DEPOIS
+
 #: As versões de origem que este módulo sabe ler. Uma lista, e não um ``if``
-#: solto: acrescentar a v3 um dia é acrescentar uma função e uma chave.
-ORIGENS_CONHECIDAS: tuple[int, ...] = (1, 2)
+#: solto: acrescentar uma versão é acrescentar uma função e uma chave.
+ORIGENS_CONHECIDAS: tuple[int, ...] = (1, 2, 3)
 
 #: As tabelas que a própria migração faz crescer, e que por isso são conferidas
 #: por "nunca menos" em vez de "exatamente igual": ``app_meta`` ganha chaves e
@@ -469,8 +525,71 @@ def _da_v2(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any
     return relatorio
 
 
+def _da_v3(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any]:
+    """Copia a v3 no arquivo já inicializado no schema de HOJE.
+
+    A migração mais barata que este módulo tem, e a mais fácil de dispensar por
+    engano: **nenhuma tabela muda de forma**. A v4 só acrescenta ``'importada'``
+    ao CHECK de ``rubricas.origem``, e o único jeito de trocar um CHECK no
+    SQLite é reconstruir a tabela — que é exatamente o que este módulo faz de
+    graça, para todas elas, desde a v1.
+
+    ``gabarito_avaliacao_json`` vem junto e é a única coluna desta cópia que
+    pode estar preenchida por algo que não é trabalho humano: uma campanha do
+    P4c que tenha rodado ANTES desta migração. Perder a coluna aqui apagaria o
+    alvo escondido de cada sintética e deixaria um banco em que tudo parece
+    humano — a mentira exata que a nulidade dela existe para impedir.
+    """
+    relatorio: dict[str, Any] = {"copiadas": {}, "avisos": []}
+
+    for tabela, colunas in COPIA_V3_ANTES:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+    for tabela, colunas in COPIA_V3_DEPOIS:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+
+    # app_meta inteira, MENOS a versão (que o `init_db` já escreveu).
+    for linha in velho.execute("SELECT key, value FROM app_meta ORDER BY key"):
+        if str(linha["key"]) == adb.CHAVE_VERSAO:
+            continue
+        adb.set_meta(novo, str(linha["key"]), linha["value"])
+
+    projetos = novo.execute("SELECT id, nome FROM projetos ORDER BY id").fetchall()
+    relatorio["projetos"] = {str(p["nome"]): int(p["id"]) for p in projetos}
+    relatorio["alocacao"] = {
+        str(p["nome"]): int(
+            novo.execute(
+                "SELECT count(*) AS n FROM tarefas WHERE projeto_id = ?", (int(p["id"]),)
+            ).fetchone()["n"]
+        )
+        for p in projetos
+    }
+    relatorio["diretrizes"] = relatorio["copiadas"].get("diretrizes", 0)
+    # Sem backfill: nenhum status, veredito ou origem mudou de NOME entre a v3 e
+    # a v4 — a v4 só passou a aceitar um nome a mais.
+    relatorio["status_backfill"] = {}
+
+    evmod.registrar(
+        novo,
+        acao="banco_migrado",
+        entidade="banco",
+        de=3,
+        para=adb.SCHEMA_VERSION_ANOTACAO,
+        anotacoes_preservadas=relatorio["copiadas"]["anotacoes"],
+        sinteticas_preservadas=int(
+            novo.execute(
+                "SELECT count(*) AS n FROM anotacoes "
+                f"WHERE {adb.COLUNA_GABARITO_AVALIACAO} IS NOT NULL"
+            ).fetchone()["n"]
+        ),
+        avaliacoes_preservadas=relatorio["copiadas"]["avaliacoes"],
+        projetos=relatorio["projetos"],
+        alocacao=relatorio["alocacao"],
+    )
+    return relatorio
+
+
 #: versão de origem → a função que sabe lê-la. Ver ``ORIGENS_CONHECIDAS``.
-PASSOS = {1: _da_v1, 2: _da_v2}
+PASSOS = {1: _da_v1, 2: _da_v2, 3: _da_v3}
 
 
 def precisa_migrar(caminho: Path) -> int | None:
@@ -603,6 +722,8 @@ __all__ = [
     "COPIA_DIRETA",
     "COPIA_V2_ANTES",
     "COPIA_V2_DEPOIS",
+    "COPIA_V3_ANTES",
+    "COPIA_V3_DEPOIS",
     "MAPA_STATUS",
     "MAPA_VEREDITO",
     "ORIGENS_CONHECIDAS",

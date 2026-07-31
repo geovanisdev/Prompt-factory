@@ -348,40 +348,21 @@ def _conferir_contra_a_rubrica(
 ) -> None:
     """A nota tem de caber na escala DAQUELE critério, e todos precisam de nota.
 
-    O Pydantic não pode fazer isto: ele não conhece a rubrica. A checagem mora
-    aqui, onde a rubrica está em mãos — e é o mesmo cálculo que o botão da tela
-    faz ANTES do clique ("2 de 4 critérios sem nota"). Os dois concordarem é o
-    que faz a validação parecer instantânea sem deixar de ser do servidor.
-    """
-    rubrica = tmod.rubrica_ativa(conn, uid)
-    if rubrica is None:
-        return
-    esperados = {str(c.get("nome")): c for c in rubrica["criterios"] if isinstance(c, dict)}
-    if not esperados:
-        return
-    dadas = {nota.criterio: nota for nota in dados.notas}
+    O Pydantic não pode fazer isto: ele não conhece a rubrica. A regra mora em
+    ``tarefas.erro_contra_a_rubrica``, e esta rota só a traduz para 422 — a
+    campanha de geração do P4c chama a MESMA função para recusar uma sintética
+    antes de gravá-la. Duas cópias divergiriam, e a divergência apareceria como
+    uma anotação com nota que a tela não sabe desenhar.
 
-    faltam = sorted(set(esperados) - set(dadas))
-    if faltam:
-        raise HTTPException(
-            status_code=422,
-            detail=f"{len(faltam)} critério(s) sem nota: {', '.join(faltam)}",
-        )
-    sobram = sorted(set(dadas) - set(esperados))
-    if sobram:
-        raise HTTPException(
-            status_code=422,
-            detail=f"critério que não está na rubrica: {', '.join(sobram)}",
-        )
-    for nome, criterio in esperados.items():
-        escala = criterio.get("escala") or {}
-        piso, teto = int(escala.get("min", 1)), int(escala.get("max", 9))
-        valor = dadas[nome].nota
-        if not piso <= valor <= teto:
-            raise HTTPException(
-                status_code=422,
-                detail=f"'{nome}' aceita de {piso} a {teto}; veio {valor}",
-            )
+    É também o mesmo cálculo que o botão da tela faz ANTES do clique ("2 de 4
+    critérios sem nota"). Os dois concordarem é o que faz a validação parecer
+    instantânea sem deixar de ser do servidor.
+    """
+    problema = tmod.erro_contra_a_rubrica(
+        tmod.rubrica_ativa(conn, uid), [(nota.criterio, nota.nota) for nota in dados.notas]
+    )
+    if problema:
+        raise HTTPException(status_code=422, detail=problema)
 
 
 @router.post("/api/atribuicoes/{atribuicao_id}/submeter", summary="Enviar a anotação")

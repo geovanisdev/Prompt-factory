@@ -18,6 +18,18 @@ labeling/seed/**
 !labeling/seed/**/
 !labeling/seed/**/.gitkeep
 
+# Campanha de GERAÇÃO da Bancada (P4c). Mesma regra da rotulagem, e pela mesma
+# razão: VERSIONADO é só o `manifest.json` (o livro-caixa, que É o estado da
+# campanha e o que a torna retomável entre sessões). Os lotes carregam o texto
+# dos prompts do corpus e as respostas carregam o material gerado — nem um nem
+# outro entra no git.
+geracao/lotes/**
+!geracao/lotes/**/
+!geracao/lotes/**/.gitkeep
+geracao/respostas/**
+!geracao/respostas/**/
+!geracao/respostas/**/.gitkeep
+
 # cache de modelos/datasets do HuggingFace, caso alguém aponte HF_HOME pra cá
 hf-cache/
 

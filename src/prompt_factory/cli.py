@@ -20,6 +20,7 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from . import __version__
 
@@ -827,11 +828,281 @@ def _annotate(args: argparse.Namespace) -> int:
             print(f"[annotate] corpus AUSENTE em {corpus} — `pf annotate serve` vai recusar")
         return 0
 
+    if acao == "gerar":
+        return _annotate_gerar(args, banco, corpus)
+
     print(
-        f"[pf] ação desconhecida: {acao!r} (use serve | seed | status | migrate)",
+        f"[pf] ação desconhecida: {acao!r} (use serve | seed | status | migrate | gerar)",
         file=sys.stderr,
     )
     return 2
+
+
+def _limpar_shm(corpus: Path) -> None:
+    """Apaga o ``-shm`` órfão que uma conexão read-only em WAL deixa para trás.
+
+    É exatamente o sinal que o pré-voo do swap do ``pf load-db`` lê como "alguém
+    está com isto aberto": deixá-lo faria a próxima recarga do corpus ser
+    recusada por causa de um processo já morto. **Nunca o ``-wal``** — ele pode
+    conter transações commitadas que ainda não foram para o arquivo principal.
+    """
+    try:
+        shm = corpus.with_name(corpus.name + "-shm")
+        if shm.is_file():
+            shm.unlink()
+    except OSError:
+        pass
+
+
+def _annotate_gerar(args: argparse.Namespace, banco: Path, corpus: Path) -> int:
+    """``pf annotate gerar <preparar|importar|status>`` (P4c) — a campanha.
+
+    O MESMO desenho de ``pf labels``, e pela mesma razão: o agente gerador é
+    puro cômputo (lê um arquivo de lote, devolve JSON como texto) e **só este
+    fio grava**, com validação estrita antes de encostar no banco. Se o agente
+    escrevesse, duas sessões paralelas se sobrescreveriam e a validação estrita
+    seria contornável — que é o mesmo que não existir.
+
+    ``geracao`` importa ``payloads``, ``catalogo`` e ``tarefas``: um import lazy,
+    para um ``pf --help`` não pagar por pydantic nem pelo módulo de busca.
+    """
+    from . import db as dbmod
+    from .annotate import db as adb
+    from .annotate import geracao as gmod
+    from .stages import imprimir_funil
+
+    gp = gmod.GeracaoPaths(Path(args.geracao_dir).resolve() if args.geracao_dir else None)
+    sub = args.subacao or "status"
+
+    if sub == "status":
+        p = gmod.painel(gp)
+        composicao = None
+        cobertura = None
+        if banco.is_file():
+            conn = dbmod.connect(banco)
+            try:
+                composicao = gmod.composicao(conn)
+                cobertura = gmod.cobertura_do_pool(conn)
+            finally:
+                conn.close()
+        if args.json:
+            import json as _json
+
+            print(
+                _json.dumps(
+                    {"campanha": p, "composicao": composicao, "cobertura": cobertura},
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
+
+        linhas = [["contrato", p["contrato"]], ["lotes", p["n_lotes"]]]
+        for campanha in gmod.CAMPANHAS:
+            c = p["por_campanha"][campanha]
+            linhas.append(
+                [
+                    f"{campanha}: lotes",
+                    f"{c[gmod.DONE]} done · {c[gmod.CLAIMED]} claimed · "
+                    f"{c[gmod.PENDING]} pending · {c[gmod.FAILED]} failed",
+                ]
+            )
+            linhas.append(
+                [f"{campanha}: itens", f"{p['importados'][campanha]} / {p['itens'][campanha]}"]
+            )
+        linhas.append(["claims órfãos (TTL)", f"{len(p['orfaos'])} (ttl {p['ttl_horas']:g} h)"])
+        imprimir_funil("gerar", ("item", "valor"), linhas)
+
+        dist = ", ".join(f"{k} {v:.0%}" for k, v in sorted(p["distribuicao"].items()))
+        print(f"[gerar] distribuição-alvo das sintéticas: {dist}")
+        print(f"[gerar] sintética entra como: {p['status_inicial']}")
+        if p["lotes"]:
+            imprimir_funil(
+                "gerar",
+                ("lote", "campanha", "status", "itens", "tent.", "motivo"),
+                [
+                    [
+                        lid,
+                        r["campanha"],
+                        r["status"],
+                        r["n_items"],
+                        r["tentativas"],
+                        (r["motivo"] or "")[:44],
+                    ]
+                    for lid, r in p["lotes"].items()
+                ],
+            )
+        if composicao is not None:
+            print(
+                f"[gerar] anotações: {composicao['humanas']} humana(s) + "
+                f"{composicao['sinteticas']} sintética(s) de {composicao['anotacoes']}"
+            )
+            # A MARCA, dita com todas as letras. É ela que o export do P5b honra
+            # e o painel do P5a lê — e é a única: NULL significa trabalho humano.
+            print(f"[gerar] sinal de sintética: {composicao['sinal']}")
+            print(
+                "[gerar] anotação sintética fica FORA dos exports de dado por padrão "
+                "(o projeto não entrega anotação de IA como humana)"
+            )
+            if composicao["sinteticas_por_alvo"]:
+                print(
+                    "[gerar] alvos escondidos: "
+                    + ", ".join(f"{k} {v}" for k, v in composicao["sinteticas_por_alvo"].items())
+                )
+            for tabela, origens in composicao["material_por_origem"].items():
+                if origens:
+                    print(
+                        f"[gerar] {tabela} por origem: "
+                        + ", ".join(f"{k} {v}" for k, v in origens.items())
+                    )
+        if cobertura is not None:
+            print(
+                f"[gerar] pool ({cobertura['pool']} prompts): "
+                f"{cobertura['avaliar_rubrica']} sustentam avaliar_rubrica, "
+                f"{cobertura['comparar_ab']} sustentam comparar_ab "
+                f"(+{cobertura['comparar_ab_demo']} do pacote de demonstração)"
+            )
+        return 0
+
+    if not corpus.is_file():
+        print(f"[pf] corpus não encontrado em {corpus}", file=sys.stderr)
+        print("[pf] a campanha só LÊ o corpus; quem o constrói é a pipeline: pf load-db")
+        return 1
+    banco.parent.mkdir(parents=True, exist_ok=True)
+    conn = dbmod.connect(banco)
+    conn_corpus = dbmod.connect(corpus, readonly=True)
+    try:
+        try:
+            adb.init_db(conn)
+        except adb.SchemaDivergente as exc:
+            print(f"[pf] {banco}: {exc}", file=sys.stderr)
+            print("[pf] o conserto é `pf annotate migrate` — este banco guarda trabalho humano")
+            return 3
+
+        if sub == "preparar":
+            if args.lote:
+                # Retomada: o lote já existe no disco e regerá-lo escolheria
+                # prompts diferentes, fazendo a resposta que o agente já
+                # produziu deixar de casar com o arquivo.
+                try:
+                    rel = gmod.reemitir(args.lote, gp)
+                except ValueError as exc:
+                    print(f"[gerar] {exc}", file=sys.stderr)
+                    return 1
+                destino = _copiar_lote(rel["arquivo"], args.out_dir)
+                print(f"[gerar] {rel['lote_id']} reivindicado de novo -> {destino}")
+                return 0
+            if not args.campanha:
+                print(
+                    "[pf] 'gerar preparar' exige --campanha material|anotacoes "
+                    "(ou --lote para retomar um lote existente)",
+                    file=sys.stderr,
+                )
+                return 2
+            try:
+                rel = gmod.preparar(
+                    conn,
+                    conn_corpus,
+                    campanha=args.campanha,
+                    n=int(args.count or 8),
+                    lang=args.lang or "ambos",
+                    gp=gp,
+                )
+            except ValueError as exc:
+                print(f"[gerar] {exc}", file=sys.stderr)
+                return 1
+            if rel["lote_id"] is None:
+                print(f"[gerar] nada a preparar: {rel['motivo']}")
+                return 0
+            destino = _copiar_lote(rel["arquivo"], args.out_dir)
+            print(
+                f"[gerar] {rel['lote_id']} ({rel['campanha']}): {rel['n']} item(ns) -> {destino}"
+            )
+            print(
+                "[gerar] o agente LÊ este arquivo e devolve JSON; a skill `gerar-material` "
+                "tem o protocolo inteiro"
+            )
+            print(
+                f"[gerar] importe com: pf annotate gerar importar --lote {rel['lote_id']} "
+                "--file <resposta.json>"
+            )
+            return 0
+
+        if sub == "importar":
+            if not args.lote or not args.file:
+                print("[pf] 'gerar importar' exige --lote e --file", file=sys.stderr)
+                return 2
+            texto = Path(args.file).read_text(encoding="utf-8")
+            try:
+                rel = gmod.importar(
+                    conn, args.lote, texto, gp=gp, status=args.status, modelo=args.model
+                )
+            except ValueError as exc:
+                print(f"[gerar] {exc}", file=sys.stderr)
+                return 1
+            for aviso in rel.get("avisos", []):
+                print(f"[gerar] aviso: {aviso}")
+            if not rel["ok"]:
+                for erro in rel["erros"]:
+                    print(f"[gerar] {erro}", file=sys.stderr)
+                print(
+                    f"[gerar] {rel['lote_id']}: tentativa {rel['tentativas']} de "
+                    f"{rel['max_tentativas']}, lote em {rel['status']!r}",
+                    file=sys.stderr,
+                )
+                if rel["status"] == gmod.CLAIMED:
+                    # Falha de validação NÃO muda o estado: o lote segue
+                    # reivindicado e o retry dirigido é a correção normal.
+                    print(
+                        "[gerar] o lote SEGUE reivindicado — corrija o arquivo e importe de novo",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"[gerar] tentativas esgotadas — reviva com "
+                        f"`pf annotate gerar preparar --lote {rel['lote_id']}`",
+                        file=sys.stderr,
+                    )
+                return 1
+            gravado = ", ".join(f"{n} {t}" for t, n in rel["gravado"].items() if n)
+            print(
+                f"[gerar] {rel['lote_id']} ({rel['campanha']}): {rel['n_itens']} item(ns) "
+                f"validado(s); gravado: {gravado or 'nada novo'}"
+            )
+            if rel["campanha"] == "anotacoes":
+                print(
+                    "[gerar] cada anotação nasceu com o alvo escondido em "
+                    f"anotacoes.{adb.COLUNA_GABARITO_AVALIACAO} — é a marca de sintética"
+                )
+            return 0
+
+        print(
+            f"[pf] subação desconhecida: {sub!r} (use preparar | importar | status)",
+            file=sys.stderr,
+        )
+        return 2
+    finally:
+        conn.close()
+        conn_corpus.close()
+        _limpar_shm(corpus)
+
+
+def _copiar_lote(origem: Path, out_dir: str | None) -> Path:
+    """Entrega o arquivo do lote onde o maestro pediu.
+
+    ``--out-dir`` existe desde o primeiro dia pela pegadinha que o M5 já
+    documentou: a saída de ferramenta do harness trunca em ~30k caracteres e um
+    lote de dezenas de prompts do corpus passa disso com folga. O fluxo real é
+    sempre por arquivo — imprimir o lote no terminal entregaria um JSON cortado
+    ao meio, que o agente aceitaria e responderia pela metade.
+    """
+    if not out_dir:
+        return origem
+    destino = Path(out_dir) / origem.name
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    from .labeling_io import escrever_texto_atomico
+
+    return escrever_texto_atomico(destino, origem.read_text(encoding="utf-8"))
 
 
 def _export(args: argparse.Namespace) -> int:
@@ -1172,11 +1443,20 @@ COMMANDS: tuple[_Cmd, ...] = (
                 ("action",),
                 {
                     "nargs": "?",
-                    "choices": ["serve", "seed", "status", "migrate"],
+                    "choices": ["serve", "seed", "status", "migrate", "gerar"],
                     "help": (
                         "serve (padrão) | seed (personas + fixtures + tarefas) | "
-                        "status | migrate (sobe o schema preservando as anotações)"
+                        "status | migrate (sobe o schema preservando as anotações) | "
+                        "gerar (campanha de material e de anotações sintéticas)"
                     ),
+                },
+            ),
+            (
+                ("subacao",),
+                {
+                    "nargs": "?",
+                    "choices": ["preparar", "importar", "status"],
+                    "help": "só de `gerar`: preparar | importar | status (padrão)",
                 },
             ),
             (("--host",), {"metavar": "HOST", "help": "padrão: [annotate] host do settings.toml"}),
@@ -1196,6 +1476,49 @@ COMMANDS: tuple[_Cmd, ...] = (
                     "help": "seed: APAGA fixtures e tarefas e refaz (recusa se houver anotação)",
                 },
             ),
+            (
+                ("--campanha",),
+                {
+                    "choices": ["material", "anotacoes"],
+                    "help": "gerar preparar: rubrica+2 respostas | anotações sintéticas",
+                },
+            ),
+            (
+                ("-n", "--count"),
+                {"type": int, "metavar": "N", "help": "gerar preparar: itens no lote (padrão 8)"},
+            ),
+            (
+                ("--lang",),
+                {
+                    "choices": ["pt", "en", "ambos"],
+                    "help": "gerar preparar: língua dos prompts do lote (padrão: ambos)",
+                },
+            ),
+            (
+                ("--lote",),
+                {"metavar": "ID", "help": "gerar: o lote (ex.: mat_0001); em preparar, retoma"},
+            ),
+            (("--file",), {"metavar": "PATH", "help": "gerar importar: o JSON que o agente devolveu"}),
+            (
+                ("--out-dir",),
+                {
+                    "metavar": "DIR",
+                    "help": "gerar preparar: copia o lote para cá (a saída do agente trunca ~30k)",
+                },
+            ),
+            (
+                ("--status",),
+                {
+                    "choices": ["pendente_triagem", "pendente_avaliacao"],
+                    "help": "gerar importar: onde a sintética entra (padrão: [annotate] sinteticas_status)",
+                },
+            ),
+            (("--model",), {"metavar": "NOME", "help": "gerar importar: modelo que gerou (no manifest)"}),
+            (
+                ("--geracao-dir",),
+                {"metavar": "DIR", "help": "raiz da campanha (padrão: geracao/)"},
+            ),
+            (("--json",), {"action": "store_true", "help": "gerar status em JSON, para script"}),
         ],
         implemented=True,
         handler=_annotate,

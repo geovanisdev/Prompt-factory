@@ -60,7 +60,18 @@ from typing import Any
 #: inteira porque este banco guarda trabalho humano: acrescentá-la depois de a
 #: campanha do P4c gravar centenas de anotações custaria mais, e o preço de
 #: migrar é exatamente o número de linhas que já existem.
-SCHEMA_VERSION_ANOTACAO = 3
+#:
+#: **v4 (P4c)**: UM valor a mais no CHECK de ``rubricas.origem`` —
+#: ``'importada'``, que ``respostas_modelo`` já aceitava. A campanha de geração
+#: escreve os DOIS lados do material (a rubrica e as duas respostas) e eles
+#: precisam sair da mesma linha de origem: chamar de ``'fixture'`` uma rubrica
+#: gerada sobre um prompt REAL do corpus seria mentir numa coluna, que é
+#: exatamente o que este projeto existe para não fazer. Nenhuma coluna nasce,
+#: nenhuma linha é transformada — mas o CHECK está no ``CREATE TABLE`` e
+#: ``IF NOT EXISTS`` não o reescreve num banco que já existe. Ou seja: sem a
+#: migração, o banco do dono continuaria recusando o INSERT com um CHECK velho
+#: que nenhum arquivo do repositório mostra mais. Meio-schema de novo.
+SCHEMA_VERSION_ANOTACAO = 4
 
 #: Chave de ``app_meta`` onde a versão acima mora.
 CHAVE_VERSAO = "schema_version_anotacao"
@@ -206,10 +217,18 @@ STATUS_PROJETO: tuple[str, ...] = ("ativo", "pausado", "encerrado")
 STATUS_QUALIFICACAO: tuple[str, ...] = ("pendente", "aprovada", "reprovada")
 
 #: Origem de rubricas e respostas de modelo. ``fixture`` = pacote de
-#: demonstração; ``anotacao`` = materializada da aba escrever-rubrica na
-#: aprovação; ``importada`` = respostas de modelo reais, quando o dono decidir
-#: como alimentar a plataforma. Essa decisão futura **não muda o schema**.
-ORIGENS_RUBRICA: tuple[str, ...] = ("fixture", "anotacao")
+#: demonstração, escrito à mão sobre prompts que **não são de ninguém**;
+#: ``anotacao`` = materializada da aba escrever-rubrica na aprovação do revisor;
+#: ``importada`` = material gerado pela campanha do P4c (``pf annotate gerar``)
+#: sobre prompts REAIS do corpus.
+#:
+#: As duas tuplas terminam iguais desde a v4, e o motivo de elas continuarem
+#: separadas é que uma rubrica nunca vai ter uma origem que uma resposta tenha
+#: (ou vice-versa) por acaso: a divergência entre elas é informação, não
+#: duplicação. ``importada`` entrou em ``rubricas`` porque a campanha escreve o
+#: PAR — a rubrica e as duas respostas nascem do mesmo lote e não podem contar
+#: histórias diferentes sobre a própria procedência.
+ORIGENS_RUBRICA: tuple[str, ...] = ("fixture", "anotacao", "importada")
 ORIGENS_RESPOSTA: tuple[str, ...] = ("fixture", "importada")
 
 #: Rótulos cegos do A/B. Cegos de propósito: "modelo-a"/"modelo-b" na tela, o

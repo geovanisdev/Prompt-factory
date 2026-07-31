@@ -1,0 +1,81 @@
+{
+  "contrato": "geracao@1",
+  "criado_em": "2026-07-31T20:39:34Z",
+  "lotes": {
+    "mat_0001": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 4,
+      "claimed_at": "2026-07-31T20:39:34Z",
+      "done_at": "2026-07-31T20:42:46Z",
+      "tentativas": 0,
+      "modelo": "opus",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 4,
+        "respostas_modelo": 8,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "4feae10c98de8fb4",
+        "1e43fd0e244d9fba",
+        "aa4f80d56c1cfb69",
+        "cbf82c1f515aeb00"
+      ],
+      "lang": "ambos"
+    },
+    "anot_0001": {
+      "campanha": "anotacoes",
+      "status": "done",
+      "n_items": 4,
+      "claimed_at": "2026-07-31T20:42:59Z",
+      "done_at": "2026-07-31T20:46:45Z",
+      "tentativas": 2,
+      "modelo": "opus",
+      "motivo": null,
+      "resultado": {
+        "atribuicoes": 4,
+        "anotacoes": 4
+      },
+      "plano": [
+        {
+          "tarefa_id": 1,
+          "tipo": "avaliar_rubrica",
+          "prompt_uid": "demo:51e1e4d113f1",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "excepcional",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 2,
+          "tipo": "avaliar_rubrica",
+          "prompt_uid": "demo:341220a32054",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "inutilizavel",
+          "familia_defeito": "justificativa-generica"
+        },
+        {
+          "tarefa_id": 3,
+          "tipo": "avaliar_rubrica",
+          "prompt_uid": "demo:9e9d49a8f65b",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "adequado",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 4,
+          "tipo": "avaliar_rubrica",
+          "prompt_uid": "demo:bbd002244120",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "restricao-do-prompt-ignorada"
+        }
+      ],
+      "status_inicial": "pendente_triagem"
+    }
+  }
+}

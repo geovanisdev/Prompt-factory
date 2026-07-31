@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..config import get as _cfg
@@ -439,6 +440,46 @@ def rubrica_ativa(conn: sqlite3.Connection, uid: str) -> dict[str, Any] | None:
     }
 
 
+def erro_contra_a_rubrica(
+    rubrica: Mapping[str, Any] | None, notas: Sequence[tuple[str, int]]
+) -> str | None:
+    """A nota cabe na escala DAQUELE critério, e todo critério tem nota?
+
+    Devolve a frase do problema, ou ``None``. **Função pura, e é ela que os DOIS
+    escritores chamam**: a rota de submissão (que a transforma num 422) e a
+    campanha de geração do P4c (que a transforma numa linha de erro no import).
+    Duas cópias divergiriam, e a divergência apareceria como uma anotação
+    sintética gravada com uma nota que a tela não sabe desenhar — inconsistente,
+    e sem nada apontando para o momento em que ela entrou.
+
+    O Pydantic não pode fazer esta checagem: ele não conhece a rubrica. 1..9 é o
+    teto ABSOLUTO da plataforma; a escala REAL é a de cada critério, e ela só
+    está em mãos aqui.
+    """
+    if rubrica is None:
+        return None
+    esperados = {
+        str(c.get("nome")): c for c in rubrica.get("criterios", []) if isinstance(c, dict)
+    }
+    if not esperados:
+        return None
+    dadas = dict(notas)
+
+    faltam = sorted(set(esperados) - set(dadas))
+    if faltam:
+        return f"{len(faltam)} critério(s) sem nota: {', '.join(faltam)}"
+    sobram = sorted(set(dadas) - set(esperados))
+    if sobram:
+        return f"critério que não está na rubrica: {', '.join(sobram)}"
+    for nome, criterio in esperados.items():
+        escala = criterio.get("escala") or {}
+        piso, teto = int(escala.get("min", 1)), int(escala.get("max", 9))
+        valor = dadas[nome]
+        if not piso <= valor <= teto:
+            return f"'{nome}' aceita de {piso} a {teto}; veio {valor}"
+    return None
+
+
 def _rubrica_proposta_por_mim(
     conn: sqlite3.Connection, uid: str, anotador_id: int
 ) -> dict[str, Any] | None:
@@ -696,6 +737,7 @@ __all__ = [
     "SQL_REABRIR",
     "SQL_VIVA",
     "contagens_por_tipo",
+    "erro_contra_a_rubrica",
     "expirar_vencidas",
     "hidratar",
     "hidratar_anotacao",

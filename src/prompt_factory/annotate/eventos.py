@@ -37,12 +37,19 @@ ACOES: tuple[str, ...] = (
     "decisao_admin",         # P3b
     "banco_migrado",
     "pool_materializado",
+    # P4c — a campanha de geração. O evento da sintética NÃO carrega o gabarito:
+    # `eventos` é a trilha de auditoria e um alvo escondido que vaza por aqui
+    # vaza por uma porta que ninguém está olhando.
+    "material_importado",
+    "anotacao_sintetica_importada",
 )
 
 #: Os nomes de entidade. ``entidade`` + ``entidade_id`` é a referência lógica:
 #: não há FK de propósito, porque um evento sobre algo apagado continua sendo um
 #: fato que aconteceu — e uma FK com CASCADE apagaria o registro de que existiu.
-ENTIDADES: tuple[str, ...] = ("tarefa", "atribuicao", "anotacao", "avaliacao", "banco")
+ENTIDADES: tuple[str, ...] = (
+    "tarefa", "atribuicao", "anotacao", "avaliacao", "banco", "lote"
+)
 
 
 def registrar(
