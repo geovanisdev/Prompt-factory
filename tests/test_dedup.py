@@ -14,7 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from prompt_factory import dedup
+from prompt_factory import config, dedup
 from prompt_factory.schema import License
 from prompt_factory.stages import DEDUP1, MAPA_EXATO, SCRUBBED, StageConfig
 from prompt_factory.stages import s04_dedup_exact as s04
@@ -319,3 +319,203 @@ def test_s06_exige_o_s05(stage_dirs: StageConfig, make_table, tmp_path: Path) ->
     escrever(tabela, stage_dirs.caminho(DEDUP1))
     with pytest.raises(SystemExit, match="pf run s05"):
         s06.run(stage_dirs)
+
+
+# ---------------------------------------------------------------------------
+# s06 — validação par a par contra o canônico (`[dedup] near_pairwise`)
+# ---------------------------------------------------------------------------
+
+#: Três textos que compartilham 9 dos 10 tokens dois a dois: o Jaccard aprova
+#: TODOS os pares (9/11 = 0,82), então quem decide o encadeamento é só o cosseno.
+CADEIA_A = "alfa bravo charlie delta echo foxtrot golf hotel india juliett"
+CADEIA_B = "alfa bravo charlie delta echo foxtrot golf hotel india kilo"
+CADEIA_C = "alfa bravo charlie delta echo foxtrot golf hotel india lima"
+
+#: A, B e C a 6 graus um do outro no MESMO plano: cos(6°) = 0,9945 passa dos
+#: 0,985 e cos(12°) = 0,9781 não passa. Logo A~B e B~C são pares de verdade e
+#: A~C nunca chega a ser candidato — o C só entra no grupo por transitividade do
+#: union-find, que é exatamente o defeito que a validação par a par mata.
+_ANGULOS = np.deg2rad(np.array([0.0, 6.0, 12.0]))
+VETORES_CADEIA = np.array(
+    [[float(np.cos(a)), float(np.sin(a)), 0.0, 0.0] for a in _ANGULOS]
+    + [[0.0, 0.0, 1.0, 0.0]],
+    dtype=np.float32,
+)
+
+
+def _preparar_cadeia(cfg: StageConfig, make_table) -> None:
+    """A, B, C encadeados + um texto solto; canônico = ``aaa`` (menor source_id)."""
+    tabela = make_table(
+        [
+            {"uid": "aaa", "text": CADEIA_A, "source": "aya", "source_id": "1"},
+            {"uid": "bbb", "text": CADEIA_B, "source": "aya", "source_id": "2"},
+            {"uid": "ccc", "text": CADEIA_C, "source": "aya", "source_id": "3"},
+            {"uid": "ddd", "text": TEXTO_C, "source": "aya", "source_id": "4"},
+        ]
+    )
+    escrever(tabela, cfg.caminho(DEDUP1))
+    np.save(cfg.caminho("emb/embeddings.f16.npy"), VETORES_CADEIA.astype(np.float16))
+    cfg.caminho("emb/uids.txt").write_text(
+        "aaa\nbbb\nccc\nddd\n", encoding="utf-8", newline="\n"
+    )
+
+
+def test_s06_par_a_par_poupa_quem_entrou_por_encadeamento(
+    stage_dirs: StageConfig, make_table, capsys
+) -> None:
+    _preparar_cadeia(stage_dirs, make_table)
+    assert s06.run(stage_dirs) == 0
+
+    universo = pq.read_table(stage_dirs.caminho("final/universe.parquet"))
+    uids = universo.column("uid").to_pylist()
+    # bbb colapsa (0,9945 contra o canônico); ccc entrou no componente só porque
+    # bbb estava no meio e sobrevive (0,9781 < 0,985).
+    assert uids == ["aaa", "ccc", "ddd"]
+    dups = dict(zip(uids, universo.column("n_near_dups").to_pylist(), strict=True))
+    assert dups == {"aaa": 1, "ccc": 0, "ddd": 0}
+
+    mapa = pq.read_table(stage_dirs.caminho("final/dedup_near_map.parquet"))
+    assert mapa.column("uid").to_pylist() == ["bbb"]
+    saida = capsys.readouterr().out
+    assert "poupados par a par" in saida
+    assert "cosseno" in saida
+
+
+def test_s06_near_pairwise_false_reproduz_o_encadeamento(
+    stage_dirs: StageConfig, make_table, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # O comportamento antigo continua alcançável — é o que torna o estágio
+    # replayável e o que permite comparar os dois universos.
+    monkeypatch.setitem(config.settings()["dedup"], "near_pairwise", False)
+    _preparar_cadeia(stage_dirs, make_table)
+    assert s06.run(stage_dirs) == 0
+
+    universo = pq.read_table(stage_dirs.caminho("final/universe.parquet"))
+    uids = universo.column("uid").to_pylist()
+    assert uids == ["aaa", "ddd"]
+    dups = dict(zip(uids, universo.column("n_near_dups").to_pylist(), strict=True))
+    assert dups == {"aaa": 2, "ddd": 0}
+
+    mapa = pq.read_table(stage_dirs.caminho("final/dedup_near_map.parquet"))
+    assert mapa.column("uid").to_pylist() == ["bbb", "ccc"]
+    # O cosseno do ccc contra o canônico fica registrado ABAIXO do limiar: é a
+    # prova, no próprio arquivo, de que ele saiu sem nunca ter sido comparado.
+    cossenos = dict(zip(mapa.column("uid").to_pylist(), mapa.column("cosine").to_pylist(),
+                        strict=True))
+    assert cossenos["ccc"] < 0.985 < cossenos["bbb"]
+
+
+# ---------------------------------------------------------------------------
+# s06 — recheck de idioma (`[dedup] lang_recheck`)
+# ---------------------------------------------------------------------------
+
+#: O template real que motivou o recheck: instrução em francês e payload colado
+#: em português. Na janela de 1.000 caracteres do s02 o payload ganha por volume
+#: e os DOIS detectores concordam em "pt" — não há discordância para pegar.
+CABECALHO_FR = (
+    "Goal\n       Corriger les erreurs de formatage dans une réponse contenant "
+    "un JSON mal structuré afin de rendre le JSON exploitable et valide.\n\n"
+    "        1. Extraire et corriger uniquement la partie JSON de la réponse "
+    "ci-dessous, sans rien ajouter ni retirer au contenu.\n"
+    "        2. Le résultat doit rester strictement conforme à la structure "
+    "d'origine.\n\n"
+)
+PAYLOAD_PT = (
+    '{"titulo": "Bolo de cenoura com cobertura de chocolate", '
+    '"ingredientes": ["cenoura", "ovos", "óleo", "açúcar", "farinha de trigo", '
+    '"fermento em pó", "chocolate em pó", "manteiga", "leite"], '
+    '"modo_de_preparo": "Bata as cenouras com os ovos e o óleo no liquidificador, '
+    'acrescente o açúcar e a farinha, misture bem e leve ao forno preaquecido '
+    'por quarenta minutos. Prepare a cobertura no fogo baixo e despeje ainda quente."}'
+)
+TEXTO_FR_LONGO = CABECALHO_FR + PAYLOAD_PT
+TEXTO_PT_LONGO = (
+    "Preciso que você revise o texto abaixo mantendo o sentido original, "
+    "corrigindo apenas os erros de concordância e de pontuação, sem trocar as "
+    "palavras técnicas por sinônimos e sem encurtar os parágrafos. Devolva "
+    "somente o texto revisado, sem comentários seus.\n\n" + PAYLOAD_PT
+)
+
+
+def _preparar_recheck(cfg: StageConfig, make_table) -> None:
+    """Um bilíngue francês/português e um português honesto, os dois longos."""
+    tabela = make_table(
+        [
+            {"uid": "fra", "text": TEXTO_FR_LONGO, "lang": "pt", "source_id": "1"},
+            {"uid": "por", "text": TEXTO_PT_LONGO, "lang": "pt", "source_id": "2"},
+        ]
+    )
+    escrever(tabela, cfg.caminho(DEDUP1))
+    np.save(cfg.caminho("emb/embeddings.f16.npy"), np.eye(2, 4, dtype=np.float16))
+    cfg.caminho("emb/uids.txt").write_text("fra\npor\n", encoding="utf-8", newline="\n")
+
+
+def test_s06_recheck_descarta_frances_plantado(
+    stage_dirs: StageConfig, make_table, capsys
+) -> None:
+    # Único teste que paga pelos dois detectores de verdade — é o que prova que
+    # a janela de cabeçalho enxerga o que a janela do s02 afogou.
+    assert len(CABECALHO_FR) > 250, "o cabeçalho tem de encher a janela do recheck"
+    _preparar_recheck(stage_dirs, make_table)
+    assert s06.run(stage_dirs) == 0
+
+    universo = pq.read_table(stage_dirs.caminho("final/universe.parquet"))
+    assert universo.column("uid").to_pylist() == ["por"]
+    saida = capsys.readouterr().out
+    assert "recheck de idioma" in saida
+    assert "idioma detectado" in saida
+    assert "fr" in saida
+
+
+def test_s06_recheck_desligado_mantem_o_frances(
+    stage_dirs: StageConfig, make_table, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(config.settings()["dedup"], "lang_recheck", False)
+    _preparar_recheck(stage_dirs, make_table)
+    assert s06.run(stage_dirs) == 0
+    universo = pq.read_table(stage_dirs.caminho("final/universe.parquet"))
+    assert universo.column("uid").to_pylist() == ["fra", "por"]
+
+
+def test_s06_recheck_exige_as_duas_camadas(
+    stage_dirs: StageConfig, make_table, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Sozinho, o árbitro devolve CATALÃO para texto em russo (que não está no
+    # conjunto dele) e derrubaria linha boa com um rótulo inventado. Aqui a
+    # camada 1 diz "fr" e o árbitro diz "ca": ninguém sai.
+    from prompt_factory import langdetect
+
+    monkeypatch.setattr(langdetect, "detect1", lambda t: ("fr", 0.99))
+    monkeypatch.setattr(langdetect, "arbitrar", lambda ts: [("ca", 1.0)] * len(ts))
+    _preparar_recheck(stage_dirs, make_table)
+    assert s06.run(stage_dirs) == 0
+    universo = pq.read_table(stage_dirs.caminho("final/universe.parquet"))
+    assert universo.column("uid").to_pylist() == ["fra", "por"]
+
+
+def test_s06_recheck_ignora_texto_que_cabe_na_janela(
+    stage_dirs: StageConfig, make_table, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Texto menor que a janela não tem cabeçalho DISTINTO do documento: é
+    # exatamente o que o s02 já leu, e reprocessar devolveria o mesmo veredito
+    # com outro nome. O detector nem chega a ser chamado.
+    from prompt_factory import langdetect
+
+    def _explodir(*_a, **_kw):  # pragma: no cover - o teste falha se rodar
+        raise AssertionError("o recheck não deveria olhar texto curto")
+
+    monkeypatch.setattr(langdetect, "detect1", _explodir)
+    tabela = make_table(
+        [
+            {"uid": "fra", "text": "Corrige les erreurs de ce texte.", "source_id": "1"},
+            {"uid": "por", "text": "Corrija os erros deste texto.", "source_id": "2"},
+        ]
+    )
+    escrever(tabela, stage_dirs.caminho(DEDUP1))
+    np.save(stage_dirs.caminho("emb/embeddings.f16.npy"), np.eye(2, 4, dtype=np.float16))
+    stage_dirs.caminho("emb/uids.txt").write_text(
+        "fra\npor\n", encoding="utf-8", newline="\n"
+    )
+    assert s06.run(stage_dirs) == 0
+    universo = pq.read_table(stage_dirs.caminho("final/universe.parquet"))
+    assert universo.column("uid").to_pylist() == ["fra", "por"]

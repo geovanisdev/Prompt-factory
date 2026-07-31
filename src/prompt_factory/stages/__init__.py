@@ -317,7 +317,7 @@ DESCRICOES: dict[str, str] = {
     "s03": "remove PII -> interim/scrubbed.parquet",
     "s04": "dedup exato por hash_norm -> interim/dedup1.parquet",
     "s05": "embeddings e5-small -> emb/embeddings.f16.npy",
-    "s06": "dedup próximo (cosseno + jaccard) -> final/universe.parquet",
+    "s06": "dedup próximo par a par + recheck de idioma -> final/universe.parquet",
     "s07": "amostra-semente estratificada + lotes de rotulagem (fora da cadeia)",
     "s08": "funde rótulos de agente + nativos -> final/seed_labels.parquet (fora da cadeia)",
     "s11": "carga bulk no SQLite + rebuild do FTS + swap de arquivo (fora da cadeia)",

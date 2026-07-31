@@ -106,7 +106,7 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 | s03 | → `interim/scrubbed.parquet` | PII (e **recalcula** `hash_norm`) |
 | s04 | → `interim/dedup1.parquet` + `dedup_exact_map.parquet` | dedup exato por `hash_norm` |
 | s05 | → `emb/embeddings.f16.npy` + `emb/uids.txt` | embeddings e5-small |
-| s06 | → `final/universe.parquet` + `final/dedup_near_map.parquet` + `emb/universe.f16.npy` | dedup próximo |
+| s06 | → `final/universe.parquet` + `final/dedup_near_map.parquet` + `emb/universe.f16.npy` | recheck de idioma + dedup próximo validado par a par |
 
 Pegadinhas deste bloco:
 
@@ -120,6 +120,13 @@ Pegadinhas deste bloco:
 - **`fast-langdetect` trunca em 80 caracteres por padrão** (`LangDetectConfig(max_input_length=80)`). O wrapper passa `None` e fatia em `[langid] max_input_chars`. Se o download do modelo `full` falhar, ele cai sozinho para o `lite` embutido no wheel e avisa alto.
 - **`lingua` 2.2.0 não tem GALEGO**; o árbitro usa CATALÃO no lugar.
 - **Aceitar os limiares do near-dup é decisão humana.** `pf report dedup-sample` grava `data/final/dedup_sample_50.txt` justamente para isso.
+- **Union-find é transitivo, e isso descartava linha boa.** Confirmado A~B e B~C, o A e o C caem no mesmo componente **sem nunca terem sido comparados**. Medido na primeira execução do s06: dos 44.333 descartes, **27% (11.964) tinham cosseno < 0,985 contra o canônico do próprio grupo** e 13,4% tinham Jaccard < 0,65. `[dedup] near_pairwise = true` reconfere cada membro **contra o canônico** nos mesmos três critérios; quem falha permanece no universo. `false` reproduz o comportamento antigo — os dois modos são replayáveis.
+- **O canônico não muda quando membros saem, e isso é invariante, não sorte.** `dedup.choose_canonical` é um `min` sobre o grupo e a validação só remove quem **não** é o canônico: o mínimo de um subconjunto que ainda contém o mínimo é o mesmo mínimo. É o que permite validar num passe só. **Não há recomputação em cascata** de propósito: dois membros poupados podem ser duplicatas entre si, mas reagrupá-los exigiria refazer o union-find até um ponto fixo com o canônico mudando no meio — preferimos deixar passar alguns pares próximos a descartar linha por transitividade.
+- **O e5 corta em 512 tokens (~1.879 caracteres em pt, ~2.117 em en), e por isso cosseno 1,0000 não prova nada.** Dois textos com o mesmo cabeçalho longo dão vetores idênticos mesmo divergindo por completo depois do corte: houve um cluster de 2.088 linhas com 8.180 caracteres de prefixo comum onde uma pedia previsão sobre o Surface RT e outra um roteiro de Kyoto. O Jaccard é o critério que enxerga o texto inteiro — nunca deixe o cosseno decidir sozinho.
+- **O idioma de um prompt é o da INSTRUÇÃO, não o do material colado embaixo dela.** 976 linhas do template francês `Goal / Corriger les erreurs de formatage...` chegaram ao universo — 839 como `pt` (318 delas classificadas pt-BR e 212 pt-PT!) e 137 como `en`. Os dois detectores do s02 estavam **certos**: são documentos bilíngues, ~200 caracteres de francês seguidos de milhares de caracteres de payload JSON em português ou inglês, e na janela de 1.000 caracteres do s02 o payload ganha por volume. fastText e lingua **concordaram** em pt/en — não houve discordância para o árbitro pegar.
+- **O recheck de idioma do s06 usa uma janela MENOR que a do s02, não maior** (`[dedup] lang_recheck_head_chars = 250`). Medido: a cobertura da família francesa cai conforme a janela cresce — 250 → 2.061 de 2.061; 300 → 2.057; 400 → 1.943; 500 → 1.202. Quanto maior a janela, mais o payload afoga a instrução. Linha com `n_chars` menor que a janela **não** é reprocessada: o s02 já leu exatamente o mesmo texto.
+- **O recheck mora no s06 e não no s02** porque refazer o s02 obrigaria a refazer as ~2 h de embedding do s05; no s06 os embeddings continuam válidos, porque remover linha não move as outras (a máscara é posicional). Ele roda **antes** do agrupamento, senão uma linha em francês poderia ser escolhida canônica e manter justamente a errada.
+- **O recheck exige as DUAS camadas de acordo num idioma fora de {pt, en}.** Sozinho, o árbitro devolve CATALÃO para texto em russo (que não está no conjunto dele) e derrubaria linha boa com um rótulo inventado — foram 251 casos `ru→ca` poupados por essa guarda. Medido no corpus real: **2.215 linhas fora (2.177 fr + 38 es)**, com a família `Goal/Corriger` inteira dentro e **nenhum falso positivo** nas 154 restantes, todas prompts genuínos em francês ou espanhol.
 
 ## Campanha de rotulagem (M5)
 

@@ -29,15 +29,50 @@ min_score = 2.0
 min_conf = 0.25
 
 [dedup]
-# s06 (dedup próximo): só é near-dup quando os DOIS critérios batem.
+# s06 (dedup próximo): só é near-dup quando os TRÊS critérios batem.
 near_cosine = 0.985
 near_jaccard = 0.65
 # Razão máxima de tamanho (n_chars) entre os dois textos de um par candidato.
 near_len_ratio = 2.0
+# Valida cada membro do grupo CONTRA O CANÔNICO, nos mesmos três critérios,
+# depois do union-find. Existe porque union-find é transitivo: confirmado A~B e
+# B~C, o A e o C caem no mesmo componente sem nunca terem sido comparados.
+# Medido na primeira execução do estágio: 27% dos 44.333 descartes (11.964)
+# tinham cosseno < 0.985 contra o canônico do próprio grupo, e 13,4% tinham
+# jaccard < 0.65. O e5 agrava (corta em 512 tokens, ~1.879 caracteres em pt):
+# dois textos com o mesmo cabeçalho longo dão cosseno 1,0000 e conteúdos sem
+# relação nenhuma depois do corte. Quem falha a validação PERMANECE no universo.
+# `false` reproduz o comportamento antigo (encadeamento aceito) — é o que torna
+# o estágio replayável nos dois modos.
+near_pairwise = true
 # Blocking duplo do produto de matrizes: block_rows linhas x col_chunk colunas
 # por vez (2048 x 32768 f32 = 256 MB de buffer, pico < 1 GB).
 block_rows = 2048
 col_chunk = 32768
+
+# Recheck de idioma DIRIGIDO, no mesmo passe do s06 (não no s02: refazer o s02
+# obrigaria a refazer as horas de embedding do s05, e remover linha aqui não
+# move as outras — a máscara é posicional).
+# O que ele conserta: prompts BILÍNGUES, com a instrução num idioma e um payload
+# colado (JSON, artigo, código) noutro. Na janela de 1.000 caracteres do s02 o
+# payload ganha por volume e os dois detectores CONCORDAM em pt/en — não há
+# discordância para o árbitro pegar. Foi assim que 976 linhas do template
+# francês "Goal / Corriger les erreurs de formatage..." entraram no universo,
+# 839 como pt (318 delas classificadas pt-BR e 212 pt-PT) e 137 como en.
+lang_recheck = true
+# Janela do cabeçalho. É MENOR que a do s02 de propósito: o idioma do prompt é o
+# da INSTRUÇÃO, não o do material colado embaixo dela. Medido no corpus real, a
+# cobertura da família francesa cai conforme a janela cresce (250 -> 2.061 de
+# 2.061; 300 -> 2.057; 400 -> 1.943; 500 -> 1.202): quanto maior a janela, mais
+# o payload afoga a instrução. Linha com n_chars <= esta janela não é
+# reprocessada — o s02 já leu exatamente o mesmo texto.
+lang_recheck_head_chars = 250
+# Confiança mínima do árbitro (lingua) para descartar. As DUAS camadas precisam
+# concordar num idioma fora de {pt, en}: sozinho, o árbitro devolve CATALÃO para
+# texto em russo (que não está no conjunto dele) e derrubaria linha boa com um
+# rótulo inventado. Medido: 2.215 linhas fora (2.177 fr + 38 es), com a família
+# 'Goal/Corriger' inteira dentro e nenhum falso positivo nas 154 restantes.
+lang_recheck_arbiter_conf = 0.85
 
 [seed]
 # s07 (`pf make-seed`). A amostra-semente é o ÚNICO insumo do classificador do
