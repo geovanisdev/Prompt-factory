@@ -15,6 +15,7 @@ entre `evaluation_order` da mesma sessão; quem deduplica é o s04).
 from __future__ import annotations
 
 import hashlib
+import os
 import statistics
 from collections.abc import Sequence
 from pathlib import Path
@@ -151,4 +152,202 @@ def report_raw(sources: Sequence[str] | None = None, head: int = 2) -> int:
     return 0
 
 
-__all__ = ["LinhaRelatorio", "report_raw"]
+# ---------------------------------------------------------------------------
+# `pf report universe` (M4)
+# ---------------------------------------------------------------------------
+
+#: Quantos pares o `pf report dedup-sample` mostra (o gate humano do M4).
+AMOSTRA_PARES = 50
+#: Quantos caracteres de cada lado do par aparecem.
+PAR_CHARS = 120
+
+
+def _tabela_contagem(titulo: str, contagens: Sequence[tuple[str, int]], total: int) -> None:
+    if not contagens:
+        return
+    largura = max(len(titulo), *(len(str(k)) for k, _ in contagens))
+    print(f"{titulo:<{largura}}  {'linhas':>9}  {'%':>6}")
+    print("-" * (largura + 20))
+    for chave, n in contagens:
+        pct = (100.0 * n / total) if total else 0.0
+        print(f"{chave!s:<{largura}}  {n:>9}  {pct:>5.1f}%")
+    print()
+
+
+def _contar(tabela: Any, coluna: str) -> list[tuple[str, int]]:
+    """Contagem por valor de uma coluna string, ordenada da maior para a menor.
+
+    Feito com ``pyarrow.compute.value_counts`` — a tabela canônica NUNCA passa
+    por pandas (``quality`` é int8 nullable e viraria float64 no caminho).
+    """
+    import pyarrow.compute as pc
+
+    contagens = pc.value_counts(tabela.column(coluna))
+    pares = [
+        (str(item["values"]) if item["values"] is not None else "(nulo)", int(item["counts"]))
+        for item in contagens.to_pylist()
+    ]
+    return sorted(pares, key=lambda kv: (-kv[1], kv[0]))
+
+
+def report_universe(caminho: Path | None = None) -> int:
+    """Retrato do ``data/final/universe.parquet``: distribuições e somas."""
+    import numpy as np
+    import pyarrow.compute as pc
+    import pyarrow.parquet as pq
+
+    alvo = Path(caminho) if caminho else paths.FINAL / "universe.parquet"
+    if not alvo.is_file():
+        print(f"[pf] {alvo} não existe — rode `pf run s01-s06` antes")
+        return 2
+
+    tabela = pq.read_table(
+        alvo,
+        columns=[
+            "lang",
+            "lang_variant",
+            "source",
+            "license",
+            "pii_found",
+            "n_exact_dups",
+            "n_near_dups",
+            "n_chars",
+            "n_words",
+            "commercial_ok",
+            "redistributable",
+        ],
+    )
+    total = tabela.num_rows
+    print(f"universo: {total} linhas em {alvo}")
+    print()
+    for coluna, titulo in (
+        ("lang", "idioma"),
+        ("lang_variant", "variante"),
+        ("source", "fonte"),
+        ("license", "licença"),
+    ):
+        _tabela_contagem(titulo, _contar(tabela, coluna), total)
+
+    pii = int(pc.sum(pc.cast(tabela.column("pii_found"), "int32")).as_py() or 0)
+    comercial = int(pc.sum(pc.cast(tabela.column("commercial_ok"), "int32")).as_py() or 0)
+    redist = int(pc.sum(pc.cast(tabela.column("redistributable"), "int32")).as_py() or 0)
+    exatas = int(pc.sum(tabela.column("n_exact_dups")).as_py() or 0)
+    proximas = int(pc.sum(tabela.column("n_near_dups")).as_py() or 0)
+    print(
+        f"pii_found: {pii} ({100.0 * pii / total if total else 0:.2f}%)   "
+        f"commercial_ok: {comercial}   redistributable: {redist}"
+    )
+    print(
+        f"duplicatas absorvidas: {exatas} exatas + {proximas} próximas "
+        f"= {exatas + proximas} linhas colapsadas em {total}"
+    )
+    print()
+
+    largura = len("n_words")
+    print(f"{'métrica':<{largura}}  {'mediana':>9}  {'p90':>9}  {'máx':>9}")
+    print("-" * (largura + 33))
+    for coluna in ("n_chars", "n_words"):
+        valores = np.asarray(tabela.column(coluna).to_numpy(zero_copy_only=False))
+        if valores.size == 0:
+            continue
+        mediana, p90 = np.percentile(valores, [50, 90])
+        print(
+            f"{coluna:<{largura}}  {int(mediana):>9}  {int(p90):>9}  {int(valores.max()):>9}"
+        )
+    return 0
+
+
+def _textos_por_uid(caminho: Path, alvos: set[str]) -> dict[str, tuple[str, str]]:
+    """``{uid: (texto, fonte)}`` só para os uids pedidos, sem carregar o resto."""
+    import pyarrow.parquet as pq
+
+    achados: dict[str, tuple[str, str]] = {}
+    arquivo = pq.ParquetFile(caminho)
+    for lote in arquivo.iter_batches(batch_size=16_384, columns=["uid", "text", "source"]):
+        uids = lote.column("uid").to_pylist()
+        if not any(u in alvos for u in uids):
+            continue
+        textos = lote.column("text").to_pylist()
+        fontes = lote.column("source").to_pylist()
+        for i, uid in enumerate(uids):
+            if uid in alvos:
+                achados[uid] = (textos[i] or "", str(fontes[i] or ""))
+        if len(achados) == len(alvos):
+            break
+    return achados
+
+
+def report_dedup_sample(
+    quantos: int = AMOSTRA_PARES,
+    seed: int | None = None,
+    data_dir: Path | None = None,
+) -> int:
+    """Amostra de pares near-duplicados lado a lado — o gate humano do M4.
+
+    Imprime **e grava** ``final/dedup_sample_50.txt``: aceitar os thresholds do
+    s06 é decisão de pessoa, e pessoa não revisa rolando terminal.
+    """
+    import numpy as np
+    import pyarrow.parquet as pq
+
+    from . import config
+
+    raiz = Path(data_dir) if data_dir else paths.DATA
+    mapa = raiz / "final" / "dedup_near_map.parquet"
+    fonte_textos = raiz / "interim" / "dedup1.parquet"
+    if not mapa.is_file():
+        print(f"[pf] {mapa} não existe — rode `pf run s06` antes")
+        return 2
+    if not fonte_textos.is_file():
+        print(f"[pf] {fonte_textos} não existe — rode `pf run s04` antes")
+        return 2
+
+    tabela = pq.read_table(mapa)
+    n = tabela.num_rows
+    if n == 0:
+        print("[pf] nenhum par near-duplicado foi encontrado — nada a revisar")
+        return 0
+    rng = np.random.default_rng(config.seed() if seed is None else seed)
+    escolhidos = sorted(rng.choice(n, size=min(quantos, n), replace=False).tolist())
+    amostra = tabela.take(escolhidos).to_pylist()
+
+    alvos = {linha["uid"] for linha in amostra} | {linha["canonical_uid"] for linha in amostra}
+    textos = _textos_por_uid(fonte_textos, alvos)
+
+    linhas: list[str] = [
+        f"amostra de {len(amostra)} pares near-duplicados de {n} (seed "
+        f"{config.seed() if seed is None else seed})",
+        "GATE HUMANO: confirme que cada par é MESMO a mesma coisa. Se houver par "
+        "diferente demais, suba [dedup] near_cosine/near_jaccard e rode `pf run s06` de novo.",
+        "",
+    ]
+    for i, linha in enumerate(amostra, start=1):
+        removido, fonte_r = textos.get(linha["uid"], ("(texto não encontrado)", "?"))
+        canonico, fonte_c = textos.get(linha["canonical_uid"], ("(texto não encontrado)", "?"))
+        linhas.append(
+            f"[{i:02d}] lang={linha['lang']} cos={linha['cosine']:.4f} "
+            f"jaccard={linha['jaccard']:.4f}"
+        )
+        linhas.append(f"  canônico  ({fonte_c}/{linha['canonical_uid']}): "
+                      f"{canonico[:PAR_CHARS]!r}")
+        linhas.append(f"  removido  ({fonte_r}/{linha['uid']}): {removido[:PAR_CHARS]!r}")
+        linhas.append("")
+
+    texto = "\n".join(linhas)
+    print(texto)
+    destino = raiz / "final" / "dedup_sample_50.txt"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    tmp = destino.parent / f"{destino.name}.tmp"
+    with tmp.open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write(texto)
+    os.replace(tmp, destino)
+    print(f"[pf] amostra gravada em {destino}")
+    return 0
+
+
+__all__ = [
+    "LinhaRelatorio",
+    "report_dedup_sample",
+    "report_raw",
+    "report_universe",
+]

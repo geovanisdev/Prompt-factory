@@ -2,9 +2,10 @@
 
 Cada subcomando corresponde a um estágio da pipeline e vai saindo do stub no
 marco indicado em `_Cmd.milestone` (implementados: `db-check` no M1; `ingest` e
-`report raw` no M2). Enquanto é stub, o comando imprime em que marco chega e sai
-com código 2. `pf --help` e `pf <cmd> --help` funcionam e saem 0 — é isso que a
-DoD do M0 exige.
+`report raw` no M2; `run` s01-s06 e `report universe`/`dedup-sample` no M4).
+Enquanto é stub, o comando imprime em que marco chega e sai com código 2.
+`pf --help` e `pf <cmd> --help` funcionam e saem 0 — é isso que a DoD do M0
+exige.
 
 O `main()` faz o *bootstrap* de ambiente ANTES de qualquer import pesado:
 UTF-8 forçado (Windows) e ``HF_HOME`` vindo do ``config/settings.toml``, para
@@ -37,6 +38,13 @@ _MAX_ROWS: _Option = (
 _FORCE: _Option = (
     ("--force",),
     {"action": "store_true", "help": "reescreve saídas já existentes"},
+)
+_DATA_DIR: _Option = (
+    ("--data-dir",),
+    {
+        "metavar": "DIR",
+        "help": "redireciona a árvore de dados (padrão: data/) — é assim que o smoke roda sem tocar no corpus real",
+    },
 )
 
 
@@ -137,16 +145,103 @@ def _ingest(args: argparse.Namespace) -> int:
     return 0
 
 
+def expandir_estagios(tokens: Sequence[str], validos: Sequence[str]) -> list[str]:
+    """``["s01", "s03-s05"]`` → ``["s01", "s03", "s04", "s05"]``.
+
+    Aceita ``all`` (todos), nomes soltos e intervalos ``sNN-sMM``. Exige ordem
+    **crescente** no resultado: pedir ``s04 s02`` é quase sempre engano de quem
+    digitou, e rodar fora de ordem produziria um universo montado com insumo
+    velho, em silêncio.
+    """
+    ordem = list(validos)
+    escolhidos: list[str] = []
+    for token in tokens:
+        bruto = token.strip().lower()
+        if bruto == "all":
+            escolhidos.extend(ordem)
+            continue
+        if "-" in bruto:
+            inicio, _, fim = bruto.partition("-")
+            for ponta in (inicio, fim):
+                if ponta not in ordem:
+                    raise ValueError(f"estágio desconhecido: {ponta!r} (conhecidos: {', '.join(ordem)})")
+            i, j = ordem.index(inicio), ordem.index(fim)
+            if i > j:
+                raise ValueError(f"intervalo invertido: {bruto!r}")
+            escolhidos.extend(ordem[i : j + 1])
+            continue
+        if bruto not in ordem:
+            raise ValueError(f"estágio desconhecido: {bruto!r} (conhecidos: {', '.join(ordem)})")
+        escolhidos.append(bruto)
+
+    vistos: list[str] = []
+    for nome in escolhidos:
+        if nome not in vistos:
+            vistos.append(nome)
+    posicoes = [ordem.index(n) for n in vistos]
+    if posicoes != sorted(posicoes):
+        raise ValueError(
+            f"estágios fora de ordem: {' '.join(vistos)} — a pipeline é uma cadeia, rode em ordem crescente"
+        )
+    return vistos
+
+
+def _run(args: argparse.Namespace) -> int:
+    """``pf run [estágios]`` (M4) — roda s01..s06 em cadeia, parando no primeiro erro.
+
+    O único import do módulo de estágios acontece aqui dentro: ``stages`` puxa
+    pyarrow e, mais fundo, torch/lingua — ``pf --help`` não paga por isso.
+    """
+    from pathlib import Path
+
+    from . import paths
+    from .stages import DESCRICOES, STAGES, StageConfig
+
+    try:
+        nomes = expandir_estagios(args.stages or ["all"], list(STAGES))
+    except ValueError as exc:
+        print(f"[pf] {exc}", file=sys.stderr)
+        return 2
+
+    if args.force:
+        print("[pf] --force não tem efeito: todo estágio reescreve a própria saída")
+    cfg = StageConfig(
+        data_dir=Path(args.data_dir).resolve() if args.data_dir else paths.DATA,
+        max_rows=args.max_rows,
+    )
+    cfg.preparar_dirs()
+    limite = f", max_rows={args.max_rows} (só o s01 corta)" if args.max_rows else ""
+    print(f"[pf] data_dir={cfg.data_dir}{limite}")
+    for nome in nomes:
+        print(f"[pf] === {nome}: {DESCRICOES.get(nome, '')} ===")
+        codigo = int(STAGES[nome](cfg))
+        if codigo != 0:
+            print(f"[pf] {nome} falhou (código {codigo}) — cadeia interrompida", file=sys.stderr)
+            return codigo
+    return 0
+
+
 def _report(args: argparse.Namespace) -> int:
-    """``pf report raw`` (M2) — tabela de conferência dos parquets de ``data/raw/``."""
+    """``pf report <alvo>`` — ``raw`` (M2), ``universe`` e ``dedup-sample`` (M4)."""
+    from pathlib import Path
+
+    raiz = Path(args.data_dir).resolve() if args.data_dir else None
     if args.target == "raw":
         from .report import report_raw
 
         return report_raw(sources=args.sources, head=args.head)
+    if args.target == "universe":
+        from .report import report_universe
+
+        return report_universe((raiz / "final" / "universe.parquet") if raiz else None)
+    if args.target == "dedup-sample":
+        from .report import report_dedup_sample
+
+        return report_dedup_sample(data_dir=raiz)
     if args.target is None:
-        print("[pf] 'report' precisa de um alvo: use `pf report raw` (os estágios chegam no M4)")
+        print("[pf] 'report' precisa de um alvo: raw | universe | dedup-sample")
         return 2
-    print(f"[pf] 'report {args.target}' ainda não implementado (chega no M4)")
+    print(f"[pf] alvo desconhecido: {args.target!r} (use raw | universe | dedup-sample)")
     return 2
 
 
@@ -187,20 +282,30 @@ COMMANDS: tuple[_Cmd, ...] = (
         "M4",
         "roda estágios da pipeline (s01 normalize .. s06 dedup próximo)",
         [
-            (("stages",), {"nargs": "*", "metavar": "STAGE", "help": "ex.: s01 s02 ou s01-s06 (padrão: todos)"}),
+            (("stages",), {"nargs": "*", "metavar": "STAGE", "help": "ex.: s01 s02, s01-s06 ou all (padrão: all)"}),
             _MAX_ROWS,
+            _DATA_DIR,
             _FORCE,
         ],
+        implemented=True,
+        handler=_run,
     ),
     _Cmd(
         "report",
         "M2",
         "resumo legível de um parquet/estágio (NUNCA abra parquet com cat)",
         [
-            (("target",), {"nargs": "?", "help": "'raw' (M2) ou caminho do parquet / nome do estágio (M4)"}),
+            (
+                ("target",),
+                {
+                    "nargs": "?",
+                    "choices": ["raw", "universe", "dedup-sample"],
+                    "help": "'raw' (M2), 'universe' ou 'dedup-sample' (M4)",
+                },
+            ),
             (("--head",), {"type": int, "default": 2, "metavar": "N", "help": "mostra N linhas de exemplo por fonte"}),
             (("--sources",), {"nargs": "+", "metavar": "FONTE", "help": "restringe o `report raw` a estas fontes"}),
-            (("--by",), {"metavar": "COL", "help": "contagens agrupadas por coluna (M4)"}),
+            _DATA_DIR,
         ],
         implemented=True,
         handler=_report,

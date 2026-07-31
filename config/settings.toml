@@ -8,10 +8,36 @@ seed = 42
 # os.environ.setdefault("HF_HOME", <este valor>) antes de qualquer import pesado.
 hf_home = "G:/hf-cache"
 
+[langid]
+# s02, camada 1 (fast-langdetect/fastText). Abaixo de `arbiter_conf` ou de
+# `min_chars` a decisão vai para o árbitro (lingua). `model = "full"` baixa
+# lid.176.bin (~126 MB) na primeira execução; se o download falhar (TLS
+# interceptado desta máquina), o wrapper cai sozinho para o "lite" EMBUTIDO no
+# wheel e avisa alto.
+arbiter_conf = 0.65
+min_chars = 25
+model = "full"
+cache_dir = "G:/hf-cache/fasttext-langdetect"
+# Fatiamento do texto ANTES de detectar: 1.000 caracteres decidem idioma com
+# folga e o corpus tem prompts de até 1 milhão de caracteres.
+max_input_chars = 1000
+
+[variant]
+# s02, classificador pt-BR/pt-PT (variant_ptbr.py). `min_score` é o mínimo do
+# lado vencedor; `min_conf` é a margem relativa (m-n)/(m+n) exigida.
+min_score = 2.0
+min_conf = 0.25
+
 [dedup]
 # s06 (dedup próximo): só é near-dup quando os DOIS critérios batem.
 near_cosine = 0.985
 near_jaccard = 0.65
+# Razão máxima de tamanho (n_chars) entre os dois textos de um par candidato.
+near_len_ratio = 2.0
+# Blocking duplo do produto de matrizes: block_rows linhas x col_chunk colunas
+# por vez (2048 x 32768 f32 = 256 MB de buffer, pico < 1 GB).
+block_rows = 2048
+col_chunk = 32768
 
 [labeling]
 batch_size = 80        # 77 itens novos + 3 de calibração ocultos
@@ -25,6 +51,15 @@ conf_review = 0.35     # entre review e accept: aceita mas marca needs_review
 [embed]
 model = "intfloat/multilingual-e5-small"
 dim = 384
+batch_size = 64
+# Linhas por bloco gravado no memmap do s05 (também o passo do sidecar de
+# retomada).
+chunk_rows = 2048
+# 0 = deixa o torch decidir o número de threads.
+threads = 0
+# O e5 corta em 512 tokens; o corpus tem prompts de até 1 milhão de caracteres e
+# tokenizar isso inteiro para jogar fora 99,7% mata a vazão. Cortar ANTES.
+truncate_chars = 3000
 
 [app]
 host = "127.0.0.1"

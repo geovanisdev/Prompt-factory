@@ -47,6 +47,11 @@ system-certs = true
 # funciona. Copiar de vez elimina o warning "Failed to hardlink files".
 link-mode = "copy"
 
+[tool.pytest.ini_options]
+markers = [
+    "slow: precisa de modelo baixado ou de I/O pesado (pule com `-m 'not slow'`)",
+]
+
 [tool.ruff]
 # Sem esta seção o ruff sobe a árvore de diretórios e herda a configuração de
 # FORA do repositório (acontece nesta máquina): o lint passa a depender de onde

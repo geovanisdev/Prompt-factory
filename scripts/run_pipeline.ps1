@@ -1,31 +1,75 @@
 <#
 .SYNOPSIS
-    Prompt Factory — pipeline completa, ponta a ponta (STUB do M0).
+    Prompt Factory -- pipeline de preparo do universo, ponta a ponta (M4).
 
 .DESCRIPTION
-    TODO (M4): preencher com a sequência real de estágios. Esqueleto previsto:
+    Encadeia os estagios ja implementados:
 
-        pf ingest                 # M2/M3 — todas as fontes habilitadas -> data/raw/*.parquet
-        pf run s01 s02 s03 s04    # M4 — normalize, idioma+variante, PII, dedup exato
-        pf run s05 s06            # M4 — embed (e5-small, f16 .npy) e dedup próximo
-        pf make-seed              # M5 — s07, amostra-semente estratificada
-        # [campanha de rotulagem: skill rotular-prompts, várias sessões]
-        pf merge-labels           # M5 — s08
-        pf train                  # M7 — s09
-        pf apply                  # M7 — s10
-        pf load-db --swap         # M8 — s11
-        pf export                 # M9 — s12
+        pf ingest              (opcional, -Ingest) -- M2/M3, horas de download
+        pf run s01 s02 s03 s04 -- normalize, idioma+variante, PII, dedup exato
+        pf run s05             -- embeddings e5-small (20-60 min em CPU)
+        pf run s06             -- dedup proximo -> data/final/universe.parquet
+        pf report universe
+        pf report dedup-sample -- grava data/final/dedup_sample_50.txt
 
-    Regras que este script DEVE respeitar quando for escrito:
-      - `uv` pode não estar no PATH: invocar via "$env:USERPROFILE\.local\bin\uv.exe".
-      - Parar no primeiro erro ($ErrorActionPreference = 'Stop' + checar $LASTEXITCODE).
-      - Nenhum redirecionamento `>` de dados: PowerShell corrompe encoding.
-        Toda escrita de dados sai de dentro do Python.
-      - Cada estágio é retomável: rodar de novo não pode duplicar nada.
+    Os estagios sao retomaveis e idempotentes: rodar de novo nao duplica nada.
+    O s05 retoma do sidecar (data/emb/progress.json) se for interrompido.
 
-.NOTES
-    Marco: M4. Até lá este script apenas avisa e sai com código 2.
+    Marcos seguintes (ainda stubs): pf make-seed (M5), pf merge-labels (M5),
+    pf train / pf apply (M7), pf load-db --swap (M8), pf export (M9).
+
+.PARAMETER Ingest
+    Roda `pf ingest` antes (todas as fontes default_on). Sem isso o script
+    assume que data/raw/ ja esta populado.
+
+.PARAMETER Stages
+    Sobrescreve os estagios (ex.: 's04-s06'). Padrao: 's01-s06'.
+
+.EXAMPLE
+    pwsh -File scripts/run_pipeline.ps1
+    pwsh -File scripts/run_pipeline.ps1 -Stages 's05-s06'
 #>
+[CmdletBinding()]
+param(
+    [switch]$Ingest,
+    [string]$Stages = 's01-s06'
+)
 
-Write-Host "[run_pipeline] stub do M0 — a pipeline e' preenchida no M4." -ForegroundColor Yellow
-exit 2
+$ErrorActionPreference = 'Stop'
+$raiz = Split-Path -Parent $PSScriptRoot
+$uv = Join-Path $env:USERPROFILE '.local\bin\uv.exe'
+if (-not (Test-Path $uv)) { $uv = 'uv' }
+
+function Invoke-Passo {
+    param([string]$Titulo, [string[]]$Args)
+    Write-Host ""
+    Write-Host "=== $Titulo ===" -ForegroundColor Cyan
+    $inicio = Get-Date
+    & $uv @Args
+    if ($LASTEXITCODE -ne 0) {
+        throw "[run_pipeline] FALHOU em '$Titulo' (codigo $LASTEXITCODE)"
+    }
+    $seg = [int]((Get-Date) - $inicio).TotalSeconds
+    Write-Host "[run_pipeline] '$Titulo' ok em $seg s" -ForegroundColor DarkGray
+}
+
+Push-Location $raiz
+try {
+    if ($Ingest) {
+        Invoke-Passo 'ingest (M2/M3)' @('run', 'pf', 'ingest')
+    }
+    Invoke-Passo "run $Stages" @('run', 'pf', 'run', $Stages)
+    Invoke-Passo 'report universe' @('run', 'pf', 'report', 'universe')
+    Invoke-Passo 'report dedup-sample' @('run', 'pf', 'report', 'dedup-sample')
+    Write-Host ""
+    Write-Host "[run_pipeline] universo pronto em data/final/universe.parquet" -ForegroundColor Green
+    Write-Host "[run_pipeline] REVISE data/final/dedup_sample_50.txt antes de seguir para o M5" -ForegroundColor Yellow
+}
+catch {
+    Write-Host ""
+    Write-Host "[run_pipeline] FAIL: $($_.Exception.Message)" -ForegroundColor Red
+    Pop-Location
+    exit 1
+}
+Pop-Location
+exit 0

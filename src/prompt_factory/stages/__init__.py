@@ -1,0 +1,289 @@
+"""Estágios da pipeline (s01-s06) e o contrato que a CLI enxerga.
+
+``cli.py`` importa **só** ``STAGES`` e ``StageConfig`` daqui. Nenhum estágio é
+importado no topo deste módulo: cada entrada de ``STAGES`` é um despachante que
+faz o import na hora de rodar, senão um ``pf --help`` pagaria por torch,
+sentence-transformers e lingua.
+
+Contrato de um estágio::
+
+    def run(cfg: StageConfig) -> int   # 0 = sucesso
+
+Regras que todos seguem:
+
+* leem e escrevem **Parquet imutável** dentro de ``cfg.data_dir``, nunca fora;
+* escrita atômica (``.tmp`` + ``os.replace``), compressão zstd, schema EXATO de
+  ``schema.arrow_schema()`` conferido na entrada e na saída;
+* a cadeia canônica é sempre ``text = norm_display(text_raw)`` →
+  ``hash_norm = sha256(norm_for_hash(text))`` → ``uid = make_uid(...)`` →
+  ``n_chars, n_words = text_stats(text)``, a mesma de ``db._insert_check_row``;
+* imprimem funil (lidas → saída, com o motivo de cada queda) e duração;
+* são **idempotentes**: rodar de novo com a mesma entrada dá o mesmo arquivo.
+
+``StageConfig.data_dir`` existe para o smoke test: apontando para um diretório
+descartável, a pipeline inteira roda em miniatura sem encostar em ``data/``.
+"""
+
+from __future__ import annotations
+
+import os
+import time
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from .. import paths
+from ..schema import COLUMN_NAMES, arrow_schema
+
+if TYPE_CHECKING:  # pragma: no cover
+    import pyarrow as pa
+
+#: Nomes dos arquivos de cada etapa, relativos a ``cfg.data_dir``.
+NORMALIZED = "interim/normalized.parquet"
+LANG = "interim/lang.parquet"
+SCRUBBED = "interim/scrubbed.parquet"
+DEDUP1 = "interim/dedup1.parquet"
+MAPA_EXATO = "interim/dedup_exact_map.parquet"
+EMBEDDINGS = "emb/embeddings.f16.npy"
+EMB_UIDS = "emb/uids.txt"
+EMB_SIDECAR = "emb/progress.json"
+UNIVERSE = "final/universe.parquet"
+MAPA_PROXIMO = "final/dedup_near_map.parquet"
+UNIVERSE_EMB = "emb/universe.f16.npy"
+UNIVERSE_UIDS = "emb/universe_uids.txt"
+
+#: Linhas por bloco na leitura dos parquets (compromisso memória x chamadas).
+BATCH_LEITURA = 16_384
+
+
+@dataclass(frozen=True)
+class StageConfig:
+    """Parâmetros que a CLI passa para qualquer estágio.
+
+    ``max_rows`` é aplicado **só pelo s01**, e por fonte: os estágios seguintes
+    processam tudo o que receberem, senão o funil deixaria de fechar.
+    """
+
+    data_dir: Path = paths.DATA
+    max_rows: int | None = None
+
+    def caminho(self, relativo: str) -> Path:
+        return self.data_dir / relativo
+
+    @property
+    def raw(self) -> Path:
+        return self.data_dir / "raw"
+
+    def preparar_dirs(self) -> None:
+        """Cria a árvore de trabalho dentro de ``data_dir`` (idempotente)."""
+        for sub in ("raw", "interim", "final", "emb", "models", "db", "exports"):
+            (self.data_dir / sub).mkdir(parents=True, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# utilidades compartilhadas pelos estágios
+# ---------------------------------------------------------------------------
+
+
+def rel(caminho: Path) -> str:
+    """Caminho relativo à raiz do repo, para caber numa linha de log."""
+    try:
+        return caminho.relative_to(paths.ROOT).as_posix()
+    except ValueError:
+        return str(caminho)
+
+
+def substituir(tmp: Path, destino: Path) -> None:
+    """``os.replace`` com uma tentativa extra — no Windows o destino pode estar
+    com handle aberto por um instante (antivírus, explorer, um `pf report` que
+    acabou de fechar)."""
+    try:
+        os.replace(tmp, destino)
+    except PermissionError:  # pragma: no cover - depende do SO e do timing
+        time.sleep(0.5)
+        os.replace(tmp, destino)
+
+
+def exigir(caminho: Path, comando: str) -> None:
+    """Falha com instrução de qual estágio rodar antes."""
+    if not caminho.is_file():
+        raise SystemExit(f"[pf] insumo ausente: {rel(caminho)} — rode `{comando}` antes")
+
+
+def checar_colunas(tabela: pa.Table | pa.RecordBatch | pa.Schema, origem: str) -> None:
+    """Confere que as colunas são EXATAMENTE as canônicas, na ordem.
+
+    Aceita tabela, record batch ou o próprio ``Schema`` (é o que
+    ``ParquetFile.schema_arrow`` devolve, e é o caminho mais barato: confere
+    antes de ler qualquer linha).
+    """
+    nomes = tuple(getattr(tabela, "schema", tabela).names)
+    if nomes != COLUMN_NAMES:
+        faltando = [c for c in COLUMN_NAMES if c not in nomes]
+        sobrando = [c for c in nomes if c not in COLUMN_NAMES]
+        detalhe = (
+            f"faltando={faltando} sobrando={sobrando}"
+            if (faltando or sobrando)
+            else "mesmas colunas, ORDEM diferente"
+        )
+        raise ValueError(f"{origem}: schema fora do contrato ({detalhe})")
+
+
+def cast_canonico(tabela: pa.Table, origem: str = "tabela") -> pa.Table:
+    """Confere nomes/ordem e converte os tipos para ``schema.arrow_schema()``."""
+    checar_colunas(tabela, origem)
+    return tabela.cast(arrow_schema())
+
+
+class EscritorParquet:
+    """``ParquetWriter`` em ``.tmp`` que só vira o arquivo final no ``close()``.
+
+    Ctrl+C no meio nunca deixa um parquet truncado no lugar do bom.
+    """
+
+    def __init__(self, destino: Path, schema: pa.Schema | None = None) -> None:
+        self.destino = destino
+        self._schema = schema
+        self._tmp = destino.parent / f"{destino.name}.tmp"
+        self._writer: Any = None
+        self.linhas = 0
+
+    def __enter__(self) -> EscritorParquet:
+        import pyarrow.parquet as pq
+
+        self.destino.parent.mkdir(parents=True, exist_ok=True)
+        self._writer = pq.ParquetWriter(
+            self._tmp, self._schema or arrow_schema(), compression="zstd"
+        )
+        return self
+
+    def escrever(self, tabela: pa.Table) -> None:
+        if tabela.num_rows == 0:
+            return
+        self._writer.write_table(tabela)
+        self.linhas += tabela.num_rows
+
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        if self._writer is not None:
+            self._writer.close()
+            self._writer = None
+        if exc_type is not None:
+            self._tmp.unlink(missing_ok=True)
+            return
+        substituir(self._tmp, self.destino)
+
+
+def escrever_tabela(tabela: pa.Table, destino: Path, schema: pa.Schema | None = None) -> Path:
+    """Grava uma tabela inteira, atômica e comprimida."""
+    with EscritorParquet(destino, schema=schema or tabela.schema) as w:
+        w.escrever(tabela)
+    return destino
+
+
+def imprimir_funil(
+    estagio: str,
+    colunas: Sequence[str],
+    linhas: Iterable[Sequence[Any]],
+    total: Sequence[Any] | None = None,
+) -> None:
+    """Tabela de funil alinhada, com TOTAL opcional na última linha."""
+    corpo = [[str(c) for c in linha] for linha in linhas]
+    if total is not None:
+        corpo.append([str(c) for c in total])
+    larguras = [len(c) for c in colunas]
+    for linha in corpo:
+        for i, celula in enumerate(linha):
+            larguras[i] = max(larguras[i], len(celula))
+    cabecalho = "  ".join(c.ljust(larguras[i]) for i, c in enumerate(colunas))
+    print(f"[{estagio}] {cabecalho}")
+    print(f"[{estagio}] {'  '.join('-' * w for w in larguras)}")
+    for i, linha in enumerate(corpo):
+        if total is not None and i == len(corpo) - 1:
+            print(f"[{estagio}] {'  '.join('-' * w for w in larguras)}")
+        print(f"[{estagio}] {'  '.join(c.ljust(larguras[j]) for j, c in enumerate(linha))}")
+
+
+class Cronometro:
+    """Marca o tempo do estágio e imprime na saída."""
+
+    def __init__(self, estagio: str) -> None:
+        self.estagio = estagio
+        self.inicio = time.perf_counter()
+
+    @property
+    def segundos(self) -> float:
+        return time.perf_counter() - self.inicio
+
+    def fim(self, mensagem: str = "") -> None:
+        s = self.segundos
+        tempo = f"{s:.1f} s" if s < 90 else f"{s / 60:.1f} min"
+        extra = f" {mensagem}" if mensagem else ""
+        print(f"[{self.estagio}] concluído em {tempo}{extra}")
+
+
+# ---------------------------------------------------------------------------
+# despacho
+# ---------------------------------------------------------------------------
+
+
+def _despacho(modulo: str) -> Callable[[StageConfig], int]:
+    """Fabrica o wrapper que importa o estágio só na hora de rodar."""
+
+    def executar(cfg: StageConfig) -> int:
+        from importlib import import_module
+
+        return int(import_module(f".{modulo}", __name__).run(cfg))
+
+    executar.__name__ = f"run_{modulo}"
+    return executar
+
+
+#: Nome curto → função do estágio. O M5 acrescenta s07/s08 aqui.
+STAGES: dict[str, Callable[[StageConfig], int]] = {
+    "s01": _despacho("s01_normalize"),
+    "s02": _despacho("s02_lang"),
+    "s03": _despacho("s03_pii"),
+    "s04": _despacho("s04_dedup_exact"),
+    "s05": _despacho("s05_embed"),
+    "s06": _despacho("s06_dedup_near"),
+}
+
+#: Descrição de uma linha para o `pf run --help` e mensagens de erro.
+DESCRICOES: dict[str, str] = {
+    "s01": "normaliza raw/*.parquet -> interim/normalized.parquet (27 colunas)",
+    "s02": "idioma (2 camadas) + variante pt-BR/pt-PT -> interim/lang.parquet",
+    "s03": "remove PII -> interim/scrubbed.parquet",
+    "s04": "dedup exato por hash_norm -> interim/dedup1.parquet",
+    "s05": "embeddings e5-small -> emb/embeddings.f16.npy",
+    "s06": "dedup próximo (cosseno + jaccard) -> final/universe.parquet",
+}
+
+
+__all__ = [
+    "BATCH_LEITURA",
+    "DEDUP1",
+    "DESCRICOES",
+    "EMBEDDINGS",
+    "EMB_SIDECAR",
+    "EMB_UIDS",
+    "LANG",
+    "MAPA_EXATO",
+    "MAPA_PROXIMO",
+    "NORMALIZED",
+    "SCRUBBED",
+    "STAGES",
+    "UNIVERSE",
+    "UNIVERSE_EMB",
+    "UNIVERSE_UIDS",
+    "Cronometro",
+    "EscritorParquet",
+    "StageConfig",
+    "cast_canonico",
+    "checar_colunas",
+    "escrever_tabela",
+    "exigir",
+    "imprimir_funil",
+    "rel",
+    "substituir",
+]

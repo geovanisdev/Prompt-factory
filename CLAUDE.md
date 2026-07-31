@@ -18,7 +18,17 @@ Plano completo (fontes, decisões de engenharia, marcos M0–M10): `C:\Users\gig
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve         # interface local em http://127.0.0.1:8765
 ```
 
-Subcomandos e em que marco cada um sai do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e demais alvos do `report` (M4), `db-check` (M1), `make-seed` (M5), `labels` (M5), `merge-labels` (M5), `train` (M7), `apply` (M7), `load-db` (M8), `export` (M9), `serve` (M9). Enquanto é stub, o comando imprime o aviso e sai com **código 2** — isso é esperado, não é bug.
+Subcomandos e em que marco cada um sai do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1), `make-seed` (M5), `labels` (M5), `merge-labels` (M5), `train` (M7), `apply` (M7), `load-db` (M8), `export` (M9), `serve` (M9). Enquanto é stub, o comando imprime o aviso e sai com **código 2** — isso é esperado, não é bug.
+
+```powershell
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf run                 # s01..s06 (= `all`)
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf run s05             # so um estagio
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf run s04-s06         # intervalo
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf report universe     # distribuicoes do universo
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf report dedup-sample # 50 pares + data/final/dedup_sample_50.txt
+pwsh -File scripts/smoke_test.ps1                                    # pipeline inteira em miniatura, em tmp
+pwsh -File scripts/run_pipeline.ps1                                  # pipeline real + os dois relatorios
+```
 
 ```powershell
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf ingest                    # todas as fontes default_on
@@ -55,7 +65,33 @@ Subcomandos e em que marco cada um sai do stub: `ingest` (M2 fontes pequenas / M
 
 ## Arquivos críticos
 
-`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `db.py` (DDL/FTS/conexão) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `config/sources.toml` (licença e atribuição por fonte) · `.claude/skills/rotular-prompts/SKILL.md`.
+`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `stages/__init__.py` (`StageConfig` + `STAGES`, único ponto de contato do `cli.py` com a pipeline) · `db.py` (DDL/FTS/conexão) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `config/sources.toml` (licença e atribuição por fonte — **a ordem das seções é o desempate do dedup**) · `.claude/skills/rotular-prompts/SKILL.md`.
+
+## Preparo do universo (M4)
+
+`pf run` encadeia os seis estágios; cada um lê e escreve Parquet imutável e é idempotente. `--data-dir` redireciona a árvore inteira (é assim que o smoke roda sem tocar em `data/`); `--max-rows` só é aplicado pelo **s01**, por fonte.
+
+| estágio | entrada → saída | o que decide |
+| --- | --- | --- |
+| s01 | `raw/*.parquet` → `interim/normalized.parquet` | cadeia canônica, dedup de `uid` intra-execução, `lang` provisório |
+| s02 | → `interim/lang.parquet` | idioma em 2 camadas + variante pt-BR/pt-PT |
+| s03 | → `interim/scrubbed.parquet` | PII (e **recalcula** `hash_norm`) |
+| s04 | → `interim/dedup1.parquet` + `dedup_exact_map.parquet` | dedup exato por `hash_norm` |
+| s05 | → `emb/embeddings.f16.npy` + `emb/uids.txt` | embeddings e5-small |
+| s06 | → `final/universe.parquet` + `final/dedup_near_map.parquet` + `emb/universe.f16.npy` | dedup próximo |
+
+Pegadinhas deste bloco:
+
+- **`lang` do s01 é provisório.** Só `"pt"`/`"en"` EXATOS da fonte são copiados; `"Portuguese"`, `"English"` e `"pt-BR"` viram `"und"` e o s02 decide pelos detectores. É de propósito: as fontes que rotulam por extenso são justamente as que erram (o mesmo template francês aparece 7.553x como `English` e 2.049x como `Portuguese`).
+- **`wildchat_en_pool.parquet` não é fonte.** O s01 ignora qualquer `*_pool.parquet` em `raw/` — entrar com ele duplicaria 158 mil linhas. Qualquer OUTRO stem fora do `sources.toml` é erro fatal.
+- **Chave vazia não agrupa no s04.** `norm_for_hash("!!!") == ""`, então todo prompt só de pontuação compartilha o `hash_norm` do sha256 da string vazia; o s04 deixa essas linhas passarem inteiras.
+- **Invariante posicional dos `.npy`.** `emb/embeddings.f16.npy` está alinhado ao `dedup1.parquet`; `emb/universe.f16.npy` ao `universe.parquet`. São pares diferentes de propósito — o s06 muda as posições. O s06 confere o primeiro par (forma + uids) com assert antes de qualquer conta.
+- **O s05 é retomável.** Memmap pré-alocado em `.tmp` + sidecar `emb/progress.json`; Ctrl+C perde no máximo um bloco de `[embed] chunk_rows`. Se o corpus ou o modelo mudarem, o sidecar é descartado e o passe recomeça. Ele é o estágio LONGO: ~16 textos/s em CPU para os textos longos do WildChat (o gargalo é o forward de 512 tokens, não a tokenização) — conte horas, não minutos.
+- **A tabela canônica nunca passa por pandas.** `quality` é int8 *nullable* e viraria float64 (3 → 3.0 no export). O s04 usa pandas só para ordenar colunas de texto e ranks inteiros; a filtragem é máscara posicional em pyarrow.
+- **O prefixo `query: ` do e5 é obrigatório** e mora em `embedder.embed_texts` — o repo do modelo não publica prompts nomeados, então `prompt_name="query"` NÃO funciona; é `prompt="query: "`. Sem o prefixo os vetores continuam saindo, plausíveis e errados.
+- **`fast-langdetect` trunca em 80 caracteres por padrão** (`LangDetectConfig(max_input_length=80)`). O wrapper passa `None` e fatia em `[langid] max_input_chars`. Se o download do modelo `full` falhar, ele cai sozinho para o `lite` embutido no wheel e avisa alto.
+- **`lingua` 2.2.0 não tem GALEGO**; o árbitro usa CATALÃO no lugar.
+- **Aceitar os limiares do near-dup é decisão humana.** `pf report dedup-sample` grava `data/final/dedup_sample_50.txt` justamente para isso.
 
 ## Camada raw (M2/M3)
 
