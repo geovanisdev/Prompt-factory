@@ -327,14 +327,15 @@ Um passe = varrer as **3.199.860** linhas do split `train` com `columns=` (pushd
 * **A `language` da fonte erra.** O mesmo template automatizado em francês aparece 7.553× rotulado `English` e 2.049× rotulado `Portuguese`. No pt, ~34% das linhas são UM robô só ("Usando o seguinte texto:" sobre diários oficiais). O s02 não é opcional.
 * **`HTTP_RANGE_LIMIT` (2 MiB) é obrigatório nesta máquina.** Sem ele o pyarrow coalesce column chunks em ranges de até 32 MiB, o middlebox de TLS corta a resposta em ~4 MB e o passe morre em 76% — sempre no mesmo shard, então os 5 retries do `huggingface_hub` refazem a mesma requisição gigante e falham igual. Acima disso, `wildchat._passe` reabre o stream sozinho a partir do último checkpoint (`MAX_TENTATIVAS_REDE`).
 
-## Bancada — plataforma de anotação (Trilha B, P1)
+## Bancada — plataforma de anotação (Trilha B, P1–P2)
 
 Produto **novo e separado**, em `src/prompt_factory/annotate/`, com nome de tela **"Bancada"**. Não é uma aba da interface de curadoria: outro banco, outra porta, outra identidade visual.
 
 ```powershell
-& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate seed     # 6 personas (idempotente por nome)
-& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate status   # contagens + origem do pool
-& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate          # = serve, em http://127.0.0.1:8766
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate seed          # personas + pacote + tarefas do pool
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate seed --force  # APAGA fixtures e refaz (recusa se houver anotação; sai 3)
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate status        # contagens + origem do pool
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate               # = serve, em http://127.0.0.1:8766
 ```
 
 * **Dois bancos, permissões diferentes.** `data/db/annotate.sqlite` (estado da plataforma; **esta app é a dona** e o cria sozinha na primeira subida) + `prompts.sqlite` **somente leitura**, sempre (`db.connect(..., readonly=True)`). A app de curadoria assume ser a única escritora do corpus (`app/cache.py:36-41`) e é isso que autoriza o cache de agregados dela — quebrar essa suposição transforma contagens certas em contagens plausíveis e erradas. Sem ATTACH; cruzamento em Python **por `uid`**, nunca por `id`/rowid (que muda a cada `pf load-db`).
@@ -347,3 +348,38 @@ Produto **novo e separado**, em `src/prompt_factory/annotate/`, com nome de tela
 * **Portas 8765 (curadoria) e 8766 (Bancada) são distintas de propósito**: as duas sobem juntas na demonstração, e colisão de porta apareceria como "a interface errada abriu".
 * Papéis **sem senha** (teatro de autorização, escrito na tela), mas o servidor valida o papel pela linha em `anotadores`, nunca pelo que o cliente afirma ser (`deps.exigir_papel`).
 * Schema em pt-BR de propósito, com vocabulário fechado: cada `CHECK ... IN` do DDL sai de uma tupla de `annotate/db.py` (`PAPEIS`, `TIPOS_TAREFA`, ...) e o Pydantic valida contra a mesma tupla — banco e API concordam por construção. Ver `annotate/db.py` para o porquê de cada CASCADE (e de cada ausência: apagar anotador é recusado, porque o histórico dele é o que as métricas somam).
+
+### O fluxo do anotador (P2)
+
+`annotate/tarefas.py` (fila, trava, hidratação) · `annotate/payloads.py` (os 4 contratos) · `annotate/catalogo.py` (busca no pool) · `annotate/routes_trabalho.py` (as rotas) · `annotate/fixtures/demo_pack.json` (o pacote) · `annotate/seed.py` (as 3 camadas do seed).
+
+| rota | o que decide |
+| --- | --- |
+| `POST /api/tarefas/proxima` | a trava do modo locked, sob `BEGIN IMMEDIATE` |
+| `POST /api/tarefas/livre` | find-or-create por `(tipo, prompt_uid)` + atribuição sem prazo |
+| `GET /api/catalogo` | busca no pool reusando `sanitize_fts`/`executar_fts` de `app/queries.py` |
+| `GET /api/prompts/{uid}` | resolve corpus × demo pelo prefixo; 404 fora do pool |
+| `POST /api/atribuicoes/{id}/submeter` | valida o payload pelo tipo **lido do banco**; grava `versao = max+1` |
+| `POST /api/atribuicoes/{id}/abandonar` · `GET /api/atribuicoes` | devolver a vaga · minhas tarefas |
+| `GET /api/tarefas/contagens` | os contadores das abas, **por pessoa** |
+
+Pegadinhas deste bloco:
+
+- **`gabarito_json` nunca sai pela API do anotador**, e a garantia não é a chave que falta: o `tarefas` do envelope é montado **campo a campo**, e a coluna nem entra no SELECT. Um `dict(linha)` passaria no teste de hoje e vazaria no dia em que alguém acrescentasse uma coluna. O `meta_json` das respostas (que guarda o defeito plantado) tem o mesmo tratamento.
+- **Fila vazia é 200 com `{tarefa: null, motivo}`, não 404.** Fila vazia é o estado mais comum de uma plataforma bem servida; um 404 faria o cliente tratar o caminho normal como falha. O `motivo` é texto de tela, e vira a frase do estado vazio.
+- **O prazo é calculado pelo SQLite, não em Python.** `strftime('%Y-%m-%dT%H:%M:%fZ','now', '+120 minutes')` — mesmo formato e mesmo relógio do `expira_em` que a expiração compara. Dois relógios dariam uma expiração que erra por um. E o formato **tem** de ser esse: `datetime('now')` sai com espaço e sem `Z`, e a comparação lexicográfica quebraria em silêncio, com os dois lados parecendo datas.
+- **Expiração preguiçosa, sem thread de fundo:** um UPDATE antes de cada claim e de cada listagem. A definição de "vaga ocupada" (`tarefas.SQL_VIVA`) repete a condição do prazo de propósito — o UPDATE é a materialização dela, não a fonte.
+- **O modo livre IGNORA as vagas, e isso é decisão.** `n_anotacoes_alvo` governa a FILA (quem recebe sem escolher). Quem foi ao catálogo já decidiu; recusar com "essa já tem duas pessoas" faria o botão "Anotar este" falhar de forma imprevisível.
+- **Prazo vencido NÃO descarta anotação submetida.** O TTL existe para devolver a vaga a quem espera, não para punir quem demorou; a resposta traz `expirou: true` e a tela avisa. Jogar fora trabalho humano por causa de um relógio é o pior desfecho possível aqui.
+- **Find-or-create é por `(tipo, prompt_uid)`, não por origem.** Escolher no catálogo um par que a semente já cobriu **reusa** aquela tarefa: criar uma segunda contaria a mesma anotação duas vezes em toda métrica e quebraria o `ja_anotei`.
+- **Nem todo prompt sustenta todo tipo.** Comparar A/B exige 2 respostas de modelo; avaliar exige rubrica ativa **e** resposta. Um prompt cru do corpus não tem nada disso. `catalogo.marcar_material` carimba `pode` em cada item (o botão já sai desabilitado, com o motivo no `title`) e `catalogo.material_faltando` é quem recusa no servidor, com 409 — as duas pontas usam a **mesma** função, senão haveria botão habilitado que devolve erro.
+- **Uid sumido do corpus vira tarefa `pausada` + bilhete no `payload_json`**, e o claim pula para a próxima. Nunca 500. Vai acontecer: o universo desta máquina foi de 144.754 para 159.733 numa recarga.
+- **`bool` é subclasse de `int`, terceira vez neste repo.** `"nota": true` viraria nota 1 — uma nota **válida** e errada. Todo campo numérico dos payloads (e o `anotador_id`) tem validador `mode="before"`. A ordem importa: o Pydantic coage antes de qualquer validador comum.
+- **1..9 é o teto da PLATAFORMA; a escala real é a da rubrica.** O Pydantic não conhece a rubrica, então ele só barra fora de 1..9; quem confere a escala de cada critério (e a cobertura de todos eles) é a rota, que tem a rubrica em mãos. É a mesma conta que o botão da tela faz **antes** do clique — os dois concordarem é o que faz a validação parecer instantânea sem deixar de ser do servidor.
+- **Os limites saem do `/api/health` (`limites`), não de uma cópia no JS.** É o que impede o botão "faltam 30 caracteres" de divergir do 422 quando alguém ajusta o `settings.toml`.
+- **A rubrica-guia do SFT vindo de continuação sai do PAYLOAD da anotação, não de `rubricas`.** A rubrica só é materializada na aprovação (P3); sem esse atalho, quem acabou de escrever uma rubrica escreveria a resposta sem ela ao lado — que é exatamente o valor da continuação.
+- **O seed do pool usa fatias DISJUNTAS** para `escrever_rubrica` e `sft_resposta`: com os mesmos prompts, a fila de SFT já traria a rubrica pronta e a oferta de continuação nunca teria o que criar.
+- **`--force` recusa sobre trabalho humano e sai com código 3.** `tarefas` cascateia para `atribuicoes` e daí para `anotacoes`. Ele também **não apaga personas**: elas são a identidade guardada no `localStorage` do navegador.
+- **O catálogo descarta resposta atrasada.** Trocar dois filtros em sequência dispara duas consultas e a primeira pode responder por último; só a busca mais recente escreve em `est.catalogo.dados` (contador `buscaAtual` no JS).
+- **`app.routes` não lista mais as rotas dos routers incluídos** nas versões recentes do FastAPI (elas ficam dentro de um `_IncludedRouter`). Quem quiser conferir caminhos em teste usa `app.openapi()["paths"]`.
+- **Medido no banco real** (159.733 prompts, pool de 500): `pf annotate seed` semeia 8 prompts + 8 rubricas + 16 respostas + 8 tarefas do pacote e 8+8 tarefas do corpus; a segunda execução cria **zero**.

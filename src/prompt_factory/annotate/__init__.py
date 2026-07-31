@@ -15,4 +15,16 @@ bancos é por ``uid`` — o ``id``/rowid do corpus muda a cada ``pf load-db``.
 
 from __future__ import annotations
 
-__all__ = ["db", "deps", "main", "models", "pool", "routes_meta", "seed"]
+__all__ = [
+    "catalogo",
+    "db",
+    "deps",
+    "main",
+    "models",
+    "payloads",
+    "pool",
+    "routes_meta",
+    "routes_trabalho",
+    "seed",
+    "tarefas",
+]

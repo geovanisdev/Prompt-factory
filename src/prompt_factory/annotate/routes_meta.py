@@ -22,12 +22,32 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from .. import __version__
+from ..config import get as _cfg
 from . import db as adb
 from . import pool as poolmod
 from .deps import ConAnotacao, ConCorpus, Estado
 from .models import PerfilIn, perfil
 
 router = APIRouter(tags=["bancada"])
+
+#: Os limites de ``[annotate]`` que a INTERFACE precisa conhecer para dizer o
+#: que falta **antes** do clique. Lidos por request (o ``config`` é cacheado por
+#: arquivo, então isto é um acesso a dict), e não congelados no lifespan: quem
+#: mexe no ``settings.toml`` espera ver o efeito ao recarregar a página.
+LIMITES: tuple[tuple[str, int], ...] = (
+    ("min_chars_justificativa", 30),
+    ("min_chars_sft", 40),
+    ("min_criterios_rubrica", 3),
+    ("max_criterios_rubrica", 8),
+    ("min_chars_criacao", 15),
+    ("claim_ttl_min", 120),
+    ("page_size", 20),
+)
+
+
+def limites() -> dict[str, int]:
+    """``{chave: valor}`` de ``[annotate]``, para a tela validar igual ao servidor."""
+    return {chave: int(_cfg("annotate", chave, default=padrao)) for chave, padrao in LIMITES}
 
 
 @router.get("/api/health", summary="Os dois bancos abriram, e de onde vem o pool")
@@ -74,6 +94,11 @@ def health(anot: ConAnotacao, corpus: ConCorpus, meta: Estado) -> dict[str, Any]
             "colecao": p.colecao,
             "filtro_fallback": poolmod.descrever_fallback(),
         },
+        # OS LIMITES SAEM DAQUI, e a tela os LÊ. É o que faz "o botão diz o que
+        # falta" concordar com o 422 do servidor sem que os números existam em
+        # dois lugares — eles moram em `config/settings.toml`, e uma cópia no
+        # JavaScript divergiria na primeira vez que alguém ajustasse o arquivo.
+        "limites": limites(),
     }
 
 

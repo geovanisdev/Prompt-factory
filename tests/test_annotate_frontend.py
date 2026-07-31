@@ -169,8 +169,16 @@ def test_marca_o_que_ainda_nao_existe(js: str) -> None:
     o marco em que chega."""
     assert '"marco"' in js
     assert "em construção" not in js.lower()
-    for marco in ("P2", "P3", "P4", "P5", "P6", "P7"):
+    for marco in ("P3", "P4", "P5", "P6", "P7"):
         assert f'"{marco}"' in js
+
+
+def test_o_p2_saiu_do_roteiro_do_que_falta(js: str) -> None:
+    """O roteiro do admin lista o que AINDA NÃO existe. Com o P2 entregue, ele
+    não pode continuar prometendo a fila e o catálogo como futuros — um roteiro
+    que lista o que já está na tela é pior que roteiro nenhum."""
+    roteiro = js.split("const ROTEIRO = [", 1)[1].split("];", 1)[0]
+    assert '"P2"' not in roteiro
 
 
 def test_estados_vazios_tem_saida(js: str) -> None:
@@ -178,18 +186,137 @@ def test_estados_vazios_tem_saida(js: str) -> None:
     assert "Nada esperando revisão." in js
     assert "Escolher no catálogo" in js
     assert "Entrar como administrador" in js
+    # P2: o vazio do catálogo e o de "minhas" também bifurcam.
+    assert "Limpar os filtros" in js
+    assert "Voltar para a fila" in js
+    assert "Ir para a fila" in js
 
 
-@pytest.mark.parametrize("rota", ["/api/health", "/api/perfis"])
+#: As rotas que a tela do P2 chama. Um caminho construído por concatenação
+#: (``"/api/atribuicoes/" + id + "/submeter"``) aparece aqui pelo PREFIXO, que é
+#: o pedaço que continua sendo literal no código.
+ROTAS_DO_FRONT: frozenset[str] = frozenset(
+    {
+        "/api/health",
+        "/api/perfis",
+        "/api/tarefas/proxima",
+        "/api/tarefas/livre",
+        "/api/tarefas/contagens",
+        "/api/catalogo",
+        "/api/atribuicoes",
+        "/api/atribuicoes/",
+    }
+)
+
+
+@pytest.mark.parametrize("rota", sorted(ROTAS_DO_FRONT))
 def test_so_chama_rotas_que_existem(js: str, rota: str) -> None:
     assert rota in js
 
 
-def test_nao_chama_rota_que_o_p1_nao_tem(js: str) -> None:
-    """A casca não pode disparar um contrato que ainda não existe: um 404 no
-    primeiro paint é indistinguível, para quem olha, de uma app quebrada."""
+def test_nao_chama_rota_que_o_backend_nao_tem(js: str) -> None:
+    """A tela não pode disparar um contrato que ainda não existe: um 404 no
+    primeiro paint é indistinguível, para quem olha, de uma app quebrada.
+
+    Esta lista **tem de crescer junto com as rotas** — é o único lugar onde o
+    contrato entre os dois lados está escrito de uma vez só.
+    """
     chamadas = set(re.findall(r'"(/api/[a-z0-9/_-]+)"', js))
-    assert chamadas <= {"/api/health", "/api/perfis"}, chamadas
+    assert chamadas <= ROTAS_DO_FRONT, chamadas - ROTAS_DO_FRONT
+
+
+def test_as_rotas_do_front_existem_no_backend(tmp_path: Path) -> None:
+    """O simétrico do teste acima: a lista branca não pode virar ficção.
+
+    Confere contra o roteador REAL da app, e não contra um segundo inventário
+    escrito à mão — que seria mais uma coisa a manter em dia.
+    """
+    corpus = tmp_path / "prompts.sqlite"
+    montar_banco(corpus)
+    app = criar_app(tmp_path / "annotate.sqlite", corpus)
+    # Pelo OpenAPI, e não por ``app.routes``: as versões recentes do FastAPI
+    # guardam os routers incluídos dentro de um invólucro, e iterar ``routes``
+    # devolveria só as rotas de documentação. O ``/openapi.json`` É o contrato.
+    caminhos = set(app.openapi()["paths"])
+    for rota in ROTAS_DO_FRONT:
+        if rota.endswith("/"):
+            # Prefixo de caminho construído: basta existir alguma rota sob ele.
+            assert any(c.startswith(rota) for c in caminhos), rota
+        else:
+            assert rota in caminhos, rota
+
+
+# ---------------------------------------------------------------------------
+# 3b. os workspaces do P2, e as regras de carga cognitiva que eles carregam
+# ---------------------------------------------------------------------------
+
+
+def test_uma_acao_primaria_com_atalho(js: str) -> None:
+    """"Enviar e próxima" + Ctrl+Enter. Uma ação primária por tela."""
+    assert '"Enviar e próxima"' in js
+    assert "Ctrl+Enter" in js
+    assert 'ev.key === "Enter"' in js
+
+
+def test_o_botao_diz_o_que_falta_antes_do_clique(js: str) -> None:
+    """Validação que só existe depois do clique é fricção pura."""
+    assert "function oQueFalta()" in js
+    assert "critérios sem nota" in js
+    assert "Escolha A, B ou empate" in js
+    assert "caracteres na justificativa" in js
+
+
+def test_os_limites_vem_do_servidor(js: str) -> None:
+    """Uma cópia dos limiares no JS divergiria do settings.toml na primeira vez
+    que alguém o ajustasse — e a tela passaria a prometer o que o 422 desmente."""
+    assert "function lim(chave, padrao)" in js
+    assert "est.saude.limites" in js
+    for chave in ("min_chars_justificativa", "min_criterios_rubrica", "max_criterios_rubrica"):
+        assert f'"{chave}"' in js
+
+
+def test_rascunho_automatico_por_atribuicao(js: str) -> None:
+    """Perder trabalho é a maior fricção que existe."""
+    assert "function rascunhoChave(id)" in js
+    assert 'CHAVE + "rascunho."' in js
+    assert "rascunhoRecuperado" in js
+
+
+def test_nenhum_cronometro_para_quem_anota(js: str) -> None:
+    """O tempo é medido e mandado ao servidor — e nunca mostrado ao anotador.
+
+    Cronômetro à vista adiciona pressão sem melhorar decisão, e aqui não há
+    pagamento por hora que o justifique.
+    """
+    assert "tempo_ativo_ms" in js
+    for proibido in ("setInterval", "restante", "cronometro", "tempo restante"):
+        assert proibido not in js.lower(), proibido
+
+
+def test_os_quatro_workspaces_existem(js: str) -> None:
+    for fn in ("function wsAvaliar(", "function wsEscrever(", "function wsSft(", "function wsComparar("):
+        assert fn in js
+
+
+def test_tres_modelos_de_partida_colapsados(js: str) -> None:
+    """Matar a página em branco é a maior redução de fricção da aba de rubrica."""
+    assert "const MODELOS_RUBRICA" in js
+    assert js.count('nome: "') >= 3
+    modelos = js.split("const MODELOS_RUBRICA = [", 1)[1].split("\n];", 1)[0]
+    assert modelos.count("titulo:") == 3
+
+
+def test_ab_tem_rolagem_sincronizada_e_atalhos(js: str) -> None:
+    assert "function sincronizarRolagem(" in js
+    assert 'ev.key === "ArrowLeft"' in js
+    assert 'ev.key === "ArrowRight"' in js
+    assert 'ev.key === "e" || ev.key === "E"' in js
+
+
+def test_o_gabarito_nao_e_sequer_nomeado_na_tela(js: str) -> None:
+    """A tela do anotador não conhece o conceito — nem para escondê-lo."""
+    assert "gabarito" not in js.lower()
+    assert "defeito_plantado" not in js
 
 
 # ---------------------------------------------------------------------------

@@ -631,22 +631,62 @@ def _annotate(args: argparse.Namespace) -> int:
         return 0
 
     if acao == "seed":
-        if args.force:
-            # O --force que APAGA fixtures chega no P2, junto com o pacote de
-            # demonstração. Prometer aqui um comportamento destrutivo que não
-            # existe seria pior que não ter a flag.
-            print("[pf] --force ainda não tem efeito: no P1 o seed só cria as personas")
+        # As TRÊS camadas: personas, pacote de demonstração e tarefas sobre o
+        # corpus real. Sem corpus, as duas primeiras rodam e o comando AVISA —
+        # é o estado de um clone limpo antes do `pf load-db`, não um erro.
         banco.parent.mkdir(parents=True, exist_ok=True)
         conn = dbmod.connect(banco)
+        conn_corpus = dbmod.connect(corpus, readonly=True) if corpus.is_file() else None
         try:
             adb.init_db(conn)
-            novas = seedmod.semear_personas(conn)
+            try:
+                relatorio = seedmod.semear(conn, conn_corpus, force=bool(args.force))
+            except RuntimeError as exc:
+                # A recusa do --force sobre trabalho humano. Código 3 (e não 1)
+                # pelo mesmo motivo do swap recusado do `load-db`: não é erro de
+                # uso, é uma guarda que disparou, e o conserto é outro comando.
+                print(f"[pf] {exc}", file=sys.stderr)
+                return 3
         finally:
             conn.close()
+            if conn_corpus is not None:
+                conn_corpus.close()
+                # Conexão read-only em WAL deixa um -shm órfão ao lado do corpus,
+                # e é ele que o pré-voo do swap do `pf load-db` lê como "alguém
+                # está com isto aberto". Nunca o -wal.
+                try:
+                    shm = corpus.with_name(corpus.name + "-shm")
+                    if shm.is_file():
+                        shm.unlink()
+                except OSError:
+                    pass
+
+        if relatorio["apagados"]:
+            apagados = ", ".join(f"{n} {t}" for t, n in relatorio["apagados"].items() if n)
+            print(f"[annotate] --force apagou: {apagados or 'nada'}")
         total = len(seedmod.PERSONAS)
+        novas = int(relatorio["personas"])
         print(f"[annotate] {novas} persona(s) criada(s), {total - novas} já existia(m)")
         for nome, papel in seedmod.PERSONAS:
             print(f"[annotate]   {nome} — {papel}")
+        pacote = relatorio["pacote"]
+        print(
+            f"[annotate] pacote de demonstração: {pacote['prompts_demo']} prompt(s), "
+            f"{pacote['rubricas']} rubrica(s), {pacote['respostas_modelo']} resposta(s), "
+            f"{pacote['tarefas']} tarefa(s)"
+        )
+        pool = relatorio["pool"]
+        print(
+            f"[annotate] tarefas sobre o corpus: {pool['escrever_rubrica']} escrever_rubrica, "
+            f"{pool['sft_resposta']} sft_resposta"
+        )
+        for aviso in relatorio["avisos"]:
+            print(f"[annotate] AVISO: {aviso}")
+        from .stages import imprimir_funil
+
+        imprimir_funil(
+            "annotate", ("tabela", "linhas"), [[t, n] for t, n in relatorio["contagens"].items()]
+        )
         return 0
 
     if acao == "status":
@@ -1025,7 +1065,7 @@ COMMANDS: tuple[_Cmd, ...] = (
     ),
     _Cmd(
         "annotate",
-        "P1",
+        "P2",
         "sobe a Bancada: plataforma de anotação (banco próprio; corpus só leitura)",
         [
             (
@@ -1033,7 +1073,7 @@ COMMANDS: tuple[_Cmd, ...] = (
                 {
                     "nargs": "?",
                     "choices": ["serve", "seed", "status"],
-                    "help": "serve (padrão) | seed (personas) | status (contagens)",
+                    "help": "serve (padrão) | seed (personas + fixtures + tarefas) | status",
                 },
             ),
             (("--host",), {"metavar": "HOST", "help": "padrão: [annotate] host do settings.toml"}),
@@ -1048,7 +1088,10 @@ COMMANDS: tuple[_Cmd, ...] = (
             ),
             (
                 ("--force",),
-                {"action": "store_true", "help": "seed: refaz as fixtures (chega no P2)"},
+                {
+                    "action": "store_true",
+                    "help": "seed: APAGA fixtures e tarefas e refaz (recusa se houver anotação)",
+                },
             ),
         ],
         implemented=True,

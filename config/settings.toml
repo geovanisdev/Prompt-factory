@@ -309,3 +309,11 @@ min_chars_justificativa = 30
 # Teto de critérios de uma rubrica escrita na plataforma. Rubrica com 20
 # critérios não é mais rigorosa, é impossível de aplicar com consistência.
 max_criterios_rubrica = 8
+# Piso de critérios (P2). Abaixo de 3, o instrumento não separa nada: com 1 ou 2
+# critérios a rubrica vira uma nota geral com nome comprido, e duas pessoas
+# aplicando a mesma "escala de qualidade" concordam por acaso.
+min_criterios_rubrica = 3
+# Piso da resposta de referência do SFT (P2). É este texto que vira exemplo de
+# treino: 40 caracteres é curto o bastante para caber um "não sei responder"
+# honesto e longo o bastante para barrar um envio acidental de campo em branco.
+min_chars_sft = 40

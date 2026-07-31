@@ -1,0 +1,776 @@
+{
+  "schema": "demo_pack@1",
+  "sobre": [
+    "Pacote de demonstração da Bancada. Oito itens escritos à MÃO — não são prompts",
+    "de pessoas reais e por isso não moram no corpus: entram em `prompts_demo`, com",
+    "uid prefixado por 'demo:'. Misturá-los ao corpus destruiria a proveniência, que",
+    "é o argumento inteiro deste projeto.",
+    "",
+    "Cada item traz uma rubrica profissional (3 a 5 critérios com escala ancorada) e",
+    "DUAS respostas de modelo com rótulo cego. Em nenhum par as duas respostas são",
+    "igualmente boas: um A/B sem resposta defensável não mede preferência, mede ruído.",
+    "",
+    "O `meta.defeito_plantado` de cada resposta diz o que foi posto ali de propósito.",
+    "Ele NUNCA sai pela API do anotador — é o gabarito do exercício, e sai só no",
+    "painel do admin. As quatro famílias de defeito são as que um linguista pega e um",
+    "leitor apressado não: fato inventado com aparência de precisão, restrição do",
+    "pedido ignorada, registro errado e fluência boa cobrindo conteúdo vazio."
+  ],
+  "itens": [
+    {
+      "chave": "receita-bolo-fuba",
+      "lang": "pt",
+      "genero": "receita",
+      "prompt": "minha avó fazia um bolo de fubá cremoso que ficava com uma camada de creme no fundo e eu nunca consegui reproduzir. tenho fubá comum (não é fubá mimoso), leite, ovos, açúcar, manteiga, queijo parmesão ralado e fermento. o forno lá de casa é a gás e não tem termostato, só o botão de 1 a 5. me passa a receita e me explica o que faz a camada cremosa aparecer, porque as minhas tentativas saem com bolo homogêneo.",
+      "rubrica": {
+        "titulo": "Receita executável a partir do que a pessoa tem",
+        "criterios": [
+          {
+            "nome": "Responde à pergunta do porquê",
+            "descricao": "A pessoa não pediu só a receita: pediu o mecanismo da camada cremosa. Uma resposta que entrega o passo a passo sem explicar por que o creme se separa não resolveu o problema dela, porque ela vai errar de novo na próxima variação.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Ignora o porquê; só lista os passos" },
+                { "valor": 3, "rotulo": "Menciona o mecanismo de passagem, sem ligá-lo a nenhum passo" },
+                { "valor": 5, "rotulo": "Explica o mecanismo e aponta em qual passo ele se decide" }
+              ]
+            }
+          },
+          {
+            "nome": "Respeita as restrições declaradas",
+            "descricao": "Fubá comum (não mimoso) e forno a gás sem termostato, com botão de 1 a 5. Resposta que pede fubá mimoso ou manda pré-aquecer a 180 °C está entregando uma receita que esta pessoa não pode executar.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Exige ingrediente ou equipamento que a pessoa disse não ter" },
+                { "valor": 3, "rotulo": "Usa só o declarado, mas dá o forno em graus" },
+                { "valor": 5, "rotulo": "Usa só o declarado e traduz o forno para o botão de 1 a 5, com um sinal visual de conferência" }
+              ]
+            }
+          },
+          {
+            "nome": "Precisão verificável",
+            "descricao": "Toda quantidade, tempo e temperatura afirmada tem de ser plausível e não inventada. Número específico e falso é PIOR que faixa honesta: ele passa confiança sem entregar acerto, e a pessoa culpa o próprio forno.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Afirma dado técnico inventado com casas decimais ou marca específica" },
+                { "valor": 3, "rotulo": "Números plausíveis, mas apresentados como exatos onde não são" },
+                { "valor": 5, "rotulo": "Faixas honestas e um critério de ponto (\"até dourar a borda\") em vez de só o relógio" }
+              ]
+            }
+          },
+          {
+            "nome": "Ordem executável",
+            "descricao": "É possível cozinhar lendo de cima para baixo, uma vez só, sem voltar? Ingrediente que aparece no meio do modo de preparo sem estar na lista é retrabalho na cozinha.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Passos fora de ordem ou ingrediente surgindo do nada" },
+                { "valor": 3, "rotulo": "Ordem correta, mas exige reler para entender o encadeamento" },
+                { "valor": 5, "rotulo": "Lê-se uma vez e executa" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Bolo de fubá cremoso da vovó\n\nIngredientes: 3 ovos, 2 xícaras de leite, 1 xícara de açúcar, 1/2 xícara de fubá mimoso, 3 colheres de sopa de manteiga derretida, 2 colheres de sopa de queijo parmesão ralado, 1 colher de sopa de fermento em pó.\n\nModo de preparo: bata tudo no liquidificador por 2 minutos, acrescente o fermento por último e bata mais 10 segundos. Despeje numa forma untada e leve ao forno pré-aquecido a 180 °C por exatamente 42 minutos.\n\nO segredo da camada cremosa é o fubá mimoso: por ser moído mais fino, ele tem cerca de 12% mais amido disponível que o fubá comum, e é esse amido que decanta durante o forno e forma o creme no fundo. Com fubá comum a separação não acontece, por isso os seus saíram homogêneos.\n\nDica final: não abra o forno antes dos 42 minutos, senão o bolo murcha.",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "fato-inventado-com-precisao",
+            "defeito_plantado": "Inventa um dado técnico com casa decimal ('12% mais amido no fubá mimoso') e o usa como explicação central; o mecanismo real da camada cremosa é a massa muito líquida, que decanta por densidade durante o forno, e acontece com fubá comum também. Além disso VIOLA as duas restrições declaradas: exige fubá mimoso (a pessoa disse que só tem comum) e dá o forno em 180 °C num forno sem termostato, com '42 minutos' exatos onde nem a temperatura é controlável. O efeito colateral é o pior: a pessoa conclui que o erro foi o ingrediente dela.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Dá para fazer com fubá comum, sim — a camada cremosa não vem do tipo de fubá.\n\nO que faz o creme aparecer é a massa ser MUITO líquida, quase como leite. No forno, a parte com mais amido e proteína (fubá, ovo, queijo) decanta e assa por baixo, enquanto a parte aerada sobe. Se a sua massa está saindo com consistência de massa de bolo comum, ela é grossa demais para separar, e é por isso que dá bolo homogêneo. Esse é o ponto que decide tudo.\n\nIngredientes: 3 ovos, 3 xícaras de leite (é isso mesmo, três), 1 e 1/2 xícara de açúcar, 3/4 de xícara de fubá comum, 2 colheres de sopa de manteiga derretida, 3 colheres de sopa de parmesão ralado, 1 colher de sopa rasa de fermento em pó.\n\n1. Bata no liquidificador ovos, leite, açúcar, manteiga e o parmesão.\n2. Junte o fubá e bata mais 1 minuto. A massa tem de ficar escorrendo, bem rala — não engrosse.\n3. Junte o fermento e bata só o suficiente para misturar.\n4. Despeje numa forma untada e polvilhada com fubá.\n\nSobre o seu forno: sem termostato, use o botão em torno de 3 (o meio), que na maioria dos fornos a gás fica na faixa de forno médio. O tempo vai de 40 a 55 minutos dependendo do seu forno — não use o relógio como critério, use isto: está pronto quando a borda estiver dourada e firme e o centro ainda tremer levemente ao balançar a forma. Se você espetar um palito e sair limpo, passou do ponto e o creme já assou junto.\n\nDeixe amornar antes de cortar: quente, o creme ainda não firmou e escorre.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. É a resposta defensável do par: explica o mecanismo real (densidade da massa), usa só o que a pessoa tem, traduz o forno para o botão de 1 a 5 e substitui o relógio por um critério visual de ponto. É a que deve vencer o A/B.",
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "email-cobranca-cliente",
+      "lang": "pt",
+      "genero": "e-mail difícil",
+      "prompt": "Preciso escrever um e-mail para um cliente que está com uma nota fiscal vencida há 45 dias. É o maior cliente da agência (representa uns 30% do faturamento) e a pessoa com quem eu falo, o Rodrigo, é o diretor de marketing — ele não é quem paga, quem paga é o financeiro deles. Já mandei dois e-mails para o financeiro sem resposta. Preciso escalar para o Rodrigo sem parecer que estou passando por cima do financeiro dele nem soando desesperado. Tom formal, mas não robótico. Máximo 150 palavras.",
+      "rubrica": {
+        "titulo": "E-mail de cobrança com relação em risco",
+        "criterios": [
+          {
+            "nome": "Registro e tom",
+            "descricao": "Foi pedido formal mas não robótico, para um diretor de uma conta grande. Informalidade excessiva ('oi, tudo certo?', 'a grana') queima a relação; formalidade de carta de cartório soa como ameaça jurídica.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Registro claramente errado para o destinatário" },
+                { "valor": 3, "rotulo": "Formal, mas engessado ou com jargão de cobrança automática" },
+                { "valor": 5, "rotulo": "Formal, direto e humano — soa como uma pessoa escrevendo para outra" }
+              ]
+            }
+          },
+          {
+            "nome": "Resolve a política interna",
+            "descricao": "O pedido central e mais difícil: escalar para o diretor sem parecer que passou por cima do financeiro. Uma resposta que só cobra ignorou a parte que a pessoa não sabia fazer sozinha.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Reclama do financeiro ou ignora que existe uma cadeia interna" },
+                { "valor": 3, "rotulo": "Evita a reclamação, mas não dá ao Rodrigo um papel confortável" },
+                { "valor": 5, "rotulo": "Enquadra o pedido como ajuda para destravar, protegendo o financeiro e dando ao diretor uma ação de um passo" }
+              ]
+            }
+          },
+          {
+            "nome": "Limite de 150 palavras",
+            "descricao": "Restrição explícita e verificável. Estourar não é detalhe: um e-mail de cobrança longo é um e-mail que o diretor arquiva para ler depois.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Passa de 200 palavras" },
+                { "valor": 3, "rotulo": "Entre 150 e 200" },
+                { "valor": 5, "rotulo": "Dentro do limite, sem parecer amputado" }
+              ]
+            }
+          },
+          {
+            "nome": "Fatos e próximo passo",
+            "descricao": "Um e-mail de cobrança precisa dos dados objetivos (nota, valor, vencimento, tentativas anteriores) e de UM próximo passo concreto. Sem número, não é cobrança; sem próximo passo, não é e-mail, é desabafo.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Nem dados nem próximo passo" },
+                { "valor": 3, "rotulo": "Tem os dados como marcadores a preencher, mas o próximo passo é vago" },
+                { "valor": 5, "rotulo": "Marcadores claros do que preencher e um próximo passo de um clique" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Assunto: e aí Rodrigo, uma ajuda aí?\n\nOi Rodrigo, tudo certo por aí?\n\nCara, desculpa incomodar com isso, mas é que ficou uma pendência aqui e eu não consegui resolver com o pessoal do financeiro de vocês. Mandei dois e-mails e não tive retorno nenhum, sabe como é.\n\nÉ a nota [NÚMERO], de [VALOR], que venceu faz 45 dias. Já era pra ter caído a grana faz tempo e a gente tá meio apertado por aqui.\n\nSerá que você consegue dar um empurrãozinho com eles? Qualquer coisa me chama no zap que a gente resolve rapidinho.\n\nValeu demais!\nAbraço",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "registro-errado",
+            "defeito_plantado": "Registro informal onde o pedido era explicitamente formal: 'e aí', 'cara', 'a grana', 'empurrãozinho', 'me chama no zap'. Pior, faz exatamente as duas coisas que a pessoa pediu para evitar: expõe o financeiro ('não tive retorno nenhum') e soa desesperado ('a gente tá meio apertado'). É o defeito mais fácil de sentir e o mais fácil de perder num skim rápido, porque o texto é fluente e simpático.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Assunto: NF [NÚMERO] — apoio para destravar internamente\n\nRodrigo, bom dia.\n\nEscrevo por um assunto operacional e recorro a você porque acredito que seja o caminho mais rápido.\n\nA NF [NÚMERO], no valor de [VALOR], venceu em [DATA] — 45 dias. Enviei o documento ao financeiro em [DATA 1] e [DATA 2]; imagino que tenha ficado num fluxo de aprovação, o que é comum nesta época do mês.\n\nVocê poderia indicar a quem eu devo encaminhar para destravar, ou pedir que me confirmem a data prevista de pagamento? Um retorno de uma linha já me basta para acertar a previsão daqui.\n\nSeguimos com as entregas normalmente. Qualquer coisa, estou à disposição.\n\nObrigado,\n[SEU NOME]",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Resolve a política interna dando ao financeiro uma saída honrosa ('imagino que tenha ficado num fluxo de aprovação'), pede ao diretor uma ação de um passo, mantém registro formal e humano, fica em ~120 palavras e sinaliza continuidade da relação ('seguimos com as entregas'). É a que deve vencer.",
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "juridico-rescisao-aluguel",
+      "lang": "pt",
+      "genero": "dúvida jurídica",
+      "prompt": "Assinei um contrato de aluguel residencial de 30 meses em março do ano passado. Passei na federal em outra cidade e preciso entregar o apartamento em dois meses, faltando ainda 14 meses de contrato. O contrato fala em multa de 3 aluguéis por rescisão antecipada. O aluguel é R$ 2.300. Eu tenho mesmo que pagar os R$ 6.900 inteiros? E existe alguma coisa no fato de eu estar mudando por causa de estudo?",
+      "rubrica": {
+        "titulo": "Orientação jurídica leiga — utilidade sem exceder o papel",
+        "criterios": [
+          {
+            "nome": "Acerto do conceito central",
+            "descricao": "A questão é a proporcionalidade da multa ao tempo restante de contrato. Uma resposta que diz 'sim, pague os três aluguéis' erra a única coisa que a pessoa precisava saber.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Erra o conceito ou afirma o contrário do que vale" },
+                { "valor": 3, "rotulo": "Cita a proporcionalidade sem mostrar como se aplica ao caso" },
+                { "valor": 5, "rotulo": "Explica a proporcionalidade e a aplica aos números que a pessoa deu" }
+              ]
+            }
+          },
+          {
+            "nome": "Honestidade das referências",
+            "descricao": "Citar número de artigo, lei ou súmula que não existe (ou que não diz aquilo) é o defeito mais grave possível num texto jurídico: ele viaja para dentro de uma conversa com o locador e explode lá.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Inventa dispositivo, número de artigo ou parágrafo" },
+                { "valor": 3, "rotulo": "Cita a lei correta de forma genérica, sem precisão nem erro" },
+                { "valor": 5, "rotulo": "Cita corretamente o que existe e diz explicitamente o que depende do contrato assinado" }
+              ]
+            }
+          },
+          {
+            "nome": "Limite do papel",
+            "descricao": "Não é advogado e não pode fingir que é. Precisa dizer o que fazer em seguida e quando procurar profissional — sem virar um aviso legal vazio que ocupa metade da resposta e não ajuda em nada.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Fala como se fosse parecer jurídico definitivo" },
+                { "valor": 3, "rotulo": "Tem o aviso, mas ele substitui a orientação em vez de acompanhá-la" },
+                { "valor": 5, "rotulo": "Orienta de verdade e delimita o papel numa linha, no lugar certo" }
+              ]
+            }
+          },
+          {
+            "nome": "Responde às duas perguntas",
+            "descricao": "Foram duas: o valor da multa e se o motivo (estudo) muda alguma coisa. Deixar a segunda sem resposta é resposta incompleta, mesmo que a primeira esteja perfeita.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Responde só uma" },
+                { "valor": 3, "rotulo": "Responde as duas, uma delas de raspão" },
+                { "valor": 5, "rotulo": "Responde as duas com o mesmo cuidado" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Não, você não paga os R$ 6.900. A multa por rescisão antecipada é reduzida proporcionalmente ao tempo já cumprido, conforme o art. 27, §2º, da Lei do Inquilinato (Lei 8.245/91), que fixa a redução em regime pro rata die.\n\nFazendo a conta no seu caso: contrato de 30 meses, dos quais você terá cumprido 16 quando entregar. Restam 14 meses, ou seja, 46,67% do prazo. A multa devida é 46,67% de R$ 6.900 = R$ 3.220,00.\n\nSobre a mudança por estudo: a Lei 8.245/91 prevê a dispensa integral da multa nos casos de transferência do locatário, e a jurisprudência estende esse benefício aos casos de mudança para instituição de ensino em outra comarca. Basta apresentar o comprovante de matrícula ao locador com 30 dias de antecedência e você fica isento.\n\nEm resumo: leve o comprovante da federal ao locador e você não paga nada.",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "fato-inventado-com-precisao",
+            "defeito_plantado": "Precisão fabricada em cima de uma base correta, que é o disfarce mais eficaz. A proporcionalidade existe, mas está no art. 4º (não no 'art. 27, §2º', que não trata disso), e a dispensa por transferência do art. 4º, parágrafo único, é para transferência pelo EMPREGADOR — estender à mudança por estudo é invenção apresentada como 'jurisprudência'. O cálculo de 46,67% também está trocado: quem cumpriu 16 de 30 meses deve a fração RESTANTE proporcional, e a resposta troca a conta de lado. O desfecho ('você não paga nada') manda a pessoa para uma conversa com o locador munida de uma citação falsa.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Provavelmente não os R$ 6.900 inteiros — mas o número final depende do seu contrato.\n\nA regra geral da Lei do Inquilinato (Lei 8.245/91, art. 4º) é que a multa por devolução antecipada seja proporcional ao tempo que FALTA cumprir. A ideia é simples: quem devolve faltando 1 mês não deve o mesmo que quem devolve faltando 29.\n\nNo seu caso, a proporção mais usada é: multa cheia × (meses restantes ÷ prazo total). Com 14 restantes de 30 meses, isso dá 14/30 de R$ 6.900 ≈ R$ 3.220. Confira no seu contrato como a cláusula descreve o cálculo, porque alguns contratos escrevem a proporção de forma diferente — e é o texto assinado que vai ser discutido.\n\nSobre a mudança por causa de estudo: infelizmente ela não muda nada, e vale a pena saber disso antes de negociar. A dispensa de multa prevista em lei é para quem é transferido pelo EMPREGADOR para outra localidade (e ainda assim exige aviso por escrito com 30 dias). Mudança para estudar não está nessa hipótese.\n\nO que eu faria, nesta ordem: (1) reler a cláusula de rescisão e ver como ela descreve a proporção; (2) avisar o locador por escrito, com data, o quanto antes — o aviso costuma valer mais que o argumento; (3) propor o valor proporcional já calculado, porque proposta com número costuma destravar. Se ele insistir nos três aluguéis cheios, aí sim vale meia hora com um advogado ou com a defensoria pública da sua cidade: é uma conversa de R$ 3.700 de diferença.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Acerta o conceito e o dispositivo, faz a conta e mostra a fórmula, responde HONESTAMENTE a segunda pergunta com a resposta que a pessoa não queria ouvir, e delimita o papel numa linha útil (defensoria pública) em vez de um aviso legal genérico. É a que deve vencer — e o par inteiro serve para mostrar que fluência e confiança não são sinal de acerto.",
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "codigo-pandas-merge",
+      "lang": "en",
+      "genero": "código",
+      "prompt": "I have two pandas DataFrames, orders (about 2M rows, has customer_id) and customers (about 40k rows, has customer_id as well). When I do pd.merge(orders, customers, on='customer_id', how='left') I end up with 2.4M rows instead of 2M, and some order_ids appear more than once. I checked and customers has no exact duplicate rows. What is going on and how do I fix it? Python 3.12, pandas 2.2.",
+      "rubrica": {
+        "titulo": "Depuração — encontrar a causa, não descrever o sintoma",
+        "criterios": [
+          {
+            "nome": "Nomeia a causa",
+            "descricao": "A causa é que a chave do lado direito não é única, mesmo sem linhas inteiramente duplicadas. Uma resposta que não nomeia isso não depurou nada, por mais correta que seja em tudo o mais.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Não chega à causa; fala de merge em geral" },
+                { "valor": 3, "rotulo": "Chega perto (\"deve haver duplicata\") sem separar linha duplicada de CHAVE duplicada" },
+                { "valor": 5, "rotulo": "Nomeia a causa exata e explica por que a checagem que a pessoa já fez não a pegaria" }
+              ]
+            }
+          },
+          {
+            "nome": "Dá o comando de diagnóstico",
+            "descricao": "A pessoa precisa CONFIRMAR na própria base antes de mudar o código. Uma linha executável que mostra a chave repetida vale mais que três parágrafos de explicação.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Nenhum código executável" },
+                { "valor": 3, "rotulo": "Código genérico que não usa os nomes de coluna do caso" },
+                { "valor": 5, "rotulo": "Uma ou duas linhas coladas ao caso, que mostram exatamente quais chaves repetem" }
+              ]
+            }
+          },
+          {
+            "nome": "Conserto com decisão explícita",
+            "descricao": "Há mais de um conserto legítimo (deduplicar, agregar, aceitar a expansão), e cada um muda o significado do resultado. Escolher por quem perguntou, sem dizer que houve escolha, é decidir a semântica dos dados dela em silêncio.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Manda deduplicar sem dizer o que se perde" },
+                { "valor": 3, "rotulo": "Dá um conserto só, bem explicado" },
+                { "valor": 5, "rotulo": "Apresenta os caminhos, diz o que cada um significa e recomenda um" }
+              ]
+            }
+          },
+          {
+            "nome": "Prevenção",
+            "descricao": "O melhor desfecho é o erro não voltar em silêncio no mês que vem. `validate=` no merge é a resposta que transforma um bug silencioso em exceção.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Nada sobre prevenir" },
+                { "valor": 3, "rotulo": "Sugere \"conferir sempre o shape depois do merge\"" },
+                { "valor": 5, "rotulo": "Mostra `validate='m:1'` e diz que ele levanta erro em vez de expandir" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "This is a very common issue when working with pandas merges, and it can be frustrating to debug. Let me walk you through what's happening.\n\nWhen you perform a left merge, pandas takes every row from the left DataFrame and attempts to find matching rows in the right DataFrame based on the join key. The resulting DataFrame will contain all rows from the left side, enriched with the columns from the right side wherever a match is found.\n\nThe row count you're seeing (2.4M instead of 2M) indicates that the merge operation is producing more rows than expected. This is generally referred to as row multiplication or fan-out, and it is one of the classic pitfalls of relational joins — it affects SQL joins in exactly the same way.\n\nMy recommendation would be to carefully inspect both DataFrames before merging. Take a close look at the structure of your data, verify that the join keys are what you expect, and confirm that the relationship between the two tables is the one you have in mind. It's also worth double-checking the dtypes of the customer_id column on both sides, since type mismatches can cause surprising behaviour.\n\nOnce you've confirmed the shape of your data, the merge should behave as expected. If it still doesn't, consider using a different merge strategy or restructuring the data upstream so the relationship is cleaner.\n\nHope this helps! Let me know if you have any other questions.",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "fluencia-cobrindo-vazio",
+            "defeito_plantado": "Prosa fluente, bem organizada, cortês e completamente vazia: reafirma o sintoma com vocabulário técnico ('fan-out'), não nomeia a causa, não dá uma única linha de código e fecha com 'inspecione seus dados', que é o que a pessoa já estava tentando fazer. É o defeito mais difícil de pegar num skim de 10 segundos, porque LÊ bem — e é exatamente por isso que está aqui.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Your `customers` frame has duplicate customer_id values, even though it has no fully duplicated rows. `drop_duplicates()` with no arguments compares ALL columns, so two rows for the same customer that differ in, say, `updated_at` or `address` both survive — and the merge then produces one output row per match.\n\nConfirm it in two lines:\n\n```python\ndup = customers['customer_id'].duplicated(keep=False)\nprint(dup.sum())                       # how many rows are involved\nprint(customers.loc[dup].sort_values('customer_id').head(20))\n```\n\n2.4M - 2M = 400k extra rows, so you should expect this to be non-zero.\n\nNow the fix, and this is a decision about your data, not just about the code:\n\n1. **One row per customer is what you want** (most likely). Pick which row wins, explicitly:\n   ```python\n   cust1 = (customers.sort_values('updated_at')\n                     .drop_duplicates('customer_id', keep='last'))\n   out = orders.merge(cust1, on='customer_id', how='left', validate='m:1')\n   ```\n   `keep='last'` after sorting means \"the most recent record wins\" — say it out loud, because `drop_duplicates('customer_id')` alone silently keeps whichever row happened to come first.\n\n2. **The duplicates are meaningful** (e.g. one row per address). Then the expansion is correct and what you actually need is to aggregate before merging, or to merge on a finer key.\n\nEither way, keep `validate='m:1'` on the merge from now on. It raises `MergeError` instead of quietly expanding, which turns this exact bug into an exception at the line where it happens rather than a row count you notice three steps later.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Nomeia a causa, explica por que a verificação que a pessoa já fez não a pegaria, dá o diagnóstico executável com os nomes de coluna do caso, apresenta os dois consertos com a semântica de cada um e fecha com `validate='m:1'`. É a que deve vencer, e o par inteiro é o melhor exemplo de fluência ≠ conteúdo do pacote.",
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "redacao-escolar-enem",
+      "lang": "pt",
+      "genero": "redação escolar",
+      "prompt": "Meu filho está no terceiro ano e vai fazer o ENEM. Ele escreve razoavelmente bem mas trava na hora de fechar a redação — a conclusão dele sempre vira um resumo do que ele já disse e ele perde ponto na proposta de intervenção. Me dá 3 dicas práticas que eu possa passar pra ele hoje à noite. Ele não gosta de coisa muito teórica, então quanto mais direto melhor.",
+      "rubrica": {
+        "titulo": "Ajuda prática a um terceiro (mãe → filho)",
+        "criterios": [
+          {
+            "nome": "Cumpre a contagem pedida",
+            "descricao": "Foram pedidas 3 dicas. Entregar 5 não é generosidade: é devolver à mãe a tarefa de escolher, que era justamente o que ela estava pedindo para alguém fazer por ela — e à noite, antes de falar com o filho.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Número claramente diferente do pedido" },
+                { "valor": 3, "rotulo": "Três dicas, mas com sub-itens que viram outras dicas disfarçadas" },
+                { "valor": 5, "rotulo": "Exatamente três, cada uma com uma ideia só" }
+              ]
+            }
+          },
+          {
+            "nome": "Acerta o problema específico",
+            "descricao": "O problema não é 'escrever conclusão': é que a conclusão vira resumo e a proposta de intervenção fica fraca. Dica genérica sobre estrutura dissertativa não resolve o que ela descreveu.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Fala de redação em geral" },
+                { "valor": 3, "rotulo": "Ataca a conclusão, mas não a proposta de intervenção" },
+                { "valor": 5, "rotulo": "Ataca os dois, e mostra por que um causa o outro" }
+              ]
+            }
+          },
+          {
+            "nome": "Transmissível pela mãe",
+            "descricao": "Quem vai falar é a mãe, hoje à noite, para um adolescente que não gosta de teoria. A resposta precisa ser dizível em voz alta, sem jargão de banca e sem tabela.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Cheia de jargão da correção do ENEM" },
+                { "valor": 3, "rotulo": "Clara, mas escrita para o aluno e não para quem vai repassar" },
+                { "valor": 5, "rotulo": "Cada dica cabe numa frase falada, com um exemplo curto" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Ótima pergunta! Aqui vão algumas dicas para o seu filho arrasar na redação:\n\n1. **Retome a tese, não o texto.** A conclusão não é para lembrar o que foi dito; é para responder à pergunta que a introdução abriu.\n\n2. **Use a fórmula dos cinco elementos.** Toda proposta de intervenção completa tem: agente (quem faz), ação (o que faz), meio (como), finalidade (para quê) e detalhamento (um detalhe concreto de qualquer um dos anteriores). Falta um, perde ponto.\n\n3. **Comece a conclusão pelo agente.** \"Cabe ao Ministério da Educação...\" já obriga o parágrafo a virar proposta em vez de resumo.\n\n4. **Não use \"portanto\" e \"conclui-se que\".** São os conectivos que empurram o cérebro para o modo resumo. Prefira \"Para reverter esse quadro...\".\n\n5. **Treine só a conclusão.** Pegue três redações antigas dele e reescreva apenas o último parágrafo de cada uma. Vinte minutos, três vezes na semana.\n\n6. **Leia a proposta em voz alta.** Se ela puder ser executada por alguém amanhã de manhã, está concreta. Se não, está vaga.\n\nEspero que ajude! Boa sorte para ele no exame!",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "restricao-ignorada",
+            "defeito_plantado": "Foram pedidas TRÊS dicas; entregou SEIS. E o conteúdo é bom, o que é justamente o ponto do exercício: uma resposta pode ser útil e ainda assim falhar no pedido. A mãe vai ter de escolher três antes de falar com o filho — que é o trabalho que ela estava terceirizando. Também ignora de raspão o 'nada muito teórico': 'os cinco elementos' com nomenclatura de banca é exatamente o registro que ela pediu para evitar.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Três coisas, e elas resolvem justamente o que a senhora descreveu — o resumo e a proposta fraca são o MESMO problema: quando o último parágrafo começa olhando para trás, ele nunca vira proposta.\n\n**1. Proibir o \"portanto\".** Sério, é literal. Se ele começar o último parágrafo com \"portanto\", \"conclui-se\" ou \"dessa forma\", o cérebro entra em modo resumo e não sai mais. Mande ele começar com \"Para mudar isso...\" ou \"Cabe ao...\". Só a primeira palavra já muda o parágrafo inteiro.\n\n**2. Responder quatro perguntas em voz alta antes de escrever.** Quem faz? O quê? Como? Para quê? Se ele não souber responder as quatro em dez segundos, a proposta ainda não existe — e escrever bonito não vai salvar. Exemplo de \"quem\": escola, prefeitura, Ministério da Saúde. Vago (\"a sociedade deve conscientizar\") não conta.\n\n**3. Treinar só o último parágrafo.** Pegue três redações que ele já escreveu e peça para reescrever SÓ a conclusão de cada uma. São 20 minutos e ataca exatamente o ponto fraco, em vez de escrever mais uma redação inteira para errar o mesmo final.\n\nSe der para fazer uma coisa só hoje, faça a 1 — é a que dá resultado na primeira tentativa.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Exatamente três dicas, ligadas ao problema descrito (mostra que resumo e proposta fraca são a mesma causa), no registro de quem vai repassar em voz alta, sem jargão de banca, e ainda prioriza uma delas para o caso de a noite ser curta. É a que deve vencer.",
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "traducao-marketing-pt-en",
+      "lang": "pt",
+      "genero": "tradução",
+      "prompt": "Preciso traduzir para o inglês o texto abaixo, que vai para a página de preços do nosso site. O público é de pequenas empresas nos EUA. Mantenha o tom, não deixe pomposo, e me avise se alguma coisa não fizer sentido lá fora.\n\n\"Nosso plano Essencial custa R$ 89 por mês e já inclui emissão ilimitada de nota fiscal de serviço, conciliação bancária automática e suporte por WhatsApp em horário comercial. Não cobramos taxa de adesão nem multa por cancelamento: se não servir, é só sair. Mais de 12 mil pequenos negócios brasileiros já usam.\"",
+      "rubrica": {
+        "titulo": "Tradução com adaptação cultural declarada",
+        "criterios": [
+          {
+            "nome": "Completude",
+            "descricao": "Toda informação do original precisa aparecer na tradução ou ter a ausência explicada. Omitir uma frase silenciosamente é o erro mais caro de tradução comercial, porque ninguém que só lê o inglês consegue perceber.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Omite informação sem avisar" },
+                { "valor": 3, "rotulo": "Completa, mas com uma passagem achatada" },
+                { "valor": 5, "rotulo": "Completa, e toda supressão ou mudança está declarada" }
+              ]
+            }
+          },
+          {
+            "nome": "Adaptação cultural sinalizada",
+            "descricao": "'Nota fiscal de serviço', 'WhatsApp em horário comercial' e o preço em reais não atravessam a fronteira sozinhos. O pedido explícito foi avisar. Adaptar em silêncio é decidir pelo cliente.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Traduz ao pé da letra ou adapta sem dizer" },
+                { "valor": 3, "rotulo": "Adapta bem, mas comenta só um dos pontos" },
+                { "valor": 5, "rotulo": "Adapta e lista o que mudou e por quê, separado da tradução" }
+              ]
+            }
+          },
+          {
+            "nome": "Tom",
+            "descricao": "Foi pedido que não ficasse pomposo. Página de preços americana para pequenas empresas é direta e curta; inglês empolado ('herewith', 'esteemed clientele') destrói a confiança que o texto original construía.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Empolado ou traduzido palavra a palavra" },
+                { "valor": 3, "rotulo": "Correto e neutro, sem a naturalidade de página de preços" },
+                { "valor": 5, "rotulo": "Soa como um site americano do setor, mantendo a voz do original" }
+              ]
+            }
+          },
+          {
+            "nome": "Separação entre entrega e comentário",
+            "descricao": "A pessoa vai copiar e colar. Tradução misturada com observações vira retrabalho de limpeza.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Comentário embutido no meio do texto" },
+                { "valor": 3, "rotulo": "Separado, mas sem deixar claro onde começa o que se copia" },
+                { "valor": 5, "rotulo": "Bloco copiável e comentários claramente à parte" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Here is the translation:\n\n\"Our Essential plan costs $89 per month and already includes unlimited service invoice issuing, automatic bank reconciliation, and WhatsApp support during business hours. We charge no setup fee and no cancellation penalty: if it doesn't work out, just leave.\"\n\nThe text reads naturally for a US audience and keeps the friendly tone of the original.",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "restricao-ignorada",
+            "defeito_plantado": "Duas falhas que se escondem uma na outra. (1) OMITE a frase final inteira do original — 'Mais de 12 mil pequenos negócios brasileiros já usam' —, que é a prova social, o elemento mais valioso de uma página de preços; nada na resposta avisa. (2) Converte 'R$ 89' em '$89' em silêncio, transformando um preço de ~US$ 16 num preço de US$ 89, o que é um erro comercial de cinco vezes o valor. E fecha afirmando que a tradução mantém o tom, o que é verdade — a afirmação verdadeira desvia a atenção das duas que faltam.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "**Tradução (pronta para copiar):**\n\n\"The Essential plan is $XX/month and includes unlimited invoicing, automatic bank reconciliation, and WhatsApp support during business hours. No setup fee, no cancellation fee — if it's not for you, just cancel. Over 12,000 small businesses already run on it.\"\n\n---\n\n**Três coisas que não atravessam a fronteira, como pedido:**\n\n1. **O preço.** Deixei `$XX` de propósito. R$ 89 são cerca de US$ 16 hoje, mas página de preços americana não usa conversão de câmbio: escolha um número redondo em dólar que faça sentido para o seu custo (US$ 15 e US$ 19 são as faixas em que esse mercado se ancora). Publicar \"$89\" seria multiplicar o preço por cinco sem querer.\n\n2. **\"Nota fiscal de serviço\".** Não existe equivalente nos EUA — lá o documento é só uma `invoice`, sem o vínculo com a prefeitura. Traduzi por `unlimited invoicing`, que é o que o leitor americano entende como benefício. Se o produto de fato emitir documento fiscal brasileiro, o público americano não é o público deste texto.\n\n3. **\"brasileiros\".** Tirei. Numa página em inglês, \"12,000 Brazilian small businesses\" levanta a pergunta \"então isso não é para mim?\" no exato parágrafo em que você quer prova social. O número sozinho trabalha a seu favor; o gentílico, contra.\n\nMantive o WhatsApp: é menos comum nos EUA como canal de suporte B2B, mas não é estranho, e tirar seria esconder uma característica real do serviço.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Traduz completo, separa o bloco copiável dos comentários, e faz exatamente o que foi pedido: avisar o que não atravessa a fronteira — inclusive pegando a armadilha do R$/$ que a resposta A caiu. Justifica cada supressão em vez de executá-la em silêncio. É a que deve vencer.",
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "roleplay-mestre-rpg",
+      "lang": "en",
+      "genero": "roleplay",
+      "prompt": "You are the game master of a dark-fantasy tabletop campaign. I'm playing Wren, a half-elf thief who has just been caught picking the pocket of a temple guard in the plaza of a city under curfew. Stay in character as the GM at all times — no out-of-character explanations, no bullet-point summaries of my options, no asking me if I'm enjoying it. Describe the scene and stop when it's my turn to act. Keep it under 200 words.",
+      "rubrica": {
+        "titulo": "Roleplay com restrições explícitas de formato",
+        "criterios": [
+          {
+            "nome": "Permanência no personagem",
+            "descricao": "A restrição mais forte do pedido, repetida de três formas (sem explicação fora de personagem, sem lista de opções, sem perguntar se está gostando). Quebrar uma delas é falhar no que foi explicitamente pedido, por melhor que seja a prosa.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Sai do personagem já no primeiro parágrafo" },
+                { "valor": 3, "rotulo": "Fica em personagem, mas fecha com uma pergunta meta ou lista de opções" },
+                { "valor": 5, "rotulo": "Em personagem do começo ao fim, e para no ponto certo" }
+              ]
+            }
+          },
+          {
+            "nome": "Passa o turno de verdade",
+            "descricao": "'Stop when it's my turn to act' significa terminar num momento de decisão aberto — não num cliffhanger que já decidiu pelo jogador, nem num convite explícito ('what do you do?' já é aceitável; 'you decide to run' não é).",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Age pelo personagem do jogador" },
+                { "valor": 3, "rotulo": "Para, mas num ponto sem tensão ou sem opção real" },
+                { "valor": 5, "rotulo": "Para num momento de decisão com mais de um caminho visível na própria cena" }
+              ]
+            }
+          },
+          {
+            "nome": "Coerência de mundo",
+            "descricao": "Dark fantasy, toque de recolher, guarda de templo, meio-elfo. Os elementos dados precisam aparecer e as consequências precisam ser as daquele mundo, não genéricas.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Cenário genérico; ignora o toque de recolher ou o templo" },
+                { "valor": 3, "rotulo": "Usa os elementos como cenário, sem consequência" },
+                { "valor": 5, "rotulo": "Os elementos criam a pressão da cena" }
+              ]
+            }
+          },
+          {
+            "nome": "Limite de 200 palavras",
+            "descricao": "Restrição verificável. Num roleplay por turnos, texto longo demais do mestre rouba o ritmo do jogador.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Passa bem do limite" },
+                { "valor": 3, "rotulo": "Estoura por pouco" },
+                { "valor": 5, "rotulo": "Dentro do limite" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Great setup! I'd love to run this for you. Before we begin, let me set some expectations so we're on the same page.\n\nI'll be playing the role of the Game Master, describing the world and the non-player characters, while you control Wren. I'll try to keep descriptions vivid but concise, and I'll always end my turns with a clear opening for you to act.\n\n---\n\nThe guard's hand closes around your wrist. The plaza is empty; curfew bells rang an hour ago.\n\n---\n\nHere are some options for what you could do next:\n\n- **Talk your way out** — you could claim you were reaching for a dropped coin.\n- **Fight** — the guard is armored, but you're faster.\n- **Run** — the alley behind the fountain is close.\n- **Surrender** — sometimes the temple is more merciful than the street.\n\nWhat would you like to do? And let me know if you'd like me to adjust the tone — I can make it grittier or lighter depending on what you're enjoying!",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "restricao-ignorada",
+            "defeito_plantado": "Viola as TRÊS restrições que o pedido enumerou, uma a uma: abre com explicação fora de personagem, entrega uma lista de opções em marcadores e fecha perguntando se o jogador está gostando. A cena em si, quando finalmente chega, tem duas frases. É o caso didático de uma resposta prestativa que ignora o que foi pedido — e serve para mostrar que 'seguir instrução' e 'ser útil' são critérios que se medem separado.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "The guard's gauntlet closes on your wrist before the purse clears his belt — not a grab, a decision, the way a man closes a door he has closed a thousand times.\n\nThe plaza is wrong-empty. Curfew bells rang at dusk and the market stalls stand skinned to their frames, canvas stripped for the night. Rain has started on the flagstones, the fine kind that gets into the joints of armor and stays there.\n\nHe doesn't shout for the watch. That is the part that should worry you.\n\nInstead he turns your hand over, thumb pressed to the inside of your wrist, and looks — not at the purse, at your fingers. At the ink there. Something moves behind his face, and it is not anger.\n\n\"Half-blood,\" he says, quiet enough that the rain nearly takes it. \"Who sent you to my pocket tonight?\"\n\nHis grip has not tightened. Over his shoulder, past the dry fountain, the alley mouth on Cooper's Row is nine paces and unlit. Behind him, the temple doors stand open, warm, and full of people who are not supposed to be out either.\n\nThe rain gets louder. He is waiting.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Fica em personagem do início ao fim, usa o toque de recolher e o templo como pressão real (o guarda NÃO chama a guarda; há gente no templo que também não deveria estar fora), planta dois caminhos visíveis dentro da própria ficção (o beco a nove passos, as portas abertas) sem transformá-los em lista, e para exatamente no turno do jogador. ~195 palavras. É a que deve vencer.",
+            "correta": true
+          }
+        }
+      ]
+    },
+    {
+      "chave": "resumo-ata-condominio",
+      "lang": "pt",
+      "genero": "resumo",
+      "prompt": "Sou síndica e preciso mandar um resumo da assembleia de ontem para os 48 condôminos, sendo que só 11 apareceram. Quero que fique claro o que foi DECIDIDO e o que ficou pendente, porque ano passado teve uma confusão enorme com gente dizendo que não sabia da obra. Segue a transcrição:\n\n[19h12] Abertura. Quórum de 11 unidades presentes, 3 por procuração.\n[19h20] Seu Antônio (302) reclamou do vazamento na garagem, disse que já avisou três vezes. Marlene (104) confirmou.\n[19h31] Orçamento da impermeabilização: três propostas. Construtora Vale R$ 84 mil, Reformax R$ 71 mil, e uma terceira que o Douglas trouxe mas não estava na pasta.\n[19h48] Votação da impermeabilização. 9 a favor de fechar com a Reformax, 2 contra (Seu Antônio queria mais orçamento). Aprovado.\n[19h55] Discussão sobre o rateio. Douglas propôs 6 parcelas, Marlene propôs 10. Não votaram, ficou pra próxima.\n[20h10] Portaria: Cleide falou que o porteiro da noite dorme. Ninguém confirmou. Decidiram só \"observar\".\n[20h18] Festa junina: Marlene se ofereceu pra organizar. Ninguém se opôs. Não teve votação formal.\n[20h30] Encerramento.",
+      "rubrica": {
+        "titulo": "Resumo de ata com valor probatório",
+        "criterios": [
+          {
+            "nome": "Separa decidido de pendente",
+            "descricao": "É o pedido central e o motivo da confusão do ano passado. Cada item precisa cair de um lado só, sem ambiguidade — e o que não foi votado não pode aparecer como decisão.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Mistura os dois num texto corrido" },
+                { "valor": 3, "rotulo": "Separa, mas classifica algum item do lado errado" },
+                { "valor": 5, "rotulo": "Separação limpa, com o status de cada item explícito" }
+              ]
+            }
+          },
+          {
+            "nome": "Fidelidade ao que está na transcrição",
+            "descricao": "Nada pode aparecer no resumo que não esteja na transcrição — nem número, nem prazo, nem decisão. Num documento que vai para 48 pessoas e que serve de prova, um detalhe inventado é o defeito mais caro possível.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Inventa prazo, valor ou decisão" },
+                { "valor": 3, "rotulo": "Tudo verdadeiro, mas com uma inferência apresentada como fato" },
+                { "valor": 5, "rotulo": "Só o que está na transcrição, e o que ficou em aberto aparece como aberto" }
+              ]
+            }
+          },
+          {
+            "nome": "Preserva os números da votação",
+            "descricao": "9 a 2 não é o mesmo que 'aprovado por maioria'. Num condomínio com histórico de contestação, o placar e o quórum são exatamente o que impede a discussão do ano que vem.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Some com o placar e o quórum" },
+                { "valor": 3, "rotulo": "Traz o placar, esquece o quórum (ou o contrário)" },
+                { "valor": 5, "rotulo": "Quórum, placar e valor aprovado, todos à vista" }
+              ]
+            }
+          },
+          {
+            "nome": "Serve como comunicado",
+            "descricao": "O destino é uma mensagem para 48 pessoas que não estavam lá. Precisa ser lido no celular, em menos de um minuto, e deixar claro o que cada um precisa fazer (se precisar).",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Formato de ata de cartório, ilegível no celular" },
+                { "valor": 3, "rotulo": "Legível, mas sem destacar o que exige ação" },
+                { "valor": 5, "rotulo": "Escaneável, com o que exige ação em evidência" }
+              ]
+            }
+          },
+          {
+            "nome": "Neutralidade",
+            "descricao": "Reclamação não confirmada (o porteiro que dorme) e queixa individual precisam ser registradas sem virar acusação — o resumo vai para todo mundo, inclusive para quem foi citado.",
+            "escala": {
+              "min": 1,
+              "max": 5,
+              "ancoras": [
+                { "valor": 1, "rotulo": "Repete a acusação como se fosse fato apurado" },
+                { "valor": 3, "rotulo": "Registra, mas sem marcar que não houve confirmação" },
+                { "valor": 5, "rotulo": "Registra o relato E o fato de não ter sido confirmado" }
+              ]
+            }
+          }
+        ]
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "RESUMO DA ASSEMBLEIA\n\nPrezados condôminos,\n\nRealizamos ontem nossa assembleia, na qual foram discutidos diversos assuntos importantes para o nosso condomínio. A participação foi produtiva e os debates ocorreram de forma bastante construtiva, com contribuições relevantes de vários moradores.\n\nO principal tema tratado foi a questão da impermeabilização da garagem, um assunto que vem preocupando a todos e que finalmente teve um encaminhamento. Após análise das propostas apresentadas, foi aprovada a contratação da empresa Reformax, que apresentou a melhor relação entre custo e qualidade técnica. A obra deverá ter início em até 30 dias e o pagamento será dividido em 6 parcelas mensais, conforme deliberado.\n\nTambém foram abordados temas relativos à portaria e à organização da nossa tradicional festa junina, que este ano ficará a cargo da Marlene, a quem agradecemos desde já pela iniciativa.\n\nAgradecemos a presença de todos e reforçamos a importância da participação de cada condômino nas nossas assembleias.\n\nAtenciosamente,\nA Síndica",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "defeito_classe": "fluencia-cobrindo-vazio",
+            "defeito_plantado": "Duas coisas ao mesmo tempo, e a primeira esconde a segunda. (1) Prosa institucional fluente e vazia: 'diversos assuntos importantes', 'debates construtivos' — some com o quórum (11 de 48), com o placar (9 a 2), com o valor (R$ 71 mil) e com a separação entre decidido e pendente, que era o pedido inteiro. (2) INVENTA dois fatos que não estão na transcrição: 'início em até 30 dias' e '6 parcelas conforme deliberado' — o rateio explicitamente NÃO foi votado. Num documento que vai para 48 pessoas depois de uma confusão sobre obra, é exatamente o defeito que produz a próxima confusão.",
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "**Assembleia de [DATA] — o que foi decidido e o que ficou pendente**\n\nQuórum: 11 unidades presentes (3 por procuração), de 48.\n\n**DECIDIDO**\n\n• **Impermeabilização da garagem — aprovada.** Contratação da **Reformax, R$ 71 mil**. Votação: **9 a favor, 2 contra**. Concorreram Construtora Vale (R$ 84 mil) e uma terceira proposta trazida em plenário, que não foi analisada por não constar da pasta.\n\n**PENDENTE — fica para a próxima assembleia**\n\n• **Forma de rateio da obra.** Houve duas propostas (6 parcelas e 10 parcelas) e **não houve votação**. Nenhum parcelamento está decidido.\n\n**REGISTRADO, SEM DELIBERAÇÃO**\n\n• **Vazamento na garagem:** a unidade 302 registrou que o problema foi comunicado três vezes; a 104 confirmou o relato. É o que motivou a obra acima.\n• **Portaria:** houve relato sobre o porteiro do turno da noite. **O relato não foi confirmado por nenhum outro presente**, e a assembleia decidiu apenas acompanhar, sem qualquer medida.\n• **Festa junina:** a unidade 104 se ofereceu para organizar e não houve oposição. **Não houve votação formal**.\n\n**O que isso significa para você**\n\nA obra está aprovada e vai acontecer. **Como ela será cobrada ainda não foi decidido** — não faça planejamento com base em 6 ou 10 parcelas. A data da próxima assembleia será enviada em separado.\n\nQuem quiser conferir a ata integral pode solicitá-la na administração.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Três blocos que resolvem o problema declarado (decidido / pendente / registrado sem deliberação), quórum e placar preservados, nada inventado, o relato sobre o porteiro registrado COM a marca de não confirmado, e um fecho que diz ao leitor o que fazer com a informação. Substitui nomes por unidades — num comunicado geral, 'a unidade 302' registra o mesmo fato sem expor a pessoa. É a que deve vencer.",
+            "correta": true
+          }
+        }
+      ]
+    }
+  ],
+  "tarefas": [
+    {
+      "tipo": "avaliar_rubrica",
+      "item": "codigo-pandas-merge",
+      "resposta": "modelo-a",
+      "prioridade": 90,
+      "n_anotacoes_alvo": 2,
+      "gabarito": {
+        "sobre": "TAREFA-OURO. O gabarito não sai pela API do anotador: ele é lido só pelo painel do admin (P5) para medir agreement. Um anotador que não percebe que a resposta A é prosa vazia dá notas altas em 'nomeia a causa'.",
+        "notas_esperadas": [
+          { "criterio": "Nomeia a causa", "faixa": [1, 2] },
+          { "criterio": "Dá o comando de diagnóstico", "faixa": [1, 1] },
+          { "criterio": "Conserto com decisão explícita", "faixa": [1, 2] },
+          { "criterio": "Prevenção", "faixa": [1, 2] }
+        ],
+        "defeito_esperado": "fluencia-cobrindo-vazio"
+      }
+    },
+    {
+      "tipo": "avaliar_rubrica",
+      "item": "receita-bolo-fuba",
+      "resposta": "modelo-b",
+      "prioridade": 80,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "avaliar_rubrica",
+      "item": "email-cobranca-cliente",
+      "resposta": "modelo-a",
+      "prioridade": 70,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "avaliar_rubrica",
+      "item": "resumo-ata-condominio",
+      "resposta": "modelo-a",
+      "prioridade": 60,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "comparar_ab",
+      "item": "juridico-rescisao-aluguel",
+      "prioridade": 90,
+      "n_anotacoes_alvo": 2,
+      "gabarito": {
+        "sobre": "TAREFA-OURO. A resposta A é fluente, confiante e cita artigo de lei — e está errada em três pontos. É o par que separa quem lê de quem confere.",
+        "preferencia_esperada": "modelo-b",
+        "defeito_esperado": "fato-inventado-com-precisao"
+      }
+    },
+    {
+      "tipo": "comparar_ab",
+      "item": "redacao-escolar-enem",
+      "prioridade": 80,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "comparar_ab",
+      "item": "roleplay-mestre-rpg",
+      "prioridade": 70,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "comparar_ab",
+      "item": "traducao-marketing-pt-en",
+      "prioridade": 60,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    }
+  ]
+}

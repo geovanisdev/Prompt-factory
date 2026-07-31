@@ -381,6 +381,185 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   font-size:.92rem;z-index:50;max-width:90vw;
 }
 .recado.ruim{background:var(--erro);color:#fff}
+
+/* ==========================================================================
+   10. ÁREA DE TRABALHO DO ANOTADOR (P2)
+
+   Uma tarefa por vez, com ar em volta. As três vistas (fila, catálogo, minhas)
+   são navegação de SEGUNDA ordem e por isso ficam em botões de texto discretos
+   à direita — as quatro abas de cima escolhem QUE TIPO de trabalho, que é a
+   decisão de primeira ordem; a vista escolhe só como o trabalho chega.
+   ========================================================================== */
+.sub-barra{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin:-8px 0 16px;
+}
+.vista{
+  background:transparent;border:1px solid transparent;border-radius:99px;
+  padding:4px 12px;cursor:pointer;color:var(--texto-2);font-size:.88rem;
+}
+.vista:hover{background:var(--superficie-2);color:var(--texto)}
+.vista[aria-current="true"]{
+  background:var(--acento-fraco);border-color:var(--acento-medio);
+  color:var(--acento);font-weight:600;
+}
+
+/* ---- leitura: prompt e resposta de modelo ---- */
+.rotulo-bloco{
+  font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--texto-3);font-weight:600;
+}
+.leitura{
+  font-family:var(--fonte-leitura);font-size:1.03rem;line-height:1.65;
+  white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.leitura-caixa{max-height:34vh;overflow:auto}
+.leitura-caixa.aberta{max-height:none}
+/* PROVENIÊNCIA À VISTA: fonte e licença de cada prompt. É o argumento inteiro
+   do projeto, e ele fica colado ao texto, não numa aba de metadados. */
+.proveniencia{
+  display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  color:var(--texto-3);font-size:.82rem;margin-top:10px;
+  padding-top:9px;border-top:1px dashed var(--linha);
+}
+.selo{
+  border:1px solid var(--linha);border-radius:99px;padding:1px 9px;
+  white-space:nowrap;
+}
+.selo.demo{border-color:var(--devolvido);color:var(--devolvido)}
+
+/* ---- critérios da rubrica ---- */
+.criterios{display:flex;flex-direction:column;gap:10px}
+.criterio{
+  border:1px solid var(--linha);border-radius:var(--raio);padding:12px 14px;
+  background:var(--superficie);
+}
+.criterio[data-foco="true"]{border-color:var(--acento);box-shadow:0 0 0 1px var(--acento)}
+.criterio-nome{font-weight:600;font-size:.96rem}
+.criterio-desc{color:var(--texto-2);font-size:.88rem;margin-top:3px}
+.notas{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.nota{
+  min-width:40px;height:34px;border:1px solid var(--linha-forte);
+  border-radius:6px;background:var(--superficie);cursor:pointer;
+  font-variant-numeric:tabular-nums;font-size:.95rem;
+}
+.nota:hover{border-color:var(--texto-3)}
+.nota[aria-pressed="true"]{
+  background:var(--acento);border-color:var(--acento);
+  color:var(--sobre-acento);font-weight:600;
+}
+.ancoras{
+  display:flex;justify-content:space-between;gap:12px;
+  color:var(--texto-3);font-size:.8rem;margin-top:6px;
+}
+/* DIVULGAÇÃO PROGRESSIVA: a justificativa por critério só existe depois do
+   clique em "justificar" — ela não é o trabalho, é a exceção do trabalho. */
+.linha-just{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+
+/* ---- editor de rubrica ---- */
+.editor-criterio{
+  border:1px solid var(--linha);border-radius:var(--raio);padding:12px 14px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.campo{display:flex;flex-direction:column;gap:3px}
+.campo > span{color:var(--texto-2);font-size:.8rem}
+input[type="text"].largo,textarea{width:100%;min-width:0}
+textarea{
+  background:var(--superficie);border:1px solid var(--linha-forte);
+  border-radius:6px;padding:8px 10px;resize:vertical;line-height:1.5;
+}
+.textarea-sft{
+  font-family:var(--fonte-leitura);font-size:1.05rem;line-height:1.6;
+  min-height:min(46vh,420px);
+}
+.contador{color:var(--texto-3);font-size:.82rem;font-variant-numeric:tabular-nums}
+.modelos{border:1px solid var(--linha);border-radius:var(--raio);background:var(--superficie-2)}
+.modelos summary{cursor:pointer;padding:9px 13px;font-size:.9rem;font-weight:600;list-style:none}
+.modelos summary::-webkit-details-marker{display:none}
+.modelos summary::before{content:"› ";color:var(--texto-3)}
+.modelos[open] summary::before{content:"⌄ "}
+.modelos-corpo{padding:0 13px 12px;display:flex;flex-direction:column;gap:8px}
+
+/* ---- comparação A/B: duas colunas com rolagem sincronizada ---- */
+.ab{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:900px){.ab{grid-template-columns:1fr}}
+.ab-coluna{
+  border:1px solid var(--linha);border-radius:var(--raio);
+  display:flex;flex-direction:column;background:var(--superficie);
+  text-align:left;cursor:pointer;padding:0;color:inherit;
+}
+.ab-coluna:hover{border-color:var(--linha-forte)}
+.ab-coluna[aria-pressed="true"]{
+  border-color:var(--acento);box-shadow:0 0 0 1px var(--acento);
+  background:var(--acento-fraco);
+}
+.ab-cabeca{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-bottom:1px solid var(--linha);
+}
+.ab-texto{padding:14px;overflow:auto;height:46vh}
+.ab-empate{display:flex;justify-content:center;margin-top:12px}
+
+/* ---- checklist da rubrica-guia (SFT vindo de continuação) ---- */
+.guia{display:flex;flex-direction:column;gap:8px}
+.marcavel{
+  display:flex;gap:9px;align-items:flex-start;padding:9px 11px;
+  border:1px solid var(--linha);border-radius:6px;cursor:pointer;
+}
+.marcavel:hover{background:var(--superficie-2)}
+.marcavel input{margin-top:3px}
+.com-guia{display:grid;grid-template-columns:1fr minmax(240px,320px);gap:16px;align-items:start}
+@media (max-width:900px){.com-guia{grid-template-columns:1fr}}
+
+/* ---- a barra da ação primária ----
+   Grudada no fim da área de trabalho: a única ação primária da tela nunca pode
+   ficar abaixo da dobra, senão a tarefa parece não ter fim. */
+.acoes{
+  position:sticky;bottom:0;z-index:5;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  padding:12px 16px;background:var(--superficie);
+  border-top:1px solid var(--linha);border-radius:0 0 var(--raio) var(--raio);
+}
+.atalho{
+  font-family:var(--fonte-mono);font-size:.76rem;color:var(--texto-3);
+  border:1px solid var(--linha);border-radius:4px;padding:1px 6px;
+}
+.falta{color:var(--devolvido);font-size:.88rem}
+.aviso-rascunho{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  background:var(--devolvido-fundo);color:var(--devolvido);
+  border:1px solid var(--devolvido);border-radius:var(--raio);
+  padding:8px 12px;font-size:.88rem;margin-bottom:14px;
+}
+
+/* ---- catálogo ---- */
+.filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filtros input[type="text"]{min-width:240px;flex:1}
+.lista-catalogo{display:flex;flex-direction:column}
+.item-catalogo{
+  display:flex;gap:14px;align-items:flex-start;
+  padding:13px 16px;border-bottom:1px solid var(--linha);
+}
+.item-catalogo:last-child{border-bottom:none}
+.item-catalogo.feito{opacity:.5}
+.item-texto{flex:1;min-width:0}
+.item-trecho{
+  font-family:var(--fonte-leitura);font-size:.96rem;line-height:1.55;
+  display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.item-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:var(--texto-3);font-size:.8rem}
+.paginacao{display:flex;gap:10px;align-items:center;justify-content:center;padding:14px}
+
+/* ---- minhas tarefas ---- */
+.minha{display:flex;gap:14px;align-items:flex-start;padding:13px 16px;border-bottom:1px solid var(--linha)}
+.minha:last-child{border-bottom:none}
+.devolucao{
+  background:var(--devolvido-fundo);border-left:3px solid var(--devolvido);
+  padding:10px 13px;border-radius:0 6px 6px 0;margin-bottom:14px;
+}
+.devolucao-titulo{font-weight:600;color:var(--devolvido);margin-bottom:4px}
 </style>
 
 <!-- ==========================================================================
@@ -426,18 +605,18 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     <!-- ---------------- ANOTADOR ---------------- -->
     <section id="tela-anotador" class="tela" hidden aria-label="Área do anotador">
       <div class="abas" id="abas-anotador" role="tablist" aria-label="Estilos de tarefa"></div>
+      <div class="sub-barra">
+        <span class="etiqueta pendente"><span class="ponto"></span><span id="fila-conta"></span></span>
+        <span class="crescer"></span>
+        <div id="vistas" role="group" aria-label="Como escolher trabalho"></div>
+      </div>
       <details class="diretrizes" id="diretrizes">
         <summary id="diretrizes-titulo">Diretrizes</summary>
         <ul id="diretrizes-lista"></ul>
       </details>
-      <div class="painel">
-        <div class="painel-cabeca">
-          <h2 id="trabalho-titulo"></h2>
-          <span class="crescer"></span>
-          <span class="etiqueta pendente"><span class="ponto"></span><span id="fila-conta"></span></span>
-        </div>
-        <div class="vazio" id="anotador-vazio"></div>
-      </div>
+      <!-- Montada inteira pelo JS: o que muda entre as quatro abas é o
+           FORMULÁRIO, não a navegação. -->
+      <div id="area-trabalho"></div>
     </section>
 
     <!-- ---------------- REVISOR ---------------- -->
@@ -594,9 +773,10 @@ const TIPOS = [
     nome: "Avaliar com rubrica",
     titulo: "Avaliar uma resposta com rubrica",
     diretrizes: [
-      "Cada critério recebe uma nota de 1 a 9 — a régua inteira existe para ser usada, inclusive as pontas.",
+      "Cada critério tem a própria escala, com as pontas descritas na rubrica — use a régua inteira, inclusive os extremos.",
       "Julgue a resposta contra o critério, não contra o que você teria escrito.",
       "Justificar é opcional por critério e obrigatório quando a nota destoa das outras.",
+      "Pelo teclado: ↑ e ↓ andam entre critérios, os números graduam o critério em foco, Ctrl+Enter envia.",
     ],
     vazioTitulo: "Nada na fila de avaliação com rubrica.",
     vazioLinha: "Quando houver tarefa, ela abre aqui sozinha: prompt, resposta e a rubrica com um campo de nota por critério.",
@@ -632,7 +812,7 @@ const TIPOS = [
     diretrizes: [
       "Escolha A, B ou empate — e escreva por que. A justificativa é obrigatória: o valor está no motivo, não na preferência.",
       "As duas colunas rolam juntas para a comparação ser trecho a trecho.",
-      "A comparação por critério é opcional e fica fechada até você pedir.",
+      "Pelo teclado: ← escolhe A, → escolhe B, E marca empate, Ctrl+Enter envia.",
     ],
     vazioTitulo: "Nada na fila de comparação A/B.",
     vazioLinha: "Quando houver par, as duas respostas abrem lado a lado, com rótulos cegos: você não vê qual modelo escreveu o quê.",
@@ -652,7 +832,6 @@ const SUBABAS_REVISOR = [
 /** O que falta, com o marco. Fica no painel do admin, à vista, em vez de
     virar surpresa em cada botão desabilitado. */
 const ROTEIRO = [
-  ["P2", "Fila, catálogo e os quatro formulários de anotação, com rascunho automático e atalhos de teclado."],
   ["P3", "Ciclo de revisão completo: devolver com comentário, corrigir e reenviar como versão 2."],
   ["P4", "Modo criar: escrever um prompt, aviso de duplicata contra o corpus e revisão da criação."],
   ["P5", "Métricas por anotador, agreement das tarefas-ouro e geração de tarefas."],
@@ -664,6 +843,14 @@ const ROTEIRO = [
    2. ESTADO
    ========================================================================== */
 const CHAVE = "bancada.";
+
+/** As três vistas do anotador. A FILA é o caminho principal e vem primeiro. */
+const VISTAS = [
+  { id: "fila", nome: "Fila" },
+  { id: "catalogo", nome: "Catálogo" },
+  { id: "minhas", nome: "Minhas tarefas" },
+];
+
 const est = {
   persona: null,      // {id, nome, papel} — id ausente = perfil ainda não criado
   papelEscolhido: null,
@@ -676,6 +863,22 @@ const est = {
   // agora não precisa procurar. Por sessão (não persistido) de propósito: uma
   // sessão nova é alguém voltando depois de um tempo.
   diretrizesVistas: new Set(),
+
+  /* ---- P2 ---- */
+  vista: "fila",
+  envelope: null,     // a tarefa hidratada em mãos (ou null)
+  motivo: "",         // por que a fila está vazia — vira a frase do estado vazio
+  form: null,         // o estado do formulário do tipo em foco
+  rascunhoRecuperado: false,
+  carregando: false,
+  contagens: {},
+  foco: 0,            // qual critério o teclado está graduando
+  // O tempo É medido e vai para o admin — e NUNCA aparece para quem anota.
+  // Cronômetro à vista adiciona pressão sem melhorar decisão, e aqui não há
+  // pagamento por hora que o justifique.
+  abertoEm: 0,
+  catalogo: { q: "", lang: "", fonte: "", faixa: "", page: 1, dados: null },
+  minhas: null,
 };
 
 function guardarPersona() {
@@ -829,9 +1032,18 @@ async function abrirApp() {
     $(no).hidden = est.persona.papel !== id;
   }
 
-  if (est.persona.papel === "anotador") desenharAnotador();
-  if (est.persona.papel === "revisor") desenharRevisor();
+  // A saúde vem ANTES do desenho do anotador: é dela que saem os limites que o
+  // botão "diz o que falta" usa, e desenhar antes mostraria os números padrão
+  // por um quadro.
   await recarregarSaude();
+  if (est.persona.papel === "anotador") {
+    est.vista = "fila";
+    est.envelope = null;
+    est.motivo = "";
+    await recarregarContagens();
+    desenharAnotador();
+  }
+  if (est.persona.papel === "revisor") desenharRevisor();
   if (est.persona.papel === "admin") desenharAdmin();
 }
 
@@ -845,14 +1057,19 @@ async function recarregarSaude() {
   atualizarContagens();
 }
 
-/** Os números que a casca JÁ sabe dizer com verdade: o que existe no banco da
-    plataforma agora. Todos são zero antes do P2 — e zero é a resposta certa. */
+/** Os números da barra. O da fila é PESSOAL (o que sobrou para mim neste
+    tipo); o do revisor ainda vem da contagem global do banco, porque a fila
+    dele chega no P3. */
 function atualizarContagens() {
   const c = (est.saude && est.saude.anotacao && est.saude.anotacao.contagens) || {};
-  const abertas = c.tarefas || 0;
-  const pendentes = c.anotacoes || 0;
   const fila = $("#fila-conta");
-  if (fila) fila.textContent = abertas === 0 ? "nenhuma tarefa na fila" : n(abertas) + " na fila";
+  if (fila) {
+    const minhas = est.contagens[est.aba];
+    fila.textContent = minhas === undefined
+      ? "…"
+      : minhas === 0 ? "nada nesta fila para você" : n(minhas) + " esperando por você";
+  }
+  const pendentes = c.anotacoes || 0;
   const rev = $("#revisor-conta");
   if (rev) rev.textContent = pendentes === 0 ? "nada esperando" : n(pendentes) + " esperando";
 }
@@ -862,6 +1079,15 @@ function atualizarContagens() {
    Uma área de trabalho, uma tarefa por vez. As quatro abas são os quatro
    estilos de tarefa; o que muda entre elas é o formulário, não a navegação.
    ========================================================================== */
+/** Os limites vêm do SERVIDOR (`/api/health.limites`), que os lê do
+    settings.toml. Uma cópia aqui divergiria na primeira vez que o arquivo
+    mudasse — e a tela passaria a prometer uma validação que o 422 desmente. */
+function lim(chave, padrao) {
+  const l = (est.saude && est.saude.limites) || {};
+  const v = Number(l[chave]);
+  return Number.isFinite(v) && v > 0 ? v : padrao;
+}
+
 function desenharAnotador() {
   const barra = $("#abas-anotador");
   limpar(barra);
@@ -871,14 +1097,14 @@ function desenharAnotador() {
     b.setAttribute("role", "tab");
     b.setAttribute("aria-selected", String(est.aba === t.id));
     b.dataset.tipo = t.id;
-    b.appendChild(el("span", "conta", "0"));
-    b.addEventListener("click", () => { est.aba = t.id; desenharAnotador(); });
-    b.addEventListener("keydown", (ev) => andarNasAbas(ev, TIPOS, (id) => { est.aba = id; desenharAnotador(); }, est.aba));
+    const conta = est.contagens[t.id];
+    b.appendChild(el("span", "conta", conta === undefined ? "" : n(conta)));
+    b.addEventListener("click", () => trocarAba(t.id));
+    b.addEventListener("keydown", (ev) => andarNasAbas(ev, TIPOS, trocarAba, est.aba));
     barra.appendChild(b);
   }
 
   const t = TIPO_POR_ID[est.aba];
-  $("#trabalho-titulo").textContent = t.titulo;
 
   // Divulgação progressiva: aberta na primeira visita desta aba na sessão.
   const primeiraVez = !est.diretrizesVistas.has(t.id);
@@ -890,43 +1116,1327 @@ function desenharAnotador() {
   limpar(lista);
   for (const linha of t.diretrizes) lista.appendChild(el("li", null, linha));
 
-  desenharVazioAnotador(t);
+  desenharVistas();
   atualizarContagens();
+  desenharArea();
 }
 
-/** ESTADO VAZIO COMO BIFURCAÇÃO. Título honesto, uma linha do que vai acontecer
-    aqui, a área do prompt na posição real, e as saídas que existem de verdade. */
-function desenharVazioAnotador(t) {
-  const caixa = $("#anotador-vazio");
+function desenharVistas() {
+  const caixa = $("#vistas");
   limpar(caixa);
+  for (const v of VISTAS) {
+    const b = el("button", "vista", v.nome);
+    b.type = "button";
+    b.setAttribute("aria-current", String(est.vista === v.id));
+    b.addEventListener("click", () => irPara(v.id));
+    caixa.appendChild(b);
+  }
+}
+
+function trocarAba(tipo) {
+  if (tipo === est.aba) return;
+  est.aba = tipo;
+  est.envelope = null;
+  est.form = null;
+  est.minhas = null;
+  est.catalogo = { q: "", lang: "", fonte: "", faixa: "", page: 1, dados: null };
+  desenharAnotador();
+}
+
+function irPara(vista) {
+  est.vista = vista;
+  desenharVistas();
+  desenharArea();
+}
+
+/** Roteia a área de trabalho pela vista atual e dispara o carregamento que
+    faltar. Toda a tela do anotador passa por aqui. */
+function desenharArea() {
+  const area = $("#area-trabalho");
+  limpar(area);
+  if (est.vista === "catalogo") {
+    desenharCatalogo(area);
+    if (!est.catalogo.dados) carregarCatalogo();
+    return;
+  }
+  if (est.vista === "minhas") {
+    desenharMinhas(area);
+    if (!est.minhas) carregarMinhas();
+    return;
+  }
+  desenharFila(area);
+  // A FILA PUXA SOZINHA: não existe botão "buscar tarefa". Fechar o laço antes
+  // de pedir a próxima coisa é o que impede a tela de perguntar "e agora?".
+  if (!est.envelope && !est.carregando && !est.motivo) carregarFila();
+}
+
+/* ==========================================================================
+   5.1 FILA
+   ========================================================================== */
+
+async function carregarFila() {
+  est.carregando = true;
+  desenharArea();
+  try {
+    const r = await postar("/api/tarefas/proxima", { anotador_id: est.persona.id, tipo: est.aba });
+    aceitarEnvelope(r.tarefa, r.motivo);
+  } catch (e) {
+    est.envelope = null;
+    est.motivo = "não deu para pedir a próxima tarefa: " + e.message;
+  } finally {
+    est.carregando = false;
+  }
+  await recarregarContagens();
+  desenharArea();
+}
+
+/** Recebe (ou não) uma tarefa e prepara o formulário — restaurando o rascunho
+    se houver um guardado para esta atribuição. */
+function aceitarEnvelope(envelope, motivo) {
+  est.envelope = envelope || null;
+  est.motivo = envelope ? "" : (motivo || "");
+  est.foco = 0;
+  est.rascunhoRecuperado = false;
+  est.abertoEm = Date.now();
+  if (!envelope) { est.form = null; return; }
+  const guardado = lerRascunho(envelope.atribuicao_id);
+  if (guardado) {
+    est.form = guardado;
+    est.rascunhoRecuperado = true;
+  } else {
+    est.form = formInicial(envelope);
+  }
+}
+
+function desenharFila(area) {
+  const t = TIPO_POR_ID[est.aba];
+  const painel = el("div", "painel");
+  const cabeca = el("div", "painel-cabeca");
+  juntar(cabeca, el("h2", null, t.titulo), el("span", "crescer"));
+  if (est.envelope) {
+    const origem = est.envelope.tarefa.origem;
+    cabeca.appendChild(el("span", "fraco", origem === "livre" ? "escolhida por você"
+      : origem === "continuacao" ? "continuação da rubrica" : "tarefa da fila"));
+  }
+  painel.appendChild(cabeca);
+
+  if (est.carregando) {
+    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", "Puxando a próxima tarefa…")));
+    area.appendChild(painel);
+    return;
+  }
+  if (!est.envelope) {
+    painel.appendChild(vazioComSaida(t));
+    area.appendChild(painel);
+    return;
+  }
+  painel.appendChild(desenharWorkspace(est.envelope));
+  area.appendChild(painel);
+}
+
+/** ESTADO VAZIO COMO BIFURCAÇÃO, nunca um beco: título honesto, o motivo que o
+    servidor deu, e as saídas que existem DE VERDADE. */
+function vazioComSaida(t) {
+  const caixa = el("div", "vazio");
   juntar(caixa,
     el("div", "vazio-titulo", t.vazioTitulo),
-    el("p", "vazio-linha", t.vazioLinha));
-
-  const area = el("div", "area-prompt");
-  juntar(area,
-    el("div", "rotulo", "área do prompt"),
-    el("p", "prompt",
-      "O texto do prompt aparece aqui, em serifa: é ele que está sendo julgado, "
-      + "e por isso tem voz diferente do resto da interface. O cromo é sem serifa; "
-      + "o conteúdo, não."));
-  caixa.appendChild(area);
+    el("p", "vazio-linha", est.motivo || t.vazioLinha));
+  if (est.motivo) caixa.appendChild(el("p", "vazio-linha fraco", t.vazioLinha));
 
   const saidas = el("div", "vazio-saidas");
-  const catalogo = el("button", "botao", "Escolher no catálogo");
+  const catalogo = el("button", "botao primaria", "Escolher no catálogo");
   catalogo.type = "button";
-  catalogo.disabled = true;
-  catalogo.appendChild(el("span", "marco", "P2"));
-  const virarAdmin = el("button", "botao primaria", "Entrar como administrador");
+  catalogo.addEventListener("click", () => irPara("catalogo"));
+  const minhas = el("button", "botao", "Ver minhas tarefas");
+  minhas.type = "button";
+  minhas.addEventListener("click", () => irPara("minhas"));
+  const virarAdmin = el("button", "botao", "Entrar como administrador");
   virarAdmin.type = "button";
   virarAdmin.addEventListener("click", () => {
     voltarParaEntrada();
     escolherPapel("admin");
     recado("é o administrador quem gera tarefas para a fila");
   });
-  juntar(saidas, catalogo, virarAdmin);
+  juntar(saidas, catalogo, minhas, virarAdmin);
   caixa.appendChild(saidas);
-  caixa.appendChild(el("p", "fraco", "A fila puxa a próxima tarefa sozinha — não há botão de 'buscar tarefa'."));
+  return caixa;
+}
+
+/* ==========================================================================
+   5.2 PEÇAS COMPARTILHADAS DOS WORKSPACES
+   ========================================================================== */
+
+/** O prompt, em serifa, com a PROVENIÊNCIA colada embaixo. Texto longo abre
+    recortado e expande no clique — o corpus tem prompts de ~1 MB. */
+function blocoPrompt(env) {
+  const bloco = el("div", "painel-corpo");
+  juntar(bloco, el("div", "rotulo-bloco", "o pedido de quem escreveu"));
+  const caixa = el("div", "leitura-caixa");
+  caixa.appendChild(el("div", "leitura", env.prompt.text));
+  bloco.appendChild(caixa);
+
+  if (env.prompt.n_chars > 1200) {
+    const abrir = el("button", "botao discreta", "mostrar o texto inteiro");
+    abrir.type = "button";
+    abrir.addEventListener("click", () => {
+      caixa.classList.toggle("aberta");
+      abrir.textContent = caixa.classList.contains("aberta") ? "recolher o texto" : "mostrar o texto inteiro";
+    });
+    bloco.appendChild(abrir);
+  }
+
+  const prov = el("div", "proveniencia");
+  const selo = el("span", "selo" + (env.prompt.demo ? " demo" : ""),
+    env.prompt.demo ? "pacote de demonstração" : "fonte: " + env.prompt.fonte);
+  juntar(prov, selo,
+    el("span", "selo", "licença: " + env.prompt.licenca),
+    el("span", "selo", n(env.prompt.n_chars) + " caracteres"),
+    el("span", "selo", env.prompt.lang === "pt" ? "português" : "inglês"));
+  if (env.prompt.atribuicao) prov.appendChild(el("span", null, env.prompt.atribuicao));
+  bloco.appendChild(prov);
+  return bloco;
+}
+
+function blocoResposta(rotulo, texto) {
+  const bloco = el("div", "painel-corpo");
+  juntar(bloco, el("div", "rotulo-bloco", rotulo));
+  const caixa = el("div", "leitura-caixa");
+  caixa.appendChild(el("div", "leitura", texto));
+  bloco.appendChild(caixa);
+  return bloco;
+}
+
+function separador(no) {
+  no.style.borderTop = "1px solid var(--linha)";
+  return no;
+}
+
+/** A ÚNICA ação primária da tela. O rótulo do botão diz o que FALTA antes do
+    clique — validação que só existe depois do clique é fricção pura. */
+function barraAcoes() {
+  const barra = el("div", "acoes");
+  const falta = oQueFalta();
+  const enviarBtn = el("button", "botao primaria", falta ? falta : "Enviar e próxima");
+  enviarBtn.type = "button";
+  enviarBtn.id = "enviar";
+  enviarBtn.disabled = !!falta || est.carregando;
+  enviarBtn.addEventListener("click", enviar);
+  juntar(barra, enviarBtn, el("span", "atalho", "Ctrl+Enter"));
+
+  barra.appendChild(el("span", "crescer"));
+  const pular = el("button", "botao discreta", "Devolver e pegar outra");
+  pular.type = "button";
+  pular.addEventListener("click", abandonar);
+  barra.appendChild(pular);
+  return barra;
+}
+
+function avisoRascunho() {
+  if (!est.rascunhoRecuperado) return null;
+  const aviso = el("div", "aviso-rascunho");
+  juntar(aviso, el("span", null, "Recuperamos o que você tinha escrito nesta tarefa."));
+  const descartar = el("button", "botao discreta", "descartar e começar do zero");
+  descartar.type = "button";
+  descartar.addEventListener("click", () => {
+    limparRascunho(est.envelope.atribuicao_id);
+    est.form = formInicial(est.envelope);
+    est.rascunhoRecuperado = false;
+    desenharArea();
+  });
+  aviso.appendChild(descartar);
+  return aviso;
+}
+
+/** Material faltando: BIFURCAÇÃO, nunca beco. A saída principal é a que resolve
+    a falta (escrever a rubrica deste mesmo prompt), não "volte e tente outra". */
+function semMaterial(titulo, linha) {
+  const caixa = el("div", "vazio");
+  juntar(caixa, el("div", "vazio-titulo", titulo), el("p", "vazio-linha", linha));
+  const saidas = el("div", "vazio-saidas");
+  const rubrica = el("button", "botao primaria", "Escrever a rubrica deste prompt");
+  rubrica.type = "button";
+  rubrica.addEventListener("click", async () => {
+    const uid = est.envelope.prompt.uid;
+    // `devolver`, e não `abandonar`: puxar a próxima da fila aqui deixaria uma
+    // atribuição a mais em aberto antes de abrir a que a pessoa pediu.
+    await devolver();
+    await pegarLivreEm("escrever_rubrica", uid);
+  });
+  const devolver = el("button", "botao", "Devolver e pegar outra");
+  devolver.type = "button";
+  devolver.addEventListener("click", abandonar);
+  juntar(saidas, rubrica, devolver);
+  caixa.appendChild(saidas);
+  return caixa;
+}
+
+/** O comentário do revisor fica ACIMA do formulário, no caminho do olho: no
+    re-trabalho, reconhecer é mais barato que reconstruir de memória. */
+function blocoDevolucao(env) {
+  const anterior = env.versao_anterior;
+  if (!anterior || anterior.veredito !== "rejeitada") return null;
+  const caixa = el("div", "devolucao");
+  juntar(caixa,
+    el("div", "devolucao-titulo", "Devolvida para ajuste — versão " + anterior.versao),
+    el("p", null, anterior.comentario_revisor || ""));
+  return caixa;
+}
+
+function desenharWorkspace(env) {
+  const caixa = el("div");
+  const aviso = avisoRascunho();
+  const devolucao = blocoDevolucao(env);
+  const corpo = el("div", "painel-corpo");
+  if (devolucao) corpo.appendChild(devolucao);
+  if (aviso) corpo.appendChild(aviso);
+  if (devolucao || aviso) caixa.appendChild(corpo);
+
+  caixa.appendChild(blocoPrompt(env));
+  const tipo = env.tarefa.tipo;
+  if (tipo === "avaliar_rubrica") caixa.appendChild(wsAvaliar(env));
+  if (tipo === "escrever_rubrica") caixa.appendChild(wsEscrever(env));
+  if (tipo === "sft_resposta") caixa.appendChild(wsSft(env));
+  if (tipo === "comparar_ab") caixa.appendChild(wsComparar(env));
+  caixa.appendChild(barraAcoes());
+  return caixa;
+}
+
+/* ==========================================================================
+   5.3 AVALIAR COM RUBRICA
+   ========================================================================== */
+
+function wsAvaliar(env) {
+  const caixa = el("div");
+  const resposta = env.respostas[0];
+  if (resposta) caixa.appendChild(separador(blocoResposta("resposta em avaliação (" + resposta.rotulo + ")", resposta.texto)));
+
+  const bloco = separador(el("div", "painel-corpo"));
+  if (!env.rubrica || !resposta) {
+    bloco.appendChild(semMaterial(
+      !resposta ? "Este prompt não tem resposta de modelo para avaliar."
+        : "Este prompt não tem rubrica ativa.",
+      "Avaliar precisa dos dois: o instrumento de medida e o que vai ser medido. Escrever a rubrica dele é o passo que falta."));
+    caixa.appendChild(bloco);
+    return caixa;
+  }
+  juntar(bloco, el("div", "rotulo-bloco", "rubrica: " + env.rubrica.titulo));
+  const lista = el("div", "criterios");
+  lista.style.marginTop = "10px";
+
+  env.rubrica.criterios.forEach((c, i) => {
+    const escala = c.escala || { min: 1, max: 5, ancoras: [] };
+    const cartao = el("div", "criterio");
+    cartao.dataset.foco = String(est.foco === i);
+    juntar(cartao, el("div", "criterio-nome", c.nome), el("div", "criterio-desc", c.descricao));
+
+    const botoes = el("div", "notas");
+    for (let v = escala.min; v <= escala.max; v++) {
+      const b = el("button", "nota", String(v));
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(est.form.notas[i] === v));
+      b.setAttribute("aria-label", c.nome + ": nota " + v);
+      b.addEventListener("click", () => { est.foco = i; graduar(i, v); });
+      botoes.appendChild(b);
+    }
+    const limpa = el("button", "botao discreta", "limpar");
+    limpa.type = "button";
+    limpa.addEventListener("click", () => graduar(i, null));
+    botoes.appendChild(limpa);
+    cartao.appendChild(botoes);
+
+    const ancoras = (escala.ancoras || []).slice().sort((a, b) => a.valor - b.valor);
+    if (ancoras.length) {
+      const linha = el("div", "ancoras");
+      juntar(linha,
+        el("span", null, ancoras[0].valor + " — " + ancoras[0].rotulo),
+        el("span", null, ancoras[ancoras.length - 1].valor + " — " + ancoras[ancoras.length - 1].rotulo));
+      cartao.appendChild(linha);
+    }
+
+    // A justificativa por critério só EXISTE depois do pedido: ela é a exceção
+    // do trabalho, não o trabalho.
+    const linhaJust = el("div", "linha-just");
+    if (est.form.justificativas[i] === null) {
+      const pedir = el("button", "botao discreta", "justificar esta nota");
+      pedir.type = "button";
+      pedir.addEventListener("click", () => { est.form.justificativas[i] = ""; salvarEDesenhar(); });
+      linhaJust.appendChild(pedir);
+    } else {
+      const campo = el("textarea");
+      campo.rows = 2;
+      campo.className = "largo";
+      campo.placeholder = "por que esta nota, e não a vizinha?";
+      campo.value = est.form.justificativas[i];
+      campo.addEventListener("input", () => { est.form.justificativas[i] = campo.value; salvarRascunho(); });
+      linhaJust.appendChild(campo);
+      linhaJust.style.display = "block";
+    }
+    cartao.appendChild(linhaJust);
+    lista.appendChild(cartao);
+  });
+  bloco.appendChild(lista);
+
+  const geral = el("div", "campo");
+  geral.style.marginTop = "14px";
+  const areaGeral = el("textarea");
+  areaGeral.rows = 3;
+  areaGeral.placeholder = "comentário geral (opcional)";
+  areaGeral.value = est.form.comentario_geral;
+  areaGeral.addEventListener("input", () => { est.form.comentario_geral = areaGeral.value; salvarRascunho(); });
+  juntar(geral, el("span", null, "Comentário geral"), areaGeral);
+  bloco.appendChild(geral);
+
+  caixa.appendChild(bloco);
+  return caixa;
+}
+
+function graduar(i, valor) {
+  est.form.notas[i] = valor;
+  salvarEDesenhar();
+}
+
+/* ==========================================================================
+   5.4 ESCREVER RUBRICA
+   Três modelos de partida, COLAPSADOS. Matar a página em branco é a maior
+   redução de fricção desta aba — e um modelo aberto por padrão viraria a
+   rubrica de todo mundo.
+   ========================================================================== */
+
+const MODELOS_RUBRICA = [
+  {
+    nome: "Instrução seguida",
+    titulo: "A resposta faz o que foi pedido",
+    criterios: [
+      ["Cumpre as restrições", "Contagem, formato, tom e limites que o pedido declarou explicitamente.", "ignora ao menos uma restrição declarada", "cumpre todas, inclusive as implícitas"],
+      ["Responde à pergunta certa", "Ataca o problema que a pessoa tem, e não um problema parecido.", "responde outra coisa", "responde exatamente o que foi perguntado"],
+      ["Completude", "Todas as partes do pedido aparecem; nada foi silenciosamente omitido.", "deixa parte do pedido sem resposta", "cobre tudo e sinaliza o que não deu para cobrir"],
+    ],
+  },
+  {
+    nome: "Verdade e verificabilidade",
+    titulo: "A resposta é confiável",
+    criterios: [
+      ["Fatos", "Nomes, números, datas e citações são verdadeiros e verificáveis.", "afirma dado inventado com aparência de precisão", "só afirma o que é verificável"],
+      ["Incerteza declarada", "O que é estimativa aparece como estimativa; o que depende de contexto, também.", "apresenta suposição como certeza", "separa o certo do provável na própria frase"],
+      ["Limite do papel", "Reconhece quando o assunto exige profissional, e ainda assim orienta.", "finge autoridade que não tem", "orienta de verdade e delimita numa linha"],
+    ],
+  },
+  {
+    nome: "Utilidade prática",
+    titulo: "A resposta serve para agir",
+    criterios: [
+      ["Executável", "Dá para agir lendo uma vez, com o que a pessoa declarou ter.", "exige recurso que a pessoa disse não ter", "executável de ponta a ponta com o declarado"],
+      ["Registro adequado", "O tom cabe no destinatário e na situação que foi descrita.", "registro claramente errado", "soa como uma pessoa escrevendo para outra"],
+      ["Densidade", "Cada parágrafo acrescenta; nada é preenchimento fluente.", "prosa fluente e vazia", "nenhuma linha sobra"],
+    ],
+  },
+];
+
+function wsEscrever(env) {
+  const caixa = separador(el("div", "painel-corpo"));
+
+  const modelos = el("details", "modelos");
+  modelos.appendChild(el("summary", null, "Começar de um modelo (3 disponíveis)"));
+  const corpoModelos = el("div", "modelos-corpo");
+  corpoModelos.appendChild(el("p", "secundario",
+    "O modelo entra como rascunho editável — ele existe para você não começar de uma página em branco, não para ser enviado como está."));
+  for (const m of MODELOS_RUBRICA) {
+    const b = el("button", "botao", "Usar: " + m.nome);
+    b.type = "button";
+    b.addEventListener("click", () => {
+      est.form.titulo = m.titulo;
+      est.form.criterios = m.criterios.map((c) => ({
+        nome: c[0], descricao: c[1], escala_min: 1, escala_max: 5, rotulo_min: c[2], rotulo_max: c[3],
+      }));
+      modelos.open = false;
+      salvarEDesenhar();
+      recado("modelo carregado — ajuste os critérios ao prompt");
+    });
+    corpoModelos.appendChild(b);
+  }
+  modelos.appendChild(corpoModelos);
+  caixa.appendChild(modelos);
+
+  const tituloCampo = el("div", "campo");
+  tituloCampo.style.margin = "14px 0";
+  const entrada = el("input");
+  entrada.type = "text";
+  entrada.className = "largo";
+  entrada.maxLength = 200;
+  entrada.placeholder = "o que esta rubrica mede, em uma linha";
+  entrada.value = est.form.titulo;
+  entrada.addEventListener("input", () => { est.form.titulo = entrada.value; salvarRascunho(); atualizarBotaoEnviar(); });
+  juntar(tituloCampo, el("span", null, "Título da rubrica"), entrada);
+  caixa.appendChild(tituloCampo);
+
+  const lista = el("div", "criterios");
+  est.form.criterios.forEach((c, i) => lista.appendChild(editorCriterio(c, i)));
+  caixa.appendChild(lista);
+
+  const rodape = el("div", "forma");
+  rodape.style.marginTop = "12px";
+  const mais = el("button", "botao", "Acrescentar critério");
+  mais.type = "button";
+  mais.disabled = est.form.criterios.length >= lim("max_criterios_rubrica", 8);
+  mais.addEventListener("click", () => {
+    est.form.criterios.push({ nome: "", descricao: "", escala_min: 1, escala_max: 5, rotulo_min: "", rotulo_max: "" });
+    salvarEDesenhar();
+  });
+  juntar(rodape, mais, el("span", "fraco",
+    "de " + lim("min_criterios_rubrica", 3) + " a " + lim("max_criterios_rubrica", 8)
+    + " critérios — rubrica com 20 não é mais rigorosa, é impossível de aplicar duas vezes igual"));
+  caixa.appendChild(rodape);
+  return caixa;
+}
+
+function editorCriterio(c, i) {
+  const cartao = el("div", "editor-criterio");
+  const cabeca = el("div", "forma");
+  juntar(cabeca, el("span", "rotulo-bloco", "critério " + (i + 1)), el("span", "crescer"));
+  const tirar = el("button", "botao discreta", "remover");
+  tirar.type = "button";
+  tirar.addEventListener("click", () => { est.form.criterios.splice(i, 1); salvarEDesenhar(); });
+  cabeca.appendChild(tirar);
+  cartao.appendChild(cabeca);
+
+  const nome = el("input");
+  nome.type = "text";
+  nome.className = "largo";
+  nome.placeholder = "nome do critério";
+  nome.value = c.nome;
+  nome.addEventListener("input", () => { c.nome = nome.value; salvarRascunho(); atualizarBotaoEnviar(); });
+  cartao.appendChild(nome);
+
+  const desc = el("textarea");
+  desc.rows = 2;
+  desc.placeholder = "o que exatamente este critério mede (e o que ele NÃO mede)";
+  desc.value = c.descricao;
+  desc.addEventListener("input", () => { c.descricao = desc.value; salvarRascunho(); atualizarBotaoEnviar(); });
+  cartao.appendChild(desc);
+
+  const campos = el("div", "campos");
+  const pontas = [
+    ["rotulo_min", "a nota mais baixa significa…"],
+    ["rotulo_max", "a nota mais alta significa…"],
+  ];
+  for (const [chave, rotulo] of pontas) {
+    const campo = el("div", "campo");
+    const entrada = el("input");
+    entrada.type = "text";
+    entrada.className = "largo";
+    entrada.value = c[chave];
+    entrada.addEventListener("input", () => { c[chave] = entrada.value; salvarRascunho(); atualizarBotaoEnviar(); });
+    juntar(campo, el("span", null, rotulo), entrada);
+    campos.appendChild(campo);
+  }
+  const escala = el("div", "campo");
+  const sel = el("select");
+  for (const max of [3, 4, 5, 7]) {
+    const o = el("option", null, "1 a " + max);
+    o.value = String(max);
+    sel.appendChild(o);
+  }
+  sel.value = String(c.escala_max);
+  sel.addEventListener("change", () => { c.escala_max = Number(sel.value); salvarRascunho(); });
+  juntar(escala, el("span", null, "escala"), sel);
+  campos.appendChild(escala);
+  cartao.appendChild(campos);
+  return cartao;
+}
+
+/* ==========================================================================
+   5.5 RESPOSTA DE REFERÊNCIA (SFT)
+   ========================================================================== */
+
+function wsSft(env) {
+  const caixa = separador(el("div", "painel-corpo"));
+  const guia = env.rubrica;
+  const grade = el("div", guia ? "com-guia" : null);
+
+  const coluna = el("div");
+  juntar(coluna, el("div", "rotulo-bloco", "sua resposta de referência"));
+  const campo = el("textarea", "textarea-sft");
+  campo.placeholder = "responda ao prompt como o modelo deveria ter respondido — é este texto que vira exemplo de treino";
+  campo.value = est.form.resposta;
+  campo.addEventListener("input", () => {
+    est.form.resposta = campo.value;
+    contadorSft.textContent = n(campo.value.trim().length) + " caracteres";
+    salvarRascunho();
+    atualizarBotaoEnviar();
+  });
+  coluna.appendChild(campo);
+  const contadorSft = el("div", "contador", n(est.form.resposta.trim().length) + " caracteres");
+  coluna.appendChild(contadorSft);
+  grade.appendChild(coluna);
+
+  if (guia) {
+    const lado = el("div");
+    juntar(lado, el("div", "rotulo-bloco", "rubrica-guia: " + guia.titulo));
+    if (guia.nota) lado.appendChild(el("p", "fraco", guia.nota));
+    const marcaveis = el("div", "guia");
+    marcaveis.style.marginTop = "10px";
+    guia.criterios.forEach((c, i) => {
+      const rotulo = el("label", "marcavel");
+      const caixinha = el("input");
+      caixinha.type = "checkbox";
+      caixinha.checked = !!est.form.checklist[i];
+      caixinha.addEventListener("change", () => { est.form.checklist[i] = caixinha.checked; salvarRascunho(); });
+      const texto = el("span");
+      juntar(texto, el("div", "criterio-nome", c.nome), el("div", "criterio-desc", c.descricao));
+      juntar(rotulo, caixinha, texto);
+      marcaveis.appendChild(rotulo);
+    });
+    lado.appendChild(marcaveis);
+    lado.appendChild(el("p", "fraco", "O que você marcar entra no envio — é o autoteste da sua própria resposta."));
+    grade.appendChild(lado);
+  }
+  caixa.appendChild(grade);
+  return caixa;
+}
+
+/* ==========================================================================
+   5.6 COMPARAR A/B
+   Duas colunas com ROLAGEM SINCRONIZADA: a comparação é trecho a trecho, e
+   duas barras independentes obrigam a pessoa a reencontrar o lugar a cada vez.
+   ========================================================================== */
+
+function wsComparar(env) {
+  const caixa = separador(el("div", "painel-corpo"));
+  // Sem par não há comparação. Estado honesto com saídas reais, nunca duas
+  // colunas vazias esperando um material que não existe.
+  if (env.respostas.length < 2) {
+    caixa.appendChild(semMaterial(
+      "Este prompt não tem duas respostas de modelo.",
+      "A comparação A/B precisa de um par. Escrever a rubrica dele é o passo que falta para que ele possa ser comparado depois."));
+    return caixa;
+  }
+  const grade = el("div", "ab");
+  const areas = [];
+
+  env.respostas.forEach((r, i) => {
+    const coluna = el("button", "ab-coluna");
+    coluna.type = "button";
+    coluna.setAttribute("aria-pressed", String(est.form.preferencia === r.rotulo));
+    const cabeca = el("div", "ab-cabeca");
+    juntar(cabeca,
+      el("strong", null, r.rotulo === "modelo-a" ? "A" : "B"),
+      el("span", "fraco", "rótulo cego"),
+      el("span", "crescer"),
+      el("span", "atalho", i === 0 ? "←" : "→"));
+    const texto = el("div", "ab-texto");
+    texto.appendChild(el("div", "leitura", r.texto));
+    juntar(coluna, cabeca, texto);
+    coluna.addEventListener("click", () => escolherAB(r.rotulo));
+    areas.push(texto);
+    grade.appendChild(coluna);
+  });
+  caixa.appendChild(grade);
+  sincronizarRolagem(areas);
+
+  const empate = el("div", "ab-empate");
+  const bEmpate = el("button", "botao", "As duas são equivalentes (empate)");
+  bEmpate.type = "button";
+  bEmpate.setAttribute("aria-pressed", String(est.form.preferencia === "empate"));
+  if (est.form.preferencia === "empate") bEmpate.classList.add("primaria");
+  bEmpate.addEventListener("click", () => escolherAB("empate"));
+  juntar(empate, bEmpate, el("span", "atalho", "E"));
+  caixa.appendChild(empate);
+
+  const minimo = lim("min_chars_justificativa", 30);
+  const campo = el("div", "campo");
+  campo.style.marginTop = "16px";
+  const area = el("textarea");
+  area.rows = 4;
+  area.placeholder = "o que a escolhida faz que a outra não faz? (mínimo de " + minimo + " caracteres)";
+  area.value = est.form.justificativa;
+  area.addEventListener("input", () => {
+    est.form.justificativa = area.value;
+    contador.textContent = n(area.value.trim().length) + " de " + minimo + " caracteres";
+    salvarRascunho();
+    atualizarBotaoEnviar();
+  });
+  juntar(campo,
+    el("span", null, "Por que — obrigatório. O valor da comparação está no motivo, não na preferência."),
+    area);
+  const contador = el("div", "contador", n(est.form.justificativa.trim().length) + " de " + minimo + " caracteres");
+  campo.appendChild(contador);
+  caixa.appendChild(campo);
+  return caixa;
+}
+
+function escolherAB(rotulo) {
+  est.form.preferencia = est.form.preferencia === rotulo ? null : rotulo;
+  salvarEDesenhar();
+}
+
+/** Rolagem sincronizada por PROPORÇÃO, não por pixel: as duas respostas quase
+    nunca têm a mesma altura, e casar o scrollTop cru descasa os textos na
+    primeira rolagem. */
+function sincronizarRolagem(areas) {
+  if (areas.length !== 2) return;
+  let ecoando = false;
+  areas.forEach((area, i) => {
+    area.addEventListener("scroll", () => {
+      if (ecoando) return;
+      ecoando = true;
+      const outro = areas[1 - i];
+      const meu = Math.max(1, area.scrollHeight - area.clientHeight);
+      const dele = Math.max(0, outro.scrollHeight - outro.clientHeight);
+      outro.scrollTop = (area.scrollTop / meu) * dele;
+      // rAF, e não um timeout: o navegador dispara o scroll do outro lado no
+      // mesmo quadro, e liberar antes disso reabre o laço.
+      requestAnimationFrame(() => { ecoando = false; });
+    });
+  });
+}
+
+/* ==========================================================================
+   5.7 FORMULÁRIO: estado inicial, o que falta, rascunho e envio
+   ========================================================================== */
+
+function formInicial(env) {
+  const tipo = env.tarefa.tipo;
+  const anterior = env.versao_anterior && env.versao_anterior.payload;
+  if (tipo === "avaliar_rubrica") {
+    const criterios = (env.rubrica && env.rubrica.criterios) || [];
+    const form = {
+      notas: criterios.map(() => null),
+      justificativas: criterios.map(() => null),
+      comentario_geral: "",
+    };
+    // RECONHECIMENTO EM VEZ DE MEMÓRIA: no re-trabalho o formulário volta
+    // preenchido com o que a pessoa escreveu.
+    if (anterior && anterior.notas) {
+      criterios.forEach((c, i) => {
+        const achado = anterior.notas.find((x) => x.criterio === c.nome);
+        if (achado) {
+          form.notas[i] = achado.nota;
+          if (achado.justificativa) form.justificativas[i] = achado.justificativa;
+        }
+      });
+      form.comentario_geral = anterior.comentario_geral || "";
+    }
+    return form;
+  }
+  if (tipo === "escrever_rubrica") {
+    if (anterior && anterior.criterios) {
+      return { titulo: anterior.titulo || "", criterios: anterior.criterios.map((c) => ({ ...c })) };
+    }
+    return { titulo: "", criterios: [] };
+  }
+  if (tipo === "sft_resposta") {
+    const criterios = (env.rubrica && env.rubrica.criterios) || [];
+    return {
+      resposta: (anterior && anterior.resposta) || "",
+      checklist: criterios.map(() => false),
+    };
+  }
+  return {
+    preferencia: (anterior && anterior.preferencia) || null,
+    justificativa: (anterior && anterior.justificativa) || "",
+  };
+}
+
+/** O QUE FALTA, em uma frase — ou `null` quando dá para enviar.
+
+    É esta função que vira o rótulo do botão. Ela usa os MESMOS limites do
+    servidor (lidos do /api/health), então o botão e o 422 nunca discordam. */
+function oQueFalta() {
+  const env = est.envelope;
+  if (!env || !est.form) return "Nada para enviar";
+  const tipo = env.tarefa.tipo;
+
+  if (tipo === "avaliar_rubrica") {
+    if (!env.rubrica) return "Esta tarefa está sem rubrica";
+    const total = est.form.notas.length;
+    const semNota = est.form.notas.filter((v) => v === null || v === undefined).length;
+    if (semNota) return semNota + " de " + total + " critérios sem nota";
+    return null;
+  }
+  if (tipo === "escrever_rubrica") {
+    const piso = lim("min_criterios_rubrica", 3);
+    if (est.form.titulo.trim().length < 5) return "Falta o título da rubrica";
+    if (est.form.criterios.length < piso) {
+      const faltam = piso - est.form.criterios.length;
+      return "Faltam " + faltam + " critério" + (faltam > 1 ? "s" : "");
+    }
+    for (let i = 0; i < est.form.criterios.length; i++) {
+      const c = est.form.criterios[i];
+      if (c.nome.trim().length < 3) return "Critério " + (i + 1) + ": falta o nome";
+      if (c.descricao.trim().length < 10) return "Critério " + (i + 1) + ": falta a descrição";
+      if (c.rotulo_min.trim().length < 3 || c.rotulo_max.trim().length < 3) {
+        return "Critério " + (i + 1) + ": descreva as duas pontas da escala";
+      }
+    }
+    return null;
+  }
+  if (tipo === "sft_resposta") {
+    const piso = lim("min_chars_sft", 40);
+    const tem = est.form.resposta.trim().length;
+    if (tem < piso) return "Faltam " + (piso - tem) + " caracteres na resposta";
+    return null;
+  }
+  if (!est.form.preferencia) return "Escolha A, B ou empate";
+  const piso = lim("min_chars_justificativa", 30);
+  const tem = est.form.justificativa.trim().length;
+  if (tem < piso) return "Faltam " + (piso - tem) + " caracteres na justificativa";
+  return null;
+}
+
+/** Atualiza SÓ o botão. Redesenhar a área inteira a cada tecla digitada tiraria
+    o foco do campo no meio da frase. */
+function atualizarBotaoEnviar() {
+  const b = $("#enviar");
+  if (!b) return;
+  const falta = oQueFalta();
+  b.textContent = falta ? falta : "Enviar e próxima";
+  b.disabled = !!falta || est.carregando;
+}
+
+function salvarEDesenhar() {
+  salvarRascunho();
+  desenharArea();
+}
+
+/* ---- rascunho automático, por atribuição ----
+   Perder trabalho é a maior fricção que existe. O rascunho é por
+   `atribuicao_id` (e não por tipo) porque é a atribuição que identifica ESTE
+   trabalho: duas tarefas do mesmo tipo têm rascunhos independentes. */
+function rascunhoChave(id) { return CHAVE + "rascunho." + id; }
+
+function salvarRascunho() {
+  if (!est.envelope || !est.form) return;
+  try {
+    localStorage.setItem(rascunhoChave(est.envelope.atribuicao_id), JSON.stringify(est.form));
+  } catch (_) { /* modo privado ou cota cheia: a demo funciona, só não lembra */ }
+}
+function lerRascunho(id) {
+  try {
+    const bruto = localStorage.getItem(rascunhoChave(id));
+    return bruto ? JSON.parse(bruto) : null;
+  } catch (_) { return null; }
+}
+function limparRascunho(id) {
+  try { localStorage.removeItem(rascunhoChave(id)); } catch (_) {}
+}
+
+/** Monta o payload no formato do contrato `<tipo>@1`. O servidor revalida tudo
+    contra o tipo que ELE leu do banco — isto aqui é conveniência, não garantia. */
+function montarPayload(env) {
+  const tipo = env.tarefa.tipo;
+  if (tipo === "avaliar_rubrica") {
+    const criterios = env.rubrica.criterios;
+    return {
+      notas: criterios.map((c, i) => {
+        const nota = { criterio: c.nome, nota: est.form.notas[i] };
+        const just = est.form.justificativas[i];
+        if (just && just.trim()) nota.justificativa = just.trim();
+        return nota;
+      }),
+      comentario_geral: est.form.comentario_geral.trim() || null,
+    };
+  }
+  if (tipo === "escrever_rubrica") {
+    return {
+      titulo: est.form.titulo.trim(),
+      criterios: est.form.criterios.map((c) => ({
+        nome: c.nome.trim(),
+        descricao: c.descricao.trim(),
+        escala_min: 1,
+        escala_max: Number(c.escala_max) || 5,
+        rotulo_min: c.rotulo_min.trim(),
+        rotulo_max: c.rotulo_max.trim(),
+      })),
+    };
+  }
+  if (tipo === "sft_resposta") {
+    const corpo = { resposta: est.form.resposta.trim() };
+    const criterios = (env.rubrica && env.rubrica.criterios) || [];
+    if (criterios.length) {
+      corpo.checklist = criterios.map((c, i) => ({ criterio: c.nome, atendido: !!est.form.checklist[i] }));
+    }
+    return corpo;
+  }
+  return { preferencia: est.form.preferencia, justificativa: est.form.justificativa.trim() };
+}
+
+async function enviar() {
+  if (!est.envelope || oQueFalta() || est.carregando) return;
+  const env = est.envelope;
+  est.carregando = true;
+  atualizarBotaoEnviar();
+  try {
+    const r = await postar("/api/atribuicoes/" + env.atribuicao_id + "/submeter", {
+      anotador_id: est.persona.id,
+      payload: montarPayload(env),
+      // Medido e enviado — e invisível para quem anota. Só o admin vê tempos.
+      tempo_ativo_ms: Math.max(0, Date.now() - est.abertoEm),
+    });
+    limparRascunho(env.atribuicao_id);
+    est.envelope = null;
+    est.form = null;
+    recado(r.expirou
+      ? "enviado (o prazo tinha expirado, mas seu trabalho foi salvo)"
+      : "enviado para revisão — versão " + r.versao);
+    est.carregando = false;
+    if (r.continuacao) { oferecerContinuacao(r.continuacao); return; }
+    // FECHAR O LOOP ANTES DE PEDIR A PRÓXIMA COISA: enviar leva direto à
+    // próxima tarefa, sem uma tela intermediária perguntando "e agora?".
+    est.motivo = "";
+    est.vista = "fila";
+    desenharVistas();
+    await carregarFila();
+  } catch (e) {
+    est.carregando = false;
+    recado(e.message, true);
+    desenharArea();
+  }
+}
+
+/** A oferta rubrica → SFT. Uma pergunta, duas saídas, nenhuma delas um beco. */
+function oferecerContinuacao(cont) {
+  const area = $("#area-trabalho");
+  limpar(area);
+  const painel = el("div", "painel");
+  painel.appendChild(juntar(el("div", "painel-cabeca"), el("h2", null, "Enviado para revisão")));
+  const caixa = el("div", "vazio");
+  juntar(caixa,
+    el("div", "vazio-titulo", cont.convite),
+    el("p", "vazio-linha", cont.porque));
+  const saidas = el("div", "vazio-saidas");
+  const sim = el("button", "botao primaria", "Escrever a resposta agora");
+  sim.type = "button";
+  sim.addEventListener("click", () => aceitarContinuacao(cont));
+  const nao = el("button", "botao", "Não, próxima da fila");
+  nao.type = "button";
+  nao.addEventListener("click", () => { est.motivo = ""; carregarFila(); });
+  juntar(saidas, sim, nao);
+  caixa.appendChild(saidas);
+  painel.appendChild(caixa);
+  area.appendChild(painel);
+}
+
+async function aceitarContinuacao(cont) {
+  est.aba = cont.tipo;
+  est.vista = "fila";
+  est.carregando = true;
+  desenharAnotador();
+  try {
+    const r = await postar("/api/tarefas/livre", {
+      anotador_id: est.persona.id,
+      tipo: cont.tipo,
+      prompt_uid: cont.prompt_uid,
+      origem: cont.origem,
+    });
+    aceitarEnvelope(r.tarefa, "");
+  } catch (e) {
+    est.motivo = "não deu para abrir a continuação: " + e.message;
+  } finally {
+    est.carregando = false;
+  }
+  await recarregarContagens();
+  desenharArea();
+}
+
+/** Devolve a atribuição em mãos e NÃO puxa a próxima — quem decide o que vem
+    depois é quem chamou. */
+async function devolver() {
+  if (!est.envelope) return;
+  const id = est.envelope.atribuicao_id;
+  try {
+    await postar("/api/atribuicoes/" + id + "/abandonar", { anotador_id: est.persona.id });
+    limparRascunho(id);
+    recado("tarefa devolvida para a fila");
+  } catch (e) {
+    recado(e.message, true);
+  }
+  est.envelope = null;
+  est.form = null;
+  est.motivo = "";
+}
+
+async function abandonar() {
+  await devolver();
+  await carregarFila();
+}
+
+async function recarregarContagens() {
+  try {
+    const r = await api(comParams("/api/tarefas/contagens", new URLSearchParams({
+      anotador_id: String(est.persona.id),
+    })));
+    est.contagens = r.contagens || {};
+  } catch (_) { est.contagens = {}; }
+  pintarContagens();
+}
+
+/** Só os números das abas — sem redesenhar a área de trabalho embaixo. */
+function pintarContagens() {
+  for (const b of document.querySelectorAll("#abas-anotador .aba")) {
+    const conta = est.contagens[b.dataset.tipo];
+    const selo = b.querySelector(".conta");
+    if (selo) selo.textContent = conta === undefined ? "" : n(conta);
+  }
+  atualizarContagens();
+}
+
+/* ==========================================================================
+   5.8 CATÁLOGO (modo livre)
+   Busca + TRÊS filtros. Recorte fino é o trabalho da outra ferramenta; aqui a
+   pessoa quer escolher uma tarefa em dez segundos.
+   ========================================================================== */
+
+const FAIXAS = [
+  ["", "qualquer tamanho"],
+  ["curto", "curto"],
+  ["medio", "médio"],
+  ["longo", "longo"],
+];
+
+function desenharCatalogo(area) {
+  const painel = el("div", "painel");
+  const cabeca = el("div", "painel-cabeca");
+  juntar(cabeca,
+    el("h2", null, "Escolher um prompt para " + TIPO_POR_ID[est.aba].nome.toLowerCase()),
+    el("span", "crescer"));
+  const dados = est.catalogo.dados;
+  if (dados) cabeca.appendChild(el("span", "fraco num", n(dados.total) + " de " + n(dados.n_pool) + " no pool"));
+  painel.appendChild(cabeca);
+
+  const corpo = el("div", "painel-corpo");
+  const filtros = el("div", "filtros");
+  const busca = el("input");
+  busca.type = "text";
+  busca.placeholder = "buscar no texto do prompt";
+  busca.value = est.catalogo.q;
+  busca.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") { est.catalogo.q = busca.value; est.catalogo.page = 1; carregarCatalogo(); }
+  });
+  filtros.appendChild(busca);
+
+  const selIdioma = seletor([["", "todos os idiomas"], ["pt", "português"], ["en", "inglês"]],
+    est.catalogo.lang, (v) => { est.catalogo.lang = v; est.catalogo.page = 1; carregarCatalogo(); });
+  const selFaixa = seletor(FAIXAS, est.catalogo.faixa,
+    (v) => { est.catalogo.faixa = v; est.catalogo.page = 1; carregarCatalogo(); });
+  const fontes = [["", "todas as fontes"]].concat(((dados && dados.fontes) || []).map((f) => [f, f]));
+  const selFonte = seletor(fontes, est.catalogo.fonte,
+    (v) => { est.catalogo.fonte = v; est.catalogo.page = 1; carregarCatalogo(); });
+  juntar(filtros, selIdioma, selFaixa, selFonte);
+
+  const buscar = el("button", "botao", "Buscar");
+  buscar.type = "button";
+  buscar.addEventListener("click", () => { est.catalogo.q = busca.value; est.catalogo.page = 1; carregarCatalogo(); });
+  filtros.appendChild(buscar);
+  corpo.appendChild(filtros);
+  if (est.catalogo.q && dados && !dados.busca_aplicada) {
+    corpo.appendChild(el("p", "falta", "A busca não sobrou nada depois de limpar os símbolos — a lista abaixo é o pool sem filtro de texto."));
+  }
+  painel.appendChild(corpo);
+
+  if (!dados) {
+    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", "Carregando o catálogo…")));
+    area.appendChild(painel);
+    return;
+  }
+  if (!dados.items.length) {
+    const vazio = el("div", "vazio");
+    juntar(vazio,
+      el("div", "vazio-titulo", "Nenhum prompt com esses filtros."),
+      el("p", "vazio-linha", "O pool tem " + n(dados.n_pool) + " prompts. Tire um filtro ou volte para a fila."));
+    const saidas = el("div", "vazio-saidas");
+    const limpaB = el("button", "botao primaria", "Limpar os filtros");
+    limpaB.type = "button";
+    limpaB.addEventListener("click", () => {
+      est.catalogo = { q: "", lang: "", fonte: "", faixa: "", page: 1, dados: null };
+      carregarCatalogo();
+    });
+    const volta = el("button", "botao", "Voltar para a fila");
+    volta.type = "button";
+    volta.addEventListener("click", () => irPara("fila"));
+    juntar(saidas, limpaB, volta);
+    vazio.appendChild(saidas);
+    painel.appendChild(vazio);
+    area.appendChild(painel);
+    return;
+  }
+
+  const lista = el("div", "lista-catalogo");
+  for (const item of dados.items) {
+    const linha = el("div", "item-catalogo" + (item.ja_anotei ? " feito" : ""));
+    const texto = el("div", "item-texto");
+    juntar(texto, el("div", "item-trecho", item.trecho + (item.truncado ? "…" : "")));
+    const meta = el("div", "item-meta");
+    juntar(meta,
+      el("span", "selo", item.fonte),
+      el("span", "selo", item.licenca),
+      el("span", "selo", n(item.n_chars) + " caracteres"),
+      el("span", "selo", item.lang === "pt" ? "português" : "inglês"));
+    if (item.ja_anotei) meta.appendChild(el("span", "selo", "você já anotou este"));
+    // O ERRO SE ANUNCIA ANTES DE ACONTECER: um prompt cru do corpus não tem
+    // resposta de modelo nenhuma, e comparar A/B sobre ele seria um beco.
+    const podeEste = (item.pode || []).indexOf(est.aba) >= 0;
+    if (!podeEste) meta.appendChild(el("span", "selo", "sem material para este tipo"));
+    texto.appendChild(meta);
+    linha.appendChild(texto);
+
+    const impedido = !!item.ja_anotei || !podeEste;
+    const b = el("button", "botao" + (impedido ? "" : " primaria"),
+      item.ja_anotei ? "Já anotado" : !podeEste ? "Sem material" : "Anotar este");
+    b.type = "button";
+    b.disabled = impedido;
+    if (!podeEste && !item.ja_anotei) {
+      b.title = est.aba === "comparar_ab"
+        ? "a comparação A/B precisa de duas respostas de modelo; este prompt tem " + n(item.n_respostas)
+        : "avaliar com rubrica precisa de uma rubrica ativa e de uma resposta de modelo";
+    }
+    b.addEventListener("click", () => pegarLivre(item.uid));
+    linha.appendChild(b);
+    lista.appendChild(linha);
+  }
+  painel.appendChild(lista);
+
+  if (dados.pages > 1) {
+    const nav = el("div", "paginacao");
+    const anterior = el("button", "botao", "anterior");
+    anterior.type = "button";
+    anterior.disabled = dados.page <= 1;
+    anterior.addEventListener("click", () => { est.catalogo.page = dados.page - 1; carregarCatalogo(); });
+    const proximo = el("button", "botao", "próxima");
+    proximo.type = "button";
+    proximo.disabled = dados.page >= dados.pages;
+    proximo.addEventListener("click", () => { est.catalogo.page = dados.page + 1; carregarCatalogo(); });
+    juntar(nav, anterior, el("span", "num", "página " + n(dados.page) + " de " + n(dados.pages)), proximo);
+    painel.appendChild(nav);
+  }
+  area.appendChild(painel);
+}
+
+function seletor(opcoes, valor, aoMudar) {
+  const sel = el("select");
+  for (const [v, rotulo] of opcoes) {
+    const o = el("option", null, rotulo);
+    o.value = v;
+    sel.appendChild(o);
+  }
+  sel.value = valor;
+  sel.addEventListener("change", () => aoMudar(sel.value));
+  return sel;
+}
+
+/** Junta caminho e query. Existe para que o caminho continue sendo um literal
+    inteiro no código — é o que o teste de contrato do front consegue ler. */
+function comParams(caminho, params) {
+  return caminho + "?" + params.toString();
+}
+
+/** Ordem das buscas do catálogo. Trocar dois filtros em sequência dispara duas
+    consultas, e a PRIMEIRA pode responder por último — a tela mostraria o
+    resultado do filtro anterior como se fosse o atual. Só a busca mais recente
+    tem direito de escrever em `est.catalogo.dados`. */
+let buscaAtual = 0;
+
+async function carregarCatalogo() {
+  const c = est.catalogo;
+  const minha = ++buscaAtual;
+  const p = new URLSearchParams({
+    anotador_id: String(est.persona.id),
+    tipo: est.aba,
+    page: String(c.page),
+  });
+  if (c.q.trim()) p.set("q", c.q.trim());
+  if (c.lang) p.set("lang", c.lang);
+  if (c.fonte) p.set("fonte", c.fonte);
+  if (c.faixa) p.set("faixa", c.faixa);
+  let resultado;
+  try {
+    resultado = await api(comParams("/api/catalogo", p));
+  } catch (e) {
+    resultado = { items: [], total: 0, pages: 0, page: 1, n_pool: 0, fontes: [] };
+    if (minha === buscaAtual) recado("não deu para ler o catálogo: " + e.message, true);
+  }
+  if (minha !== buscaAtual) return;  // chegou atrasada: descarta
+  c.dados = resultado;
+  if (est.vista === "catalogo") desenharArea();
+}
+
+const pegarLivre = (uid) => pegarLivreEm(est.aba, uid);
+
+/** Abre este prompt neste tipo, pelo modo livre, e leva para a área de trabalho. */
+async function pegarLivreEm(tipo, uid) {
+  try {
+    const r = await postar("/api/tarefas/livre", {
+      anotador_id: est.persona.id, tipo, prompt_uid: uid,
+    });
+    est.aba = tipo;
+    aceitarEnvelope(r.tarefa, "");
+    est.vista = "fila";
+    desenharAnotador();
+    await recarregarContagens();
+  } catch (e) {
+    recado(e.message, true);
+  }
+}
+
+/* ==========================================================================
+   5.9 MINHAS TAREFAS
+   ========================================================================== */
+
+const ROTULO_STATUS = {
+  em_andamento: ["pendente", "em andamento"],
+  submetida: ["pendente", "esperando revisão"],
+  aprovada: ["aprovado", "aprovada"],
+  abandonada: ["pendente", "devolvida por você"],
+  expirada: ["pendente", "prazo expirado"],
+};
+
+function desenharMinhas(area) {
+  const painel = el("div", "painel");
+  const cabeca = el("div", "painel-cabeca");
+  juntar(cabeca, el("h2", null, "Minhas tarefas"), el("span", "crescer"));
+  if (est.minhas) cabeca.appendChild(el("span", "fraco num", n(est.minhas.length) + " no total"));
+  painel.appendChild(cabeca);
+
+  if (!est.minhas) {
+    painel.appendChild(juntar(el("div", "vazio"), el("p", "vazio-linha", "Carregando…")));
+    area.appendChild(painel);
+    return;
+  }
+  if (!est.minhas.length) {
+    const vazio = el("div", "vazio");
+    juntar(vazio,
+      el("div", "vazio-titulo", "Você ainda não pegou nenhuma tarefa."),
+      el("p", "vazio-linha", "A fila entrega a próxima sozinha; o catálogo deixa você escolher."));
+    const saidas = el("div", "vazio-saidas");
+    const fila = el("button", "botao primaria", "Ir para a fila");
+    fila.type = "button";
+    fila.addEventListener("click", () => irPara("fila"));
+    const cat = el("button", "botao", "Escolher no catálogo");
+    cat.type = "button";
+    cat.addEventListener("click", () => irPara("catalogo"));
+    juntar(saidas, fila, cat);
+    vazio.appendChild(saidas);
+    painel.appendChild(vazio);
+    area.appendChild(painel);
+    return;
+  }
+
+  for (const item of est.minhas) {
+    const linha = el("div", "minha");
+    const texto = el("div", "item-texto");
+    const topo = el("div", "forma");
+    const [classe, rotulo] = ROTULO_STATUS[item.status] || ["pendente", item.status];
+    const eti = el("span", "etiqueta " + classe);
+    juntar(eti, el("span", "ponto"), el("span", null, rotulo));
+    juntar(topo, eti,
+      el("span", "fraco", (TIPO_POR_ID[item.tipo] || {}).nome || item.tipo),
+      el("span", "fraco", item.origem === "livre" ? "escolhida por você" : "da fila"));
+    if (item.versao) topo.appendChild(el("span", "fraco", "versão " + item.versao));
+    texto.appendChild(topo);
+
+    texto.appendChild(el("div", "item-trecho",
+      item.disponivel ? item.prompt : "este prompt saiu do corpus na última recarga"));
+    if (item.veredito === "rejeitada" && item.comentario_revisor) {
+      const dev = el("div", "devolucao");
+      juntar(dev,
+        el("div", "devolucao-titulo", "Devolvida para ajuste"),
+        el("p", null, item.comentario_revisor));
+      texto.appendChild(dev);
+    }
+    linha.appendChild(texto);
+
+    if (item.status === "em_andamento" && item.disponivel) {
+      const abrir = el("button", "botao primaria", "Continuar");
+      abrir.type = "button";
+      abrir.addEventListener("click", () => reabrir(item));
+      linha.appendChild(abrir);
+    }
+    painel.appendChild(linha);
+  }
+  area.appendChild(painel);
+}
+
+async function carregarMinhas() {
+  try {
+    const r = await api(comParams("/api/atribuicoes", new URLSearchParams({
+      anotador_id: String(est.persona.id),
+    })));
+    est.minhas = r.items || [];
+  } catch (e) {
+    est.minhas = [];
+    recado("não deu para ler suas tarefas: " + e.message, true);
+  }
+  if (est.vista === "minhas") desenharArea();
+}
+
+async function reabrir(item) {
+  try {
+    const r = await api(comParams("/api/atribuicoes/" + item.atribuicao_id, new URLSearchParams({
+      anotador_id: String(est.persona.id),
+    })));
+    est.aba = item.tipo;
+    aceitarEnvelope(r.tarefa, "");
+    est.vista = "fila";
+    desenharAnotador();
+  } catch (e) {
+    recado(e.message, true);
+  }
+}
+
+/* ==========================================================================
+   5.10 TECLADO
+   O teclado é o caminho principal; o mouse é o alternativo. Uma tarefa inteira
+   precisa ser completável sem tocar no mouse.
+   ========================================================================== */
+
+function ehCampo(alvo) {
+  const tag = (alvo && alvo.tagName) || "";
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (alvo && alvo.isContentEditable);
+}
+
+function teclado(ev) {
+  if (!est.persona || est.persona.papel !== "anotador") return;
+
+  // Ctrl+Enter vale DENTRO dos campos também: é o atalho de "terminei de
+  // escrever", e obrigar a sair do campo antes de enviar é fricção.
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+    ev.preventDefault();
+    enviar();
+    return;
+  }
+  if (ehCampo(ev.target) || !est.envelope || est.vista !== "fila") return;
+
+  const tipo = est.envelope.tarefa.tipo;
+  if (tipo === "avaliar_rubrica" && est.envelope.rubrica) {
+    const total = est.form.notas.length;
+    if (!total) return;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      const passo = ev.key === "ArrowDown" ? 1 : -1;
+      est.foco = (est.foco + passo + total) % total;
+      ev.preventDefault();
+      desenharArea();
+      return;
+    }
+    if (/^[1-9]$/.test(ev.key)) {
+      const criterio = est.envelope.rubrica.criterios[est.foco];
+      const escala = (criterio && criterio.escala) || { min: 1, max: 9 };
+      const valor = Number(ev.key);
+      if (valor < escala.min || valor > escala.max) {
+        recado("este critério vai de " + escala.min + " a " + escala.max, true);
+        return;
+      }
+      ev.preventDefault();
+      graduar(est.foco, valor);
+      // Andar sozinho para o próximo é o que torna a rubrica inteira uma
+      // sequência de teclas, sem uma navegação entre cada nota.
+      if (est.foco < total - 1) { est.foco += 1; desenharArea(); }
+      return;
+    }
+  }
+  if (tipo === "comparar_ab") {
+    if (ev.key === "ArrowLeft") { ev.preventDefault(); escolherAB("modelo-a"); }
+    if (ev.key === "ArrowRight") { ev.preventDefault(); escolherAB("modelo-b"); }
+    if (ev.key === "e" || ev.key === "E") { ev.preventDefault(); escolherAB("empate"); }
+  }
 }
 
 /* Navegação por setas dentro de um conjunto de abas (padrão de tablist). */
@@ -1009,8 +2519,8 @@ function desenharAdmin() {
   limpar(cards);
   const numeros = [
     [c.anotadores, "pessoas na equipe", "3 anotadores, 2 revisores, 1 admin no seed"],
-    [c.tarefas, "tarefas criadas", "a geração de tarefas chega no P5"],
-    [c.anotacoes, "anotações submetidas", "o formulário de anotação chega no P2"],
+    [c.tarefas, "tarefas criadas", "8 do pacote de demonstração + as do corpus real"],
+    [c.anotacoes, "anotações submetidas", "a revisão delas chega no P3"],
     [c.criacoes, "prompts escritos aqui", "o modo criar chega no P4"],
   ];
   for (const [valor, rotulo, nota] of numeros) {
@@ -1148,6 +2658,9 @@ function ligarEventos() {
   $("#tema").addEventListener("click", alternarTema);
   $("#admin-criar").addEventListener("click", criarPelaEquipe);
   $("#admin-nome").addEventListener("keydown", (e) => { if (e.key === "Enter") criarPelaEquipe(); });
+  // Um ouvinte só, no documento: os atalhos pertencem à TELA, não a um nó que
+  // é destruído e recriado a cada redesenho da área de trabalho.
+  document.addEventListener("keydown", teclado);
 }
 
 async function iniciar() {
