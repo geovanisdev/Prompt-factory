@@ -172,6 +172,28 @@ cache_max_entradas = 64
 # Tokens que o sanitizador do FTS aceita numa busca (o resto é descartado).
 fts_max_tokens = 24
 
+# --- busca semântica (M10) ----------------------------------------------------
+# "f32" mantém a matriz inteira convertida na RAM: 144.754 x 384 x 4 = 212 MiB e
+# 5,8 ms por consulta (BLAS sgemv). "f16" economiza metade da RAM lendo o memmap
+# em blocos, mas a CONVERSÃO — não a multiplicação — custa 199,3 ms: 34x mais,
+# medido no corpus real, para os mesmos escores (diferença de 6e-08).
+# O ganho do f32 não é só velocidade: a 5,8 ms dá para pontuar o corpus INTEIRO e
+# aplicar o filtro exato, em vez de aproximar por over-fetch. Aproximação
+# silenciosa numa ferramenta de pesquisa linguística é pior que lentidão.
+semantic_precision = "f32"
+# Itens devolvidos por consulta (default e teto). Não há paginação: a ordem é o
+# escore, e "página 2 do sentido" não significa nada para quem procura.
+semantic_k = 50
+semantic_max_k = 200
+# Mínimo de caracteres da consulta. Abaixo disso o e5 devolve um vetor que é
+# ruído com forma de vetor.
+semantic_min_chars = 3
+# Fração mínima de uids do `.npy` que precisam existir no banco (e vice-versa)
+# para a busca ser considerada alinhada. Abaixo disso a carga FALHA: um `.npy` de
+# outra build devolve vizinhos plausíveis e ERRADOS, que é o pior defeito
+# possível num corpus. 0.99 dá folga para nada — é praticamente 1:1 de propósito.
+semantic_min_alinhamento = 0.99
+
 # --- coleções e export --------------------------------------------------------
 # Teto de uids por requisição em /api/collections/{id}/items.
 max_uids_por_requisicao = 5000

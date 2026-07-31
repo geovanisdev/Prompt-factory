@@ -17,6 +17,9 @@
     PATCH /api/prompts/{uid}                edita texto e/ou rótulos
     POST  /api/prompts/{uid}/revert         desfaz a edição de texto
     GET   /api/facets                       contagens SOB O FILTRO ATUAL
+    GET   /api/semantic                     busca por sentido (top-k por cosseno)
+    GET   /api/semantic/status              disponível? já aqueceu?
+    POST  /api/semantic/warmup              começa a carregar o modelo, sem bloquear
     GET   /api/collections                  coleções
     POST  /api/collections                  cria
     PATCH /api/collections/{id}             renomeia
@@ -161,9 +164,13 @@ h2,h3{margin:0;font-size:11px;font-weight:600;letter-spacing:.09em;text-transfor
 }
 #marca{font-weight:600;letter-spacing:.02em;color:var(--texto-2);white-space:nowrap}
 #marca b{color:var(--acento);font-weight:600}
-#form-busca{display:flex;align-items:center;gap:0;flex:1;max-width:560px}
-#busca{width:100%;padding:5px 9px;border-radius:3px 0 0 3px;border-right:none}
-#form-busca button{border-radius:0 3px 3px 0;padding:5px 10px}
+#form-busca{display:flex;align-items:center;gap:0;flex:1;max-width:640px}
+/* O seletor de modo é COLADO na busca, não um segundo campo: escolher entre
+   "texto" e "sentido" é escolher como esta busca funciona, não fazer outra. */
+#modo-busca{flex:none;border-radius:3px 0 0 3px}
+#modo-busca button{padding:5px 9px;font-size:11.5px}
+#busca{width:100%;padding:5px 9px;border-radius:0;border-left:none;border-right:none}
+#form-busca>button[type=submit]{border-radius:0 3px 3px 0;padding:5px 10px}
 #topo label{color:var(--texto-3);display:flex;align-items:center;gap:4px;white-space:nowrap}
 #resumo{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
 #total{font-size:17px;font-weight:600;color:var(--texto)}
@@ -178,7 +185,7 @@ h2,h3{margin:0;font-size:11px;font-weight:600;letter-spacing:.09em;text-transfor
 #facetas,#mesa{background:var(--fundo-2);min-height:0;padding:8px 9px 40px}
 #facetas{border-right:1px solid var(--linha)}
 #mesa{border-left:1px solid var(--linha)}
-#centro{display:grid;grid-template-rows:auto 1fr auto;min-height:0;min-width:0}
+#centro{display:grid;grid-template-rows:auto auto 1fr auto;min-height:0;min-width:0}
 
 /* ---- facetas ---- */
 .grupo{margin:0 0 12px}
@@ -246,6 +253,12 @@ label.caixa input{margin-top:2px}
 .selo.pii{color:var(--lic-nc)}
 .selo.nsfw{color:var(--lic-bloq)}
 .selo.chat,.selo.edit{color:var(--texto-2)}
+/* Similaridade: o NÚMERO é o cosseno (absoluto, comparável entre buscas) e a
+   BARRA é relativa a esta lista (o valor absoluto não diz nada ao usuário; a
+   distância entre o 1º e o 10º diz). As duas coisas juntas, nunca uma só. */
+.selo.sim{color:var(--acento);border-color:var(--acento-escuro);font-variant-numeric:tabular-nums}
+.barra-sim{height:3px;background:var(--fundo-3);margin:4px 0 0 20px;border-radius:2px;overflow:hidden}
+.barra-sim i{display:block;height:100%;background:var(--acento-escuro)}
 .rotulos{color:var(--texto-2)}
 .sem-rotulo{color:var(--texto-3);font-style:italic}
 .texto{
@@ -274,6 +287,16 @@ mark{background:var(--marca-fundo);color:var(--marca-texto);border-radius:1px;pa
   border-top:1px solid var(--linha);background:var(--fundo-2);font-variant-numeric:tabular-nums;
 }
 #vazio{padding:40px 20px;color:var(--texto-3);text-align:center;line-height:1.7}
+/* Aviso da semântica: FAIXA no fluxo, não toast. O carregamento do modelo leva
+   ~16 s na primeira vez — uma mensagem que some sozinha em 2 s é exatamente a
+   que o usuário não vai ver. */
+#aviso-semantica{
+  display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:11.5px;
+  border-bottom:1px solid var(--linha);background:var(--acento-fraco);color:var(--texto-2);
+}
+#aviso-semantica.ruim{background:rgba(224,87,92,.12);color:var(--lic-bloq)}
+#aviso-semantica b{color:var(--texto)}
+#aviso-semantica.ruim b{color:var(--lic-bloq)}
 
 /* ---- mesa (direita) ---- */
 #mesa section{margin:0 0 14px}
@@ -382,6 +405,12 @@ kbd{
 <header id="topo">
   <div id="marca">prompt<b>factory</b></div>
   <form id="form-busca" autocomplete="off">
+    <span class="segmento" id="modo-busca" role="group" aria-label="modo de busca">
+      <button type="button" data-modo="fts" aria-pressed="true"
+        title="Busca TEXTUAL (FTS5, sem acento): acha os prompts que contêm as palavras digitadas.">texto</button>
+      <button type="button" data-modo="semantico" aria-pressed="false"
+        title="Busca por SENTIDO (embeddings): acha os prompts que falam do mesmo assunto, mesmo sem nenhuma palavra em comum. A primeira consulta carrega o modelo (~16 s).">sentido</button>
+    </span>
     <input id="busca" type="search" placeholder="buscar no texto…   (tecla / )" aria-label="Busca textual">
     <button type="submit">buscar</button>
   </form>
@@ -415,12 +444,13 @@ kbd{
       <div id="chips"></div>
       <span class="crescer"></span>
       <button id="btn-marcar-pagina" type="button">marcar página</button>
-      <label class="fraco">por página
+      <label class="fraco"><span id="rot-tamanho">por página</span>
         <select id="tamanho-pagina">
           <option>25</option><option selected>50</option><option>100</option><option>200</option>
         </select>
       </label>
     </div>
+    <div id="aviso-semantica" class="oculto" role="status" aria-live="polite"></div>
     <div id="lista" class="rolar"></div>
     <nav id="paginacao"></nav>
   </section>
@@ -517,6 +547,7 @@ kbd{
           <tr><td><kbd>n</kbd> / <kbd>p</kbd></td><td>próxima / página anterior</td></tr>
           <tr><td><kbd>g</kbd> / <kbd>G</kbd></td><td>primeiro / último da página</td></tr>
           <tr><td><kbd>r</kbd></td><td>abre a fila de revisão</td></tr>
+          <tr><td><kbd>m</kbd></td><td>alterna busca <b>texto</b> ⇄ <b>sentido</b></td></tr>
           <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>qualidade — só na fila de revisão</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>fecha o que estiver aberto</td></tr>
           <tr><td><kbd>?</kbd></td><td>esta folha</td></tr>
@@ -526,6 +557,13 @@ kbd{
         Dentro de um campo de texto os atalhos ficam desligados: só <kbd>Esc</kbd> (sair)
         e <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (salvar) valem.
         A qualidade vai de <b>1</b> (ruim) a <b>3</b> (bom) — é o que a taxonomia define.
+      </p>
+      <p class="fraco" style="margin:10px 0 0;line-height:1.6">
+        <b>texto</b> acha os prompts que <i>contêm</i> as palavras (FTS5, ignora acento).
+        <b>sentido</b> acha os que <i>falam da mesma coisa</i>, mesmo sem palavra em comum —
+        os filtros da barra lateral continuam valendo, a ordem passa a ser a proximidade,
+        e não há paginação: ou o item está entre os mais próximos ou não está.
+        A primeira busca por sentido carrega o modelo (~16 s); as seguintes levam ~90 ms.
       </p>
     </div>
   </div>
@@ -635,6 +673,10 @@ const remendar = (c, corpo) => api(c, { method: "PATCH", headers: JSONH, body: J
 const est = {
   f: { nsfw: "exclude" },
   sort: "relevance", seed: 42, page: 1, page_size: 50,
+  // "fts" (padrão) ou "semantico". NÃO é persistido de propósito: se o .npy
+  // sumir entre duas sessões, abrir direto num modo quebrado é pior do que
+  // pedir um clique. Ver TROCA DE MODO, mais abaixo.
+  modo: "fts", semStatus: null, semTimer: null,
   dados: null, facetas: null, stats: null, saude: null,
   rotulagemPendente: false,
   sel: new Set(),
@@ -716,22 +758,75 @@ function filtrosAtivos() {
 /* ==========================================================================
    3. CARGA
    ========================================================================== */
+/** A busca por sentido está ligada E tem texto suficiente? */
+function ehSemantica() {
+  return est.modo === "semantico" && (est.f.q || "").trim().length >= 3;
+}
+/**
+ * O filtro SEM o texto.
+ *
+ * No modo semântico o `q` é uma frase em português, não um termo de índice
+ * invertido: mandá-lo para /api/facets, /api/export ou o from-filter faria o
+ * SQLite procurar essas palavras no FTS5 e devolver quase nada. E há uma
+ * verdade por trás disso, que a interface precisa dizer: **a busca por sentido
+ * ORDENA, não RECORTA**. O conjunto continua sendo o do filtro; o cosseno só
+ * decide quem aparece primeiro.
+ */
+function filtroSemTexto(f) {
+  const copia = { ...f };
+  delete copia.q;
+  return copia;
+}
+/** O conjunto do filtro — no semântico é `n_candidatos`, não o k devolvido. */
+function totalDoConjunto(d) {
+  if (!d) return 0;
+  return d.n_candidatos !== undefined && d.n_candidatos !== null ? d.n_candidatos : d.total;
+}
+/** O `Filtros` que define o CONJUNTO (coleção em massa, export, composição). */
+function filtroDoConjunto() {
+  return ehSemantica() ? filtroSemTexto(est.f) : est.f;
+}
+
 async function carregar(manterFoco = false) {
-  const p = paramsFiltro(est.f);
-  p.set("sort", est.sort);
-  p.set("seed", String(est.seed));
-  p.set("page", String(est.page));
-  p.set("page_size", String(est.page_size));
+  const semantica = ehSemantica();
+  const fFacetas = semantica ? filtroSemTexto(est.f) : est.f;
+  let alvo;
+  if (semantica) {
+    // Sem sort/page/page_size: `extra="forbid"` no backend devolve 422 para eles,
+    // e devolve de propósito — ordenar por "mais novo" dentro de um resultado
+    // que existe por proximidade não significa nada. O `k` reaproveita o mesmo
+    // seletor de tamanho da página (25/50/100/200 = os valores aceitos).
+    const ps = paramsFiltro(filtroSemTexto(est.f));
+    ps.set("q", (est.f.q || "").trim());
+    ps.set("k", String(est.page_size));
+    alvo = "/api/semantic?" + ps.toString();
+  } else {
+    const p = paramsFiltro(est.f);
+    p.set("sort", est.sort);
+    p.set("seed", String(est.seed));
+    p.set("page", String(est.page));
+    p.set("page_size", String(est.page_size));
+    alvo = "/api/prompts?" + p.toString();
+  }
   let lista, facetas;
   try {
     [lista, facetas] = await Promise.all([
-      api("/api/prompts?" + p.toString()),
-      api("/api/facets?" + paramsFiltro(est.f).toString()),
+      api(alvo),
+      api("/api/facets?" + paramsFiltro(fFacetas).toString()),
     ]);
   } catch (erro) {
+    if (semantica) return falharSemantica(erro);
     recado(String(erro.message || erro), true, 6000);
     if (est.page > 1) { est.page = 1; return carregar(); }
     return;
+  }
+  if (semantica) {
+    est.semStatus = { ...(est.semStatus || {}), aquecido: true, aquecendo: false };
+    avisoSemantica(resumoDaBusca(lista), false);
+  } else if (est.modo === "semantico" && !est.semTimer) {
+    avisoSemantica("<b>busca por sentido ligada</b> — descreva o que procura em " +
+      "palavras suas (ao menos 3 caracteres). Enquanto não houver texto, a lista é " +
+      "o filtro inteiro, na ordem escolhida.");
   }
   est.dados = lista;
   est.facetas = facetas;
@@ -757,13 +852,152 @@ function desenharTudo() {
 }
 
 /* ==========================================================================
+   3b. TROCA DE MODO E AQUECIMENTO (M10)
+   O modelo e5 leva ~16 s para carregar na primeira vez (10,6 s de import do
+   torch + 4,7 s do modelo). Três consequências de interface, todas obrigatórias:
+   1. o aquecimento começa no CLIQUE do modo, não na primeira busca;
+   2. ele roda numa thread do servidor (POST /warmup devolve na hora), então a
+      tela não trava — o usuário pode continuar filtrando no modo texto;
+   3. o aviso é uma FAIXA que fica, não um toast que some: uma mensagem de 2 s
+      sobre uma espera de 16 s é exatamente a que ninguém vê.
+   ========================================================================== */
+function avisoSemantica(html, ruim = false) {
+  const el = $("#aviso-semantica");
+  el.classList.toggle("oculto", !html);
+  el.classList.toggle("ruim", !!ruim);
+  el.innerHTML = html || "";
+}
+function resumoDaBusca(d) {
+  const partes = [
+    "<b>busca por sentido</b> — " + n(d.total) + " mais próximos de " +
+    n(totalDoConjunto(d)) + " no filtro, por cosseno de embeddings.",
+  ];
+  if (d.aquecimento_ms) {
+    partes.push("Modelo carregado agora (" + n(Math.round(d.aquecimento_ms)) +
+      " ms); as próximas são rápidas.");
+  }
+  if (d.n_sem_vetor) {
+    partes.push("<b>" + n(d.n_sem_vetor) + "</b> item(ns) do filtro não têm vetor " +
+      "e ficaram FORA desta busca (o .npy é mais antigo que o banco).");
+  }
+  return partes.join(" ");
+}
+/** Falha da busca semântica: explica, e volta para o texto em vez de travar. */
+function falharSemantica(erro) {
+  const msg = String((erro && erro.message) || erro);
+  avisoSemantica("<b>busca por sentido indisponível</b> — " + esc(msg) +
+    " · voltando para a busca textual.", true);
+  est.modo = "fts";
+  atualizarModo();
+  return carregar();
+}
+function atualizarModo() {
+  const semantico = est.modo === "semantico";
+  $$("#modo-busca button").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.modo === est.modo)));
+  $("#busca").placeholder = semantico
+    ? "descreva o que procura…   (tecla / )"
+    : "buscar no texto…   (tecla / )";
+  $("#busca").setAttribute("aria-label", semantico ? "Busca por sentido" : "Busca textual");
+  // Ordenar não existe DENTRO de uma busca por sentido, e desabilitar é mais
+  // honesto que aceitar e ignorar: o backend recusa `sort` na rota semântica com
+  // 422, justamente para ninguém prometer uma ordenação que não aconteceu.
+  // Note o `ehSemantica()` e não o `semantico`: com o modo ligado mas sem texto
+  // ainda é a listagem normal que responde, e ali a ordem vale.
+  const ordenando = ehSemantica();
+  $("#ordem").disabled = ordenando;
+  $("#ordem").title = ordenando
+    ? "na busca por sentido a ordem é a proximidade — não há outra que faça sentido"
+    : "";
+  $("#rot-tamanho").textContent = semantico ? "vizinhos" : "por página";
+}
+async function trocarModo(modo) {
+  if (modo === est.modo) return;
+  est.modo = modo;
+  est.page = 1;
+  atualizarModo();
+  if (modo !== "semantico") { avisoSemantica(""); pararVigia(); return carregar(); }
+  if (!(await prepararSemantica())) return;
+  if ((est.f.q || "").trim().length < 3) {
+    // `!est.semTimer`: com o aquecimento em curso, o aviso do modelo VALE MAIS
+    // que o convite a digitar — ele explica os 16 s. Sobrescrevê-lo aqui foi um
+    // defeito real, pego no navegador.
+    if (!est.semTimer) {
+      avisoSemantica("<b>busca por sentido ligada</b> — descreva o que procura em " +
+        "palavras suas (ao menos 3 caracteres). Os filtros da barra lateral continuam valendo.");
+    }
+    return;
+  }
+  carregar();
+}
+/** Confere disponibilidade e dispara o aquecimento. `false` = não dá para usar. */
+async function prepararSemantica() {
+  let s;
+  try { s = await api("/api/semantic/status"); }
+  catch (e) { falharSemantica(e); return false; }
+  est.semStatus = s;
+  if (!s.disponivel) {
+    avisoSemantica("<b>sem embeddings</b> — a busca por sentido precisa de " +
+      "<span class=\"mono\">data/emb/universe.f16.npy</span>, que sai do " +
+      "<span class=\"mono\">pf run s05</span> + <span class=\"mono\">pf run s06</span>. " +
+      "A busca textual não depende disso.", true);
+    est.modo = "fts"; atualizarModo();
+    return false;
+  }
+  if (s.sonda && s.sonda.ok === false) {
+    avisoSemantica("<b>embeddings desalinhados</b> — " + esc(String(s.sonda.motivo)) +
+      ". Enquanto isso a busca por sentido fica desligada: devolver vizinhos com " +
+      "os uids errados seria pior que não buscar.", true);
+    est.modo = "fts"; atualizarModo();
+    return false;
+  }
+  if (!s.aquecido) {
+    try { await api("/api/semantic/warmup", { method: "POST" }); } catch (_) { /* a busca aquece sozinha */ }
+    avisoSemantica("<b>carregando o modelo de embeddings…</b> " +
+      "são ~450 MB e leva alguns segundos na primeira vez desta sessão. " +
+      "Pode continuar filtrando — a busca sai assim que ficar pronto.");
+    vigiarAquecimento();
+  } else {
+    avisoSemantica("<b>busca por sentido ligada</b> — os filtros continuam valendo; " +
+      "o que muda é a ordem, que passa a ser a proximidade de significado.");
+  }
+  return true;
+}
+function pararVigia() { clearInterval(est.semTimer); est.semTimer = null; }
+function vigiarAquecimento() {
+  pararVigia();
+  est.semTimer = setInterval(async () => {
+    let s;
+    try { s = await api("/api/semantic/status"); } catch (_) { return; }
+    est.semStatus = s;
+    if (s.erro) {
+      pararVigia();
+      avisoSemantica("<b>falha ao carregar o modelo</b> — " + esc(String(s.erro)), true);
+      return;
+    }
+    if (s.aquecido) {
+      pararVigia();
+      avisoSemantica("<b>modelo pronto</b> — " + n(s.n_vetores) + " vetores de " +
+        s.dim + " dimensões, " + s.mb_residentes + " MiB na memória.");
+      if (ehSemantica()) carregar();
+    }
+  }, 900);
+}
+
+/* ==========================================================================
    4. TOPO
    ========================================================================== */
 function desenharTopo() {
+  atualizarModo();
   const d = est.dados;
-  $("#total").textContent = d ? n(d.total) : "—";
+  // O número grande é sempre O CONJUNTO, nunca quantos itens estão na tela. No
+  // modo semântico isso é `n_candidatos`: o k devolvido é um recorte da ordem,
+  // não do corpus, e mostrar "50" ali diria que o filtro casou 50 linhas.
+  $("#total").textContent = d ? n(totalDoConjunto(d)) : "—";
   const t = $("#sel-topo");
-  t.textContent = est.sel.size ? "· " + n(est.sel.size) + " marcados" : "";
+  const marcados = est.sel.size ? "· " + n(est.sel.size) + " marcados" : "";
+  t.textContent = (d && d.sort_efetivo === "semantic"
+    ? "· " + n(d.total) + " mais próximos " : "") + marcados;
   $("#ordem").value = est.sort;
   // O backend devolve `sort_efetivo`: "relevância" sem busca não existe e vira
   // "mais novo". Dizer o que ORDENOU de verdade evita a interface mentir.
@@ -931,7 +1165,10 @@ function desenharChips() {
           const c = est.colecoes.find((x) => x.id === Number(v));
           mostra = c ? c.name : v;
         }
-        return '<span class="chip"><b>' + esc(ROT_CAMPO[k] || k) + "</b> " + esc(mostra) +
+        // O rótulo do `q` muda com o modo: "busca" e "sentido" são coisas
+        // diferentes, e o chip é o único lugar onde o filtro aparece por escrito.
+        const rot = k === "q" && ehSemantica() ? "sentido" : (ROT_CAMPO[k] || k);
+        return '<span class="chip"><b>' + esc(rot) + "</b> " + esc(mostra) +
           '<button type="button" data-tirar="' + esc(k) + '" title="tirar este filtro">×</button></span>';
       }).join("")
     : '<span class="fraco">sem filtro — o corpus inteiro</span>';
@@ -948,22 +1185,40 @@ function desenharLista() {
   const d = est.dados;
   if (!d) { alvo.innerHTML = ""; return; }
   if (!d.items.length) {
-    alvo.innerHTML = '<div id="vazio">Nenhum item sob este filtro.' +
-      (d.q ? "<br>A expressão que foi ao índice: <span class=\"mono\">" + esc(d.q_fts || "(vazia)") +
-        "</span>" : "") +
+    // No modo semântico "nenhum item" NUNCA é culpa da consulta: o cosseno
+    // sempre tem um vizinho mais próximo. Se veio vazio, o filtro zerou o
+    // conjunto — dizer "a expressão que foi ao índice" mandaria o usuário
+    // procurar defeito no lugar errado.
+    const explica = d.sort_efetivo === "semantic"
+      ? "<br>Nenhum prompt passa nos filtros da barra lateral, então não há o que ordenar por proximidade."
+      : (d.q ? "<br>A expressão que foi ao índice: <span class=\"mono\">" +
+          esc(d.q_fts || "(vazia)") + "</span>" : "");
+    alvo.innerHTML = '<div id="vazio">Nenhum item sob este filtro.' + explica +
       '<br><button type="button" data-acao="limpar-tudo" style="margin-top:12px">limpar filtros</button></div>';
     return;
   }
-  alvo.innerHTML = d.items.map((it, i) => cardHTML(it, i)).join("");
+  // A barra de similaridade é normalizada DENTRO desta lista: entre o 1º e o
+  // último de uma busca boa há 0,99 e 0,86, e uma barra em escala absoluta
+  // desenharia dez blocos cheios idênticos. O número no selo continua sendo o
+  // cosseno de verdade — a barra compara, o número mede.
+  const sims = d.items.map((x) => x.similaridade).filter((s) => typeof s === "number");
+  const faixa = sims.length ? { max: Math.max(...sims), min: Math.min(...sims) } : null;
+  alvo.innerHTML = d.items.map((it, i) => cardHTML(it, i, faixa)).join("");
   aplicarFoco(false);
 }
 
-function cardHTML(it, i) {
+function cardHTML(it, i, faixa) {
   const marcado = est.sel.has(it.uid);
   const aberto = est.expandidos.has(it.uid);
+  const temSim = typeof it.similaridade === "number";
   const cab = [];
   cab.push('<input type="checkbox" data-acao="marcar"' + (marcado ? " checked" : "") +
     ' aria-label="marcar item">');
+  if (temSim) {
+    cab.push('<span class="selo sim" title="cosseno ' + it.similaridade.toFixed(6) +
+      " entre este prompt e a sua consulta — 1 é o mesmo sentido, 0 é sentido nenhum" +
+      '">' + it.similaridade.toFixed(3) + "</span>");
+  }
   cab.push('<span class="fonte">' + esc(it.source) + "</span>");
   cab.push('<span class="sep">·</span><span>' + esc(it.lang) +
     (it.lang_variant ? " " + esc(it.lang_variant) : "") + "</span>");
@@ -1018,8 +1273,19 @@ function cardHTML(it, i) {
   } else if (aberto) {
     mais = '<button type="button" class="mais" data-acao="expandir">fechar (x)</button>';
   }
+  // Sem termo de busca não há o que destacar: no lugar do <mark> do FTS, a
+  // barrinha de proximidade. É a única diferença visual entre os dois modos.
+  let barra = "";
+  if (temSim && faixa) {
+    const largura = faixa.max > faixa.min
+      ? 8 + 92 * ((it.similaridade - faixa.min) / (faixa.max - faixa.min))
+      : 100;
+    barra = '<div class="barra-sim" title="proximidade relativa a esta lista (o número ' +
+      'do selo é o cosseno absoluto)"><i style="width:' + largura.toFixed(2) + '%"></i></div>';
+  }
   return '<article class="item' + (marcado ? " marcado" : "") + '" data-uid="' + esc(it.uid) +
-    '" data-i="' + i + '"><div class="cab">' + cab.join("") + "</div>" + corpo + mais + "</article>";
+    '" data-i="' + i + '"><div class="cab">' + cab.join("") + "</div>" + corpo + mais +
+    barra + "</article>";
 }
 function dicaLicenca(it) {
   const c = it.license_class;
@@ -1116,6 +1382,18 @@ function desenharPaginacao() {
   const d = est.dados;
   const nav = $("#paginacao");
   if (!d) { nav.innerHTML = ""; return; }
+  if (d.sort_efetivo === "semantic") {
+    // Não há página 2 de uma busca por sentido: ou o item está entre os mais
+    // próximos ou não está. Fingir paginação aqui seria oferecer um "próxima"
+    // que devolveria os 51º ao 100º vizinhos como se fossem outra coisa.
+    nav.innerHTML =
+      '<span class="num">' + n(d.total) + " mais próximos</span>" +
+      '<span class="fraco num">de ' + n(totalDoConjunto(d)) + " no filtro</span>" +
+      '<span class="crescer"></span>' +
+      '<span class="fraco">ordenado por proximidade — a única ordem que existe aqui</span>' +
+      '<span class="fraco num">' + n(Math.round(d.ms)) + " ms</span>";
+    return;
+  }
   const partes = [];
   partes.push('<button type="button" data-pag="1"' + (d.page <= 1 ? " disabled" : "") + ">« primeira</button>");
   partes.push('<button type="button" data-pag="' + (d.page - 1) + '"' + (d.page <= 1 ? " disabled" : "") +
@@ -1149,7 +1427,10 @@ function desenharMesa() {
     : '<option value="">— nenhuma coleção ainda —</option>';
   $("#filtrar-colecao").checked = est.f.collection_id !== undefined;
 
-  const total = est.dados ? est.dados.total : 0;
+  // `totalDoConjunto`, não `total`: no modo semântico o botão levaria os 50
+  // vizinhos e prometeria os 144.754 do filtro — ou o contrário. A busca por
+  // sentido ORDENA, ela não recorta, e o que entra na coleção é o filtro.
+  const total = totalDoConjunto(est.dados);
   const temColecao = !!colecaoAtiva();
   $("#btn-filtro-mais").textContent = "adicionar os " + n(total) + " do filtro";
   $("#btn-filtro-menos").textContent = "remover os " + n(total) + " do filtro";
@@ -1198,14 +1479,20 @@ async function jogarSelecao(remover) {
 async function massaPorFiltro(remover) {
   const c = colecaoAtiva();
   if (!c || !est.dados) return;
-  const total = est.dados.total;
+  const total = totalDoConjunto(est.dados);
   const verbo = remover ? "REMOVER de" : "adicionar a";
-  if (!confirm(verbo + " “" + c.name + "” os " + n(total) + " itens do filtro atual?")) return;
+  const nota = ehSemantica()
+    ? "\n\n(A busca por sentido ORDENA, não recorta: entram os " + n(total) +
+      " do filtro, não os " + n(est.dados.total) + " vizinhos que estão na tela.)"
+    : "";
+  if (!confirm(verbo + " “" + c.name + "” os " + n(total) + " itens do filtro atual?" + nota)) return;
   const rota = "/api/collections/" + c.id + "/items/" + (remover ? "remove-from-filter" : "from-filter");
   try {
     // O MESMO objeto Filtros da listagem: é isso que garante que o número
-    // prometido na tela seja o número que entra (ou sai) da coleção.
-    const r = await postar(rota, { filter: est.f, sort: "newest" });
+    // prometido na tela seja o número que entra (ou sai) da coleção. Sem o `q`
+    // no modo semântico: lá ele é uma frase, e o from-filter a mandaria para o
+    // FTS5, casando quase nada.
+    const r = await postar(rota, { filter: filtroDoConjunto(), sort: "newest" });
     await recarregarColecoes();
     recado((remover ? n(r.removed) + " removidos" : n(r.added) + " adicionados") +
       " de " + n(r.matched) + " encontrados — a coleção tem " + n(r.n_items));
@@ -1408,7 +1695,7 @@ function filtroDoEscopo() {
     const c = colecaoAtiva();
     return c ? { collection_id: c.id, nsfw: "include" } : null;
   }
-  return est.f;
+  return filtroDoConjunto();
 }
 async function composicao() {
   if (exp.modo === "uids") {
@@ -1439,7 +1726,7 @@ async function desenharExport() {
   alvo.innerHTML = '<p class="fraco">calculando a composição…</p>';
   const c = colecaoAtiva();
   const escopos = [
-    ["filter", "filtro atual", est.dados ? est.dados.total : 0, true],
+    ["filter", "filtro atual", totalDoConjunto(est.dados), true],
     ["collection", c ? "coleção “" + c.name + "”" : "coleção (nenhuma ativa)", c ? c.n_items : 0, !!c],
     ["uids", "seleção marcada", est.sel.size, est.sel.size > 0],
   ];
@@ -1450,7 +1737,12 @@ async function desenharExport() {
   partes.push('<div class="grupo"><h3>o que exportar</h3><div class="segmento" style="margin-top:4px">' +
     escopos.map(([v, r, q, ok]) => '<button type="button" data-escopo="' + v + '" aria-pressed="' +
       (exp.modo === v ? "true" : "false") + '"' + (ok ? "" : " disabled") + ">" + esc(r) +
-      ' <span class="num">' + n(q) + "</span></button>").join("") + "</div></div>");
+      ' <span class="num">' + n(q) + "</span></button>").join("") + "</div>" +
+    (ehSemantica()
+      ? '<p class="nota aviso" style="margin-top:5px">Você está na busca por sentido: ' +
+        "ela ORDENA o filtro, não o recorta. “filtro atual” exporta o conjunto inteiro, " +
+        "não os vizinhos da tela — para levar só eles, marque-os (<b>a</b>) e use “seleção marcada”.</p>"
+      : "") + "</div>");
 
   if (comp) {
     const total = CLASSES_LIC.reduce((s, k) => s + (comp.classes[k] || 0), 0) || 1;
@@ -1513,7 +1805,7 @@ async function gerar() {
     include_text_original: exp.incluirOriginal,
   };
   if (exp.nome) corpo.name = exp.nome;
-  if (exp.modo === "filter") corpo.filter = est.f;
+  if (exp.modo === "filter") corpo.filter = filtroDoConjunto();
   else if (exp.modo === "collection") corpo.collection_id = est.ativa;
   else corpo.uids = Array.from(est.sel);
   try {
@@ -1728,6 +2020,7 @@ document.addEventListener("keydown", (e) => {
     case "g": e.preventDefault(); est.foco = 0; est.ancora = 0; aplicarFoco(); break;
     case "G": if (est.dados) { e.preventDefault(); est.foco = est.dados.items.length - 1; est.ancora = est.foco; aplicarFoco(); } break;
     case "r": e.preventDefault(); abrirRevisao(); break;
+    case "m": e.preventDefault(); trocarModo(est.modo === "fts" ? "semantico" : "fts"); break;
     case "?": e.preventDefault(); $("#painel-atalhos").classList.remove("oculto"); break;
   }
 });
@@ -1751,6 +2044,10 @@ function ligarCliques() {
     por("q", v || null);
     est.page = 1;
     carregar();
+  });
+  $("#modo-busca").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-modo]");
+    if (b) trocarModo(b.dataset.modo);
   });
   $("#ordem").addEventListener("change", (e) => {
     est.sort = e.target.value;
@@ -1948,6 +2245,7 @@ async function mapearLicencas() {
 async function iniciar() {
   restaurar();
   ligarCliques();
+  atualizarModo();
   $("#tamanho-pagina").value = String(est.page_size);
   try {
     const [saude, stats, cols] = await Promise.all([

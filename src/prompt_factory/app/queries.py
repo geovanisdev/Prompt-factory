@@ -498,6 +498,48 @@ def sql_ids(f: Filtros, *, sort: str = "newest", seed: int = 42, limit: int | No
     return sql, params
 
 
+def sql_ids_filtrados(f: Filtros) -> tuple[str, dict[str, Any]]:
+    """Só os ``id`` que passam no filtro — **sem ORDER BY e sem o FTS**.
+
+    É o insumo da busca semântica (M10), onde a ordem quem decide é o cosseno e o
+    ``q`` do filtro é a consulta em linguagem natural, não um termo de índice
+    invertido. Ordenar aqui seria ordenar 144 mil ids que vão virar uma máscara
+    booleana.
+
+    Medido no banco real: sem filtro nenhum (só o ``nsfw IS NOT 1`` do default)
+    **61 ms** para os 144.754 ids, por varredura de cobertura; com ``lang=pt``,
+    23 ms para 38.715. Ver ``executar_ids`` para o porquê do ``row_factory``.
+    """
+    cond, params = build_where(f)
+    return f"SELECT p.id {_FROM_SIMPLES}{_clausula(cond)}", params
+
+
+def executar_ids(conn: sqlite3.Connection, sql: str, params: dict[str, Any]) -> Any:
+    """Roda um SELECT de uma coluna e devolve um ``ndarray`` int64.
+
+    ``row_factory = None`` no cursor **desta** consulta: ``sqlite3.Row`` constrói
+    um objeto com nomes de coluna por linha, e aqui são 144.754 linhas de uma
+    coluna só. Medido no banco real, o mesmo SELECT: 76 ms com ``Row``, **61 ms**
+    com tuplas cruas. (``np.array(fetchall())`` é PIOR — 85 ms: materializa a
+    lista de tuplas antes.)
+    """
+    import numpy as np
+
+    cur = conn.cursor()
+    cur.row_factory = None
+    return np.fromiter((linha[0] for linha in cur.execute(sql, params)), dtype=np.int64)
+
+
+def sql_lista_por_ids(quantos: int) -> str:
+    """As colunas da LISTAGEM para uma lista de ids (parâmetros ``:id0``...).
+
+    A ordem do resultado é a do SQLite, **não** a dos ids — quem chama reordena.
+    Um ``IN`` não preserva ordem, e a ordem aqui é o resultado da busca.
+    """
+    marcas = ", ".join(f":id{i}" for i in range(quantos))
+    return f"SELECT {_COLS_LISTA} {_FROM_SIMPLES} WHERE p.id IN ({marcas})"
+
+
 def sql_export(f: Filtros) -> tuple[str, dict[str, Any]]:
     """As linhas de um export por filtro, com o texto INTEIRO."""
     cte, origem, _, params = preparar_busca(f)
@@ -779,6 +821,7 @@ __all__ = [
     "buscar_snippets",
     "campos_ativos",
     "executar_fts",
+    "executar_ids",
     "expr_marcadores_chat",
     "fts_literal",
     "limites",
@@ -794,6 +837,8 @@ __all__ = [
     "sql_faceta",
     "sql_facetas_prefixo",
     "sql_ids",
+    "sql_ids_filtrados",
     "sql_lista",
+    "sql_lista_por_ids",
     "sql_snippets",
 ]

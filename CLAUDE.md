@@ -18,7 +18,7 @@ Plano completo (fontes, decisões de engenharia, marcos M0–M10): `C:\Users\gig
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve         # interface local em http://127.0.0.1:8765
 ```
 
-Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1) e `db-check --bench` (M8), `make-seed`/`labels`/`merge-labels` (M5), `load-db` (M8), `serve`/`export` (M9). Ainda stub: `train` (M7) e `apply` (M7) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
+Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1) e `db-check --bench` (M8), `make-seed`/`labels`/`merge-labels` (M5), `load-db` (M8), `serve`/`export` (M9), busca semântica dentro do `serve` (M10). Ainda stub: `train` (M7) e `apply` (M7) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
 
 ```powershell
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf run                 # s01..s06 (= `all`)
@@ -50,7 +50,7 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 ```
 
 ```powershell
-# Interface e export (M9). A app só LÊ o SQLite — não roda pipeline nenhuma.
+# Interface, busca semântica e export (M9/M10). A app só LÊ — não roda pipeline nenhuma.
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve                          # http://127.0.0.1:8765 (contrato em /docs)
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve --port 8799 --db X.sqlite # outra porta, outro banco
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf export --format jsonl          # o universo inteiro + manifesto
@@ -89,7 +89,7 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 2. `raw/{fonte}.parquet` → s01 normalize → s02 idioma+variante pt-BR/pt-PT → s03 PII → s04 dedup exato → s05 embed (e5-small, `.npy` f16) → s06 dedup próximo → `final/universe.parquet`.
 3. s07 amostra-semente → campanha de rotulagem por agentes → s08 merge → s09 treino → s10 aplica com limiares de confiança.
 4. s11 carrega o universo rotulado num **SQLite** (WAL + FTS5 `remove_diacritics 2`), construído à parte e trocado por swap de arquivo (`pf load-db`).
-5. `app/`: FastAPI toca **apenas** o SQLite (mais os `.npy` por mmap na busca semântica do M10) e serve um `static/index.html` único, sem build.
+5. `app/`: FastAPI toca **apenas** o SQLite (mais `emb/universe.f16.npy`, convertido para f32 residente na busca semântica do M10) e serve um `static/index.html` único, sem build.
 
 ## Arquivos críticos
 
@@ -181,7 +181,8 @@ Pegadinhas deste bloco:
 | `app/queries.py` | TODO o SQL de leitura: `sanitize_fts`, `build_where`, `ORDER_BY`, facetas, snippets |
 | `app/deps.py` | a conexão por request + a regra dura sobre `async def` |
 | `app/presenters.py` | linha do SQLite → JSON (bool de verdade, `license_class`, `attribution`) |
-| `app/main.py` | `criar_app()` (fábrica), lifespan, `idx_prompts_app` + `idx_prompts_chatmark`, mount do `static/` |
+| `app/main.py` | `criar_app()` (fábrica), lifespan, `idx_prompts_app` + `idx_prompts_chatmark`, sonda da semântica, mount do `static/` |
+| `app/semantic.py` | a matriz f32 residente, o casamento uid → id e as duas guardas de alinhamento (M10) |
 | `app/cache.py` | cache em memória de `/api/facets` e `/api/stats`, com invalidação por escrita e por `db_build_id` |
 | `app/static/index.html` | **a interface inteira**: um arquivo, CSS+JS inline, sem build e sem rede |
 | `export.py` | `REGISTRY` perfil×container, escritores JSONL/CSV, manifesto |
@@ -258,6 +259,41 @@ Um arquivo de ~1.970 linhas, **sem build, sem framework, sem CDN** — CSS e JS 
 - **Qualidade é 1..3** (`schema.QUALITY_VALUES`), não 1..5. Vale para a folha de atalhos, para os botões da fila de revisão e para o seletor do editor.
 - **`rotulagem_pendente` desabilita, nunca esconde.** Os grupos `task_type`/`domain` aparecem com as 16 classes zeradas e a explicação na barra lateral — sumir pareceria bug.
 - **O editor manda só o que mudou** (`PATCH` com os campos alterados). Limpar um rótulo é `null` explícito; não mexer é omitir a chave — é o que `exclude_unset` distingue do lado do backend.
+- **O seletor `texto | sentido` (M10) é COLADO à busca, não um segundo campo**: escolher o modo é escolher como *esta* busca funciona, não fazer outra. `est.modo` **não é persistido** — se o `.npy` sumir entre duas sessões, abrir direto num modo quebrado é pior que pedir um clique. O aviso do aquecimento é uma **faixa no fluxo** (`#aviso-semantica`), nunca o `recado()`: uma mensagem que some em 2 s é exatamente a que ninguém vê numa espera de 16 s.
+- **A barra de similaridade é normalizada DENTRO da lista; o número do selo, não.** Entre o 1º e o 50º de uma busca boa há 0,99 e 0,86 — numa escala absoluta de 0 a 1 são cinquenta barras cheias idênticas. O selo mostra o cosseno de verdade (comparável entre buscas), a barra compara os itens desta lista.
+
+## Busca semântica (M10)
+
+`GET /api/semantic` devolve os **k mais próximos** de uma consulta em linguagem natural, dentro do **mesmo `Filtros`** da listagem. Módulo: `app/semantic.py` (`IndiceSemantico`, uma instância por app em `app.state.semantica`) + `app/routes_semantic.py`. Duas rotas de apoio existem por causa do custo do modelo: `GET /api/semantic/status` e `POST /api/semantic/warmup`.
+
+| medida (corpus real, 144.754 × 384) | valor |
+| --- | ---: |
+| carga da matriz (f16 no disco → f32 na RAM) | 417 ms / **212 MiB** |
+| produto `M @ v` em f32 (BLAS sgemv) | **5,8 ms** |
+| o mesmo em f16, memmap por blocos | **199,3 ms** |
+| `pontuar` inteiro (produto + máscara + argpartition k=50) | 7,8 ms |
+| `SELECT id` sob o filtro padrão (144.754 ids) | 61 ms |
+| o mesmo com `lang=pt` (38.715 ids) | 20 ms |
+| embedding da consulta (modelo quente) | 10 ms |
+| **consulta quente ponta a ponta** | **~87 ms** |
+| `import sentence_transformers` + torch | 10,6 s |
+| carregar o e5 | 4,7 s |
+| **primeira consulta da sessão** | **~16,5 s** |
+
+Pegadinhas deste bloco:
+
+- **f32 residente é 34x mais rápido que f16 por blocos** (5,8 contra 199,3 ms), e o gargalo do f16 **não é a multiplicação, é a conversão** de 55,6 milhões de elementos por consulta. Os dois dão o mesmo escore (diferem em 6e-08). E o ganho colateral vale mais que a velocidade: **a 5,8 ms dá para pontuar o corpus inteiro e aplicar o filtro EXATO**, em vez de pegar os N melhores e filtrar depois. Over-fetch aproximado num recorte estreito devolve um top-k que parece certo e não é. `[app] semantic_precision = "f16"` existe como escape para pouca RAM.
+- **Desalinhamento entre o `.npy` e o banco é o pior defeito possível** — cosseno continua saindo, vizinhos continuam plausíveis, cada uid é de outra linha, ninguém percebe. Duas guardas, as duas falhando alto: `sondar()` no lifespan (cabeçalho do `.npy` + contagem + 64 uids conferidos no SQL, ~109 ms) e `carregar()` na primeira busca (casamento uid → id **nos dois sentidos**, contra `[app] semantic_min_alinhamento = 0.99`). Coberto por `tests/test_semantic.py::test_desalinhamento_com_o_banco_falha_alto`.
+- **503 e 500 são erros DIFERENTES aqui.** `.npy` ausente = `SemanticaIndisponivel` = **503** ("rode o s05/s06", clone limpo, falta de insumo). `.npy` de outra build = `DesalinhamentoEmbeddings` = **500** (o banco e a matriz discordam sobre o que é cada linha). Tratar o segundo como indisponibilidade temporária convidaria a ignorar.
+- **A sonda avisa alto mas NÃO derruba a app.** A busca textual não depende dos embeddings, e recusar a interface inteira por causa de um arquivo auxiliar deixaria o usuário sem nem a lista. Quem falha é a rota; o `/api/health` carrega o resultado da sonda em `semantica`.
+- **`aquecido` é matriz E modelo — e confundir isso foi um bug real, pego no navegador.** A matriz carrega em 417 ms e o e5 leva ~16 s; com `aquecido` respondendo só pela matriz, a interface anunciava "modelo pronto" meio segundo depois do clique e disparava a busca, que travava 16 s dizendo o contrário. `carregado` = matriz; `aquecido` = `carregado and _modelo_pronto`. O `aquecimento_ms` da resposta soma a carga da matriz **com** o embedding frio, porque o modelo só carrega de fato no primeiro `embed_texts`.
+- **`row_factory = None` no cursor do `SELECT id`, e só nele.** `sqlite3.Row` constrói um objeto com nomes de coluna por linha, e aqui são 144.754 de uma coluna só: 76 → **61 ms**. (`np.array(cur.fetchall())` é PIOR, 85 ms: materializa a lista de tuplas antes.) Mora em `queries.executar_ids`.
+- **`ConsultaSemantica` NÃO herda `sort`/`page`/`page_size`** — `extra="forbid"` os transforma em 422. Ordenar dentro de um resultado que existe por proximidade não significa nada, e "página 2 do sentido" menos ainda; aceitar e ignorar faria a interface prometer uma ordenação que não aconteceu. O front tem um caminho de URL separado por causa disso (`test_a_busca_por_sentido_nao_manda_sort_nem_pagina`).
+- **`total` na resposta é quantos VOLTARAM; o conjunto é `n_candidatos`.** `truncated_total` é sempre `true`. A tela mostra `n_candidatos` no número grande — mostrar 50 ali diria que o filtro casou 50 linhas.
+- **A busca por sentido ORDENA, não RECORTA.** Consequência prática: `/api/facets`, `from-filter` e o export operam sobre o filtro **sem o `q`** (`filtroSemTexto` no JS). Mandar a frase em português para o FTS5 casaria quase nada, e o botão "adicionar os N do filtro" prometeria um número que não é o do recorte.
+- **Nenhum índice novo foi preciso.** Medido: `SELECT id, uid FROM prompts` já sai por `SCAN prompts USING COVERING INDEX sqlite_autoindex_prompts_1` (109 ms) e o `SELECT id` sob filtro cai no `idx_prompts_nsfw`/`idx_prompts_app`. O padrão de criar índice no lifespan e registrar no s11 continua valendo para o próximo que precisar.
+- **O item da resposta ganha `similaridade` E preenche `score`.** `score` é o campo genérico de relevância que a listagem já devolve — só que lá é bm25 (**negativo**, menor é melhor) e aqui é cosseno (**maior é melhor**). A inversão de sinal é invisível para quem só lê o número, então a similaridade também sai com nome próprio. Nenhum campo do contrato foi renomeado ou removido (`test_busca_devolve_o_mesmo_shape_da_listagem`).
+- **Não há cache do conjunto de ids**, e é decisão consciente: economizaria os 61 ms do caso sem filtro, mas ao custo de mais um estado que pode ficar velho e devolver o recorte errado — exatamente o que o cache do M9-C tem duas guardas para evitar. 87 ms já é rápido.
 
 ## Camada raw (M2/M3)
 

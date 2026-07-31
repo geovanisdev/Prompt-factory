@@ -26,6 +26,7 @@ from fastapi import Depends, HTTPException, Request
 
 from .. import db as dbmod
 from .cache import CacheAgregados
+from .semantic import IndiceSemantico
 
 
 def get_conn(request: Request) -> Iterator[sqlite3.Connection]:
@@ -114,6 +115,20 @@ def cache(request: Request) -> CacheAgregados:
 Cache = Annotated[CacheAgregados, Depends(cache)]
 
 
+def semantica(request: Request) -> IndiceSemantico:
+    """O índice de embeddings desta app (``app.state.semantica``).
+
+    Do ``app.state`` pelo mesmo motivo do cache, com a aposta bem maior: a matriz
+    guarda um mapa uid → id de UM banco. Compartilhada entre duas apps, ela
+    devolveria os vizinhos de um corpus com os ids do outro — e cosseno não
+    reclama de nada.
+    """
+    return request.app.state.semantica  # type: ignore[no-any-return]
+
+
+Semantica = Annotated[IndiceSemantico, Depends(semantica)]
+
+
 # ---------------------------------------------------------------------------
 # guardas
 # ---------------------------------------------------------------------------
@@ -175,6 +190,7 @@ __all__ = [
     "Cache",
     "Conexao",
     "Estado",
+    "Semantica",
     "cache",
     "estado",
     "exigir_colecao",
@@ -183,4 +199,5 @@ __all__ = [
     "linha_por_uid",
     "marcar_atualizado",
     "rotulagem_pendente",
+    "semantica",
 ]

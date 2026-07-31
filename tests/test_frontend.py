@@ -157,7 +157,8 @@ ANCORAS: tuple[str, ...] = (
     "topo", "marca", "form-busca", "busca", "ordem", "resumo", "total", "sel-topo",
     "btn-revisao", "btn-tema", "btn-atalhos",
     "grade", "facetas", "centro", "barra", "chips", "lista", "paginacao",
-    "tamanho-pagina", "btn-marcar-pagina",
+    "tamanho-pagina", "rot-tamanho", "btn-marcar-pagina",
+    "modo-busca", "aviso-semantica",
     "mesa", "contador-sel", "btn-limpar-sel", "btn-sel-colecao", "btn-sel-fora",
     "colecao-ativa", "btn-nova-colecao", "btn-renomear-colecao", "btn-apagar-colecao",
     "filtrar-colecao", "btn-filtro-mais", "btn-filtro-menos",
@@ -239,6 +240,9 @@ ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("PATCH", "/api/prompts/{uid}"),
     ("POST", "/api/prompts/{uid}/revert"),
     ("GET", "/api/facets"),
+    ("GET", "/api/semantic"),
+    ("GET", "/api/semantic/status"),
+    ("POST", "/api/semantic/warmup"),
     ("GET", "/api/collections"),
     ("POST", "/api/collections"),
     ("PATCH", "/api/collections/{colecao_id}"),
@@ -304,6 +308,83 @@ def test_a_taxonomia_nao_foi_copiada_para_a_tela(js: str) -> None:
     assert "est.stats.taxonomia" in js
     # Idem para os rótulos legíveis: quem os resolve é routes_prompts._rotulo.
     assert "Geração criativa" not in js
+
+
+# ---------------------------------------------------------------------------
+# 5b. o modo semântico (M10)
+# ---------------------------------------------------------------------------
+
+
+def test_a_busca_por_sentido_nao_manda_sort_nem_pagina(js: str) -> None:
+    """``ConsultaSemantica`` recusa ``sort``/``page``/``page_size`` com 422.
+
+    A recusa é de propósito (ordenar dentro de uma busca por proximidade não
+    existe), então quem monta a URL não pode mandá-los "por simetria" com a
+    listagem: a tela ficaria vazia com um 422 que ninguém entende.
+    """
+    trecho = js.split("if (semantica) {", 1)[1].split("} else {", 1)[0]
+    for proibido in ('set("sort"', 'set("page"', 'set("page_size"'):
+        assert proibido not in trecho, f"a URL da semântica manda {proibido}"
+    assert 'set("k"' in trecho, "o k é o único parâmetro a mais da rota semântica"
+    assert "filtroSemTexto(est.f)" in trecho
+
+
+def test_o_conjunto_do_filtro_nunca_leva_o_texto_da_busca_semantica(js: str) -> None:
+    """Facetas, coleção em massa e export operam sobre o CONJUNTO, não o ranking.
+
+    No modo semântico o ``q`` é uma frase em português; mandá-la para
+    ``/api/facets`` ou para o ``from-filter`` faria o SQLite procurar essas
+    palavras no FTS5 e devolver quase nada — com a barra lateral e o botão
+    "adicionar os N do filtro" prometendo números que não são os do recorte.
+    """
+    assert "function filtroSemTexto(" in js and "delete copia.q" in js
+    assert "function filtroDoConjunto(" in js
+    for uso in (
+        "postar(rota, { filter: filtroDoConjunto()",
+        "corpo.filter = filtroDoConjunto()",
+        "return filtroDoConjunto();",
+    ):
+        assert uso in js, uso
+
+
+def test_o_numero_grande_e_o_conjunto_e_nao_o_k(js: str) -> None:
+    """``total`` no modo semântico é quantos VOLTARAM; o filtro é ``n_candidatos``."""
+    assert "function totalDoConjunto(" in js
+    assert "d.n_candidatos" in js
+    topo = js.split("function desenharTopo() {", 1)[1].split("\n}", 1)[0]
+    assert "totalDoConjunto(d)" in topo
+    mesa = js.split("function desenharMesa() {", 1)[1].split("\n}", 1)[0]
+    assert "totalDoConjunto(est.dados)" in mesa
+
+
+def test_a_similaridade_substitui_o_snippet_no_card(js: str) -> None:
+    """Sem termo de busca não há ``<mark>``: o card mostra a proximidade."""
+    assert "it.similaridade.toFixed(3)" in js, "o cosseno absoluto tem de aparecer"
+    assert "barra-sim" in js
+    # A barra é normalizada DENTRO da lista; o número, não. Sem isso, dez barras
+    # cheias idênticas (0,99 e 0,86 desenham igual numa escala de 0 a 1).
+    assert "faixa.max - faixa.min" in js
+
+
+def test_o_aquecimento_do_modelo_e_faixa_e_nao_toast(html: str, js: str) -> None:
+    """~16 s de espera não cabem num aviso que some em 2 s."""
+    assert 'id="aviso-semantica"' in html
+    assert "/api/semantic/warmup" in js
+    assert "vigiarAquecimento" in js
+    # e o aviso NÃO passa pelo `recado()`, que é o toast temporizado
+    prep = js.split("async function prepararSemantica() {", 1)[1].split("\n}", 1)[0]
+    assert "recado(" not in prep
+
+
+def test_o_modo_semantico_nao_e_persistido(js: str) -> None:
+    """Abrir a ferramenta num modo que talvez não funcione mais é pior que um clique."""
+    guardar = js.split("function guardar() {", 1)[1].split("\n}", 1)[0]
+    restaurar = js.split("function restaurar() {", 1)[1].split("\n}", 1)[0]
+    # As chaves do localStorage são todas `CHAVE + "<nome>"`; a busca literal
+    # evita o falso positivo do comentário "modo privado / cota".
+    assert 'CHAVE + "modo"' not in guardar
+    assert 'CHAVE + "modo"' not in restaurar
+    assert "est.modo" not in guardar and "est.modo" not in restaurar
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,10 @@ O que o lifespan faz, e por quê:
    argumento, um índice completamente vazio PASSA (ele só valida coerência
    interna). ``SELECT count(*) FROM prompts_fts`` também não detecta: numa
    tabela de conteúdo externo o count lê a tabela de conteúdo.
+4. **Sonda o índice semântico** (M10) sem carregá-lo: contagem do ``.npy`` contra
+   a do banco e 64 uids conferidos no SQL. Avisa alto e segue — a busca textual
+   não depende dos embeddings, e um ``.npy`` de outra build precisa impedir a
+   BUSCA, não a interface. Ver ``app/semantic.py``.
 
 **CORS não é configurado.** A interface é servida pela mesma origem; abrir CORS
 seria superfície de ataque de graça numa app que roda em ``127.0.0.1`` com o
@@ -38,9 +42,11 @@ from fastapi.staticfiles import StaticFiles
 from .. import __version__, paths
 from .. import db as dbmod
 from ..schema import TAXONOMY_VERSION
+from ..stages import UNIVERSE_EMB, UNIVERSE_UIDS
 from . import queries
 from .cache import CacheAgregados
 from .deps import Conexao, Estado, rotulagem_pendente
+from .semantic import IndiceSemantico
 
 #: Índice de COBERTURA da interface. A ordem é a ordem em que a app filtra
 #: (igualdade mais usada primeiro); ``n_chars`` e ``n_exact_dups`` entram no fim
@@ -103,7 +109,7 @@ def _indice_marcadores(conn: sqlite3.Connection) -> None:
     conn.execute(ddl)
 
 
-def _preparar(db_file: Path) -> dict[str, Any]:
+def _preparar(db_file: Path, indice: IndiceSemantico | None = None) -> dict[str, Any]:
     """Guardas de partida + metadados do banco. Levanta ``RuntimeError`` se não dá."""
     if not db_file.is_file():
         raise RuntimeError(
@@ -144,11 +150,32 @@ def _preparar(db_file: Path) -> dict[str, Any]:
 
         meta = {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM app_meta")}
         n_rows = int(conn.execute("SELECT count(*) AS n FROM prompts").fetchone()["n"])
+
+        # SONDA DO ÍNDICE SEMÂNTICO (M10). Barata de propósito — só o cabeçalho do
+        # .npy, a contagem do txt e 64 uids conferidos no SQL — porque a carga de
+        # verdade é preguiçosa. O que ela pega é o caso que importa: o `.npy` ser
+        # de OUTRA build do universo. Nesse estado o cosseno continua saindo, os
+        # vizinhos continuam plausíveis, e cada uid devolvido é de outra linha.
+        #
+        # AVISA ALTO, mas NÃO derruba a app: a busca textual não depende disto, e
+        # recusar a interface inteira por causa de um arquivo auxiliar deixaria o
+        # usuário sem nem a lista. Quem falha alto é a rota — 500 com o conserto
+        # escrito. O silêncio é o único desfecho proibido.
+        semantica = None
+        if indice is not None:
+            semantica = indice.sondar(conn)
+            if not semantica["ok"] and semantica["n_vetores"]:
+                print(
+                    f"[app] AVISO: busca por sentido DESLIGADA — {semantica['motivo']}.\n"
+                    "[app]        A busca textual (FTS) continua funcionando."
+                )
+
         conn.execute("PRAGMA optimize")
     finally:
         conn.close()
 
     return {
+        "semantica": semantica,
         "db_file": str(db_file),
         "db_size_bytes": db_file.stat().st_size,
         "n_rows": n_rows,
@@ -166,16 +193,20 @@ def _preparar(db_file: Path) -> dict[str, Any]:
 
 
 def criar_app(
-    db_file: str | Path | None = None, exports_dir: str | Path | None = None
+    db_file: str | Path | None = None,
+    exports_dir: str | Path | None = None,
+    emb_dir: str | Path | None = None,
 ) -> FastAPI:
     """Monta a app.
 
     ``db_file`` padrão: ``data/db/prompts.sqlite``. ``exports_dir`` padrão:
-    ``data/exports/`` — é parâmetro (e não constante) para que os testes gerem
-    arquivos de verdade sem escrever uma linha em ``data/``.
+    ``data/exports/``; ``emb_dir`` padrão: ``data/emb/`` — são parâmetros (e não
+    constantes) para que os testes gerem arquivos de verdade, e apontem um índice
+    semântico sintético, sem escrever uma linha em ``data/``.
     """
     alvo = Path(db_file) if db_file is not None else paths.DB_FILE
     saida = Path(exports_dir) if exports_dir is not None else paths.EXPORTS
+    embeddings = Path(emb_dir) if emb_dir is not None else paths.EMB
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -183,7 +214,17 @@ def criar_app(
         app.state.exports_dir = saida
         # Antes do _preparar: o cache é por app, e nasce vazio junto com ela.
         app.state.cache = CacheAgregados()
-        app.state.meta = _preparar(alvo)
+        # O índice semântico nasce VAZIO e não carrega nada aqui. O e5 tem ~450 MB
+        # e a matriz 212 MiB: aquecer no lifespan faria `pf serve` demorar segundos
+        # para todo mundo, inclusive para quem nunca vai clicar em "sentido". Quem
+        # paga é a primeira busca — ou o `POST /api/semantic/warmup`, que a
+        # interface dispara no clique do modo.
+        app.state.semantica = IndiceSemantico(
+            alvo,
+            embeddings / Path(UNIVERSE_EMB).name,
+            embeddings / Path(UNIVERSE_UIDS).name,
+        )
+        app.state.meta = _preparar(alvo, app.state.semantica)
         try:
             yield
         finally:
@@ -210,7 +251,12 @@ def criar_app(
 
     # Import aqui dentro (e não no topo) para manter o grafo de import da app
     # acíclico: as rotas importam `deps`, que importa daqui.
-    from . import routes_collections, routes_export, routes_prompts
+    from . import (
+        routes_collections,
+        routes_export,
+        routes_prompts,
+        routes_semantic,
+    )
 
     @app.get("/api/health", tags=["app"], summary="A app subiu e o banco abriu")
     def health(conn: Conexao, meta: Estado) -> dict[str, Any]:
@@ -222,6 +268,7 @@ def criar_app(
         }
 
     app.include_router(routes_prompts.router)
+    app.include_router(routes_semantic.router)
     app.include_router(routes_collections.router)
     app.include_router(routes_export.router)
 

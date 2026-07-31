@@ -99,6 +99,16 @@ def get_model() -> Any:
     return _modelo
 
 
+def modelo_carregado() -> bool:
+    """Diz se o modelo já está NA MEMÓRIA deste processo (não no disco).
+
+    Diferente de ``modelo_em_cache``, que responde sobre o cache do HuggingFace.
+    Aqui a pergunta é "a próxima chamada vai custar 10 ms ou 16 s?" — e é ela que
+    a interface precisa para saber se ainda está aquecendo.
+    """
+    return _modelo is not None
+
+
 def modelo_em_cache() -> bool:
     """Diz se o modelo já está no cache local do HuggingFace (sem baixar nada).
 
@@ -143,6 +153,7 @@ __all__ = [
     "embed_texts",
     "get_model",
     "model_name",
+    "modelo_carregado",
     "modelo_em_cache",
     "truncate_chars",
 ]

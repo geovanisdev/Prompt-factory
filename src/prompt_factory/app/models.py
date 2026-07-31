@@ -32,6 +32,12 @@ from ..schema import DOMAINS, QUALITY_VALUES, TASK_TYPES, License
 MAX_PAGE_SIZE: int = int(_cfg("app", "max_page_size", default=200))
 PAGE_SIZE: int = int(_cfg("app", "page_size", default=50))
 MAX_UIDS: int = int(_cfg("app", "max_uids_por_requisicao", default=5000))
+#: Tetos da busca semântica (M10). Ficam aqui, e não em ``app/semantic.py``, pelo
+#: mesmo motivo dos de cima: viram limites de validação do Pydantic, que são
+#: lidos no import.
+K_SEMANTICO: int = int(_cfg("app", "semantic_k", default=50))
+MAX_K_SEMANTICO: int = int(_cfg("app", "semantic_max_k", default=200))
+MIN_CHARS_SEMANTICO: int = int(_cfg("app", "semantic_min_chars", default=3))
 
 #: Ordenações aceitas. ``relevance`` só existe com ``q``; sem ele a rota cai
 #: para ``newest`` e **devolve o sort efetivo** no envelope, para a interface
@@ -183,6 +189,42 @@ class ConsultaPrompts(Filtros):
         return Filtros.model_validate(
             self.model_dump(include=set(Filtros.model_fields))
         )
+
+
+class ConsultaSemantica(Filtros):
+    """``Filtros`` + ``k``. Só ``GET /api/semantic`` usa (M10).
+
+    **Não herda ``sort``, ``page`` nem ``page_size``, e isso é deliberado.** Numa
+    busca por sentido a ordem É o escore — não existe "ordenar por mais novo"
+    dentro de um resultado cuja única razão de ser é a proximidade. E "página 2 do
+    sentido" não significa nada para quem procura: ou o item está entre os mais
+    próximos ou não está. Com ``extra="forbid"``, mandar ``sort=newest`` aqui
+    devolve **422** em vez de ser ignorado em silêncio — que é justamente o que
+    faria a interface prometer uma ordenação que não aconteceu.
+
+    ``q`` é herdado de ``Filtros`` (onde é opcional) e passa a ser **obrigatório**:
+    sem texto não há vetor de consulta.
+    """
+
+    #: Quantos itens voltam. Teto em ``[app] semantic_max_k``: o custo não está no
+    #: k (o top-k é 1,4 ms para qualquer k pequeno), está em hidratar e serializar
+    #: — e ninguém lê 5.000 vizinhos.
+    k: Annotated[int, Field(ge=1, le=MAX_K_SEMANTICO)] = K_SEMANTICO
+
+    @model_validator(mode="after")
+    def _consulta_com_texto(self) -> ConsultaSemantica:
+        texto = (self.q or "").strip()
+        if len(texto) < MIN_CHARS_SEMANTICO:
+            raise ValueError(
+                f"q é obrigatório na busca por sentido e precisa de ao menos "
+                f"{MIN_CHARS_SEMANTICO} caracteres (recebi {len(texto)}): abaixo "
+                "disso o modelo devolve ruído com forma de vetor"
+            )
+        return self
+
+    def filtros(self) -> Filtros:
+        """O recorte puro, sem o ``k``."""
+        return Filtros.model_validate(self.model_dump(include=set(Filtros.model_fields)))
 
 
 # ---------------------------------------------------------------------------
@@ -371,12 +413,16 @@ def dump_filtros(f: Filtros) -> dict[str, Any]:
 
 
 __all__ = [
+    "K_SEMANTICO",
+    "MAX_K_SEMANTICO",
     "MAX_PAGE_SIZE",
     "MAX_UIDS",
+    "MIN_CHARS_SEMANTICO",
     "PAGE_SIZE",
     "ColecaoIn",
     "ColecaoPatch",
     "ConsultaPrompts",
+    "ConsultaSemantica",
     "ExportIn",
     "Filtros",
     "ItensPorFiltro",
