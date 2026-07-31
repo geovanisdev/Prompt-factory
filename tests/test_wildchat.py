@@ -602,6 +602,95 @@ def test_passe_completo_so_reconsolida(raw_dir: Path, capsys: pytest.CaptureFixt
 
 
 # ---------------------------------------------------------------------------
+# retomada automática depois de erro de rede (sem rede: `_varrer` é dublê)
+# ---------------------------------------------------------------------------
+
+
+def _args() -> Any:
+    import argparse
+
+    return argparse.Namespace(downsample=False, max_rows=None, restart=False)
+
+
+_CFG_EN: dict[str, Any] = {
+    "enabled": True,
+    "hf_id": "allenai/WildChat-4.8M",
+    "license": "odc-by-1.0",
+}
+
+
+@pytest.fixture
+def sem_espera(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(wc.time, "sleep", lambda _s: None)
+
+
+def test_passe_reabre_o_stream_depois_de_erro_de_rede(
+    raw_dir: Path, sem_espera: None, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    chamadas: list[int] = []
+
+    def falha_duas_vezes(nome, modo, hf_id, estado, max_rows, *, quieto=False):
+        chamadas.append(1)
+        if len(chamadas) <= 2:
+            raise ConnectionError("Connection broken: IncompleteRead")
+        estado["scanned"] = 3_199_860
+        estado["kept"] = 0
+        return "ok"
+
+    monkeypatch.setattr(wc, "_varrer", falha_duas_vezes)
+    assert wc.run_ingest("wildchat_en", _CFG_EN, _args()) == 0
+    assert len(chamadas) == 3
+    saida = capsys.readouterr().out
+    assert "rede caiu" in saida and "Tentativa 1/" in saida and "Tentativa 2/" in saida
+
+
+def test_passe_desiste_quando_a_falha_nao_avanca_nenhum_checkpoint(
+    raw_dir: Path, sem_espera: None, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    chamadas: list[int] = []
+
+    def sempre_falha(nome, modo, hf_id, estado, max_rows, *, quieto=False):
+        chamadas.append(1)
+        raise ConnectionError("middlebox cortou em 4 MB")
+
+    monkeypatch.setattr(wc, "MAX_TENTATIVAS_REDE", 2)
+    monkeypatch.setattr(wc, "_varrer", sempre_falha)
+    with pytest.raises(ConnectionError):
+        wc.run_ingest("wildchat_en", _CFG_EN, _args())
+    # 2 tentativas + a que estourou o limite: uma falha determinística não gira.
+    assert len(chamadas) == 3
+    assert "desistindo" in capsys.readouterr().out
+
+
+def test_passe_zera_o_contador_quando_o_checkpoint_avanca(
+    raw_dir: Path, sem_espera: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chamadas: list[int] = []
+
+    def falha_mas_avanca(nome, modo, hf_id, estado, max_rows, *, quieto=False):
+        chamadas.append(1)
+        estado["scanned"] += 50_000  # cada tentativa gravou um checkpoint novo
+        if len(chamadas) <= 5:  # mais falhas que MAX_TENTATIVAS_REDE=2
+            raise ConnectionError("rede ruim a noite inteira")
+        return "ok"
+
+    monkeypatch.setattr(wc, "MAX_TENTATIVAS_REDE", 2)
+    monkeypatch.setattr(wc, "_varrer", falha_mas_avanca)
+    assert wc.run_ingest("wildchat_en", _CFG_EN, _args()) == 0
+    assert len(chamadas) == 6  # nunca desistiu, porque sempre houve progresso
+
+
+def test_erros_de_rede_cobre_o_que_o_hub_levanta() -> None:
+    erros = wc._erros_de_rede()
+    import requests
+
+    assert issubclass(requests.exceptions.ChunkedEncodingError, erros)
+    assert issubclass(ConnectionError, erros) and issubclass(TimeoutError, erros)
+    # ValueError NÃO é erro de rede: schema quebrado tem de estourar na hora.
+    assert not issubclass(ValueError, erros)
+
+
+# ---------------------------------------------------------------------------
 # lmsys: opt-in, zero rede
 # ---------------------------------------------------------------------------
 

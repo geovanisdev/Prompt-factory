@@ -31,9 +31,9 @@ license = "odc-by-1.0"
 commercial_ok = true
 redistributable = true
 attribution = "Zhao, Wenting; Ren, Xiang; Hessel, Jack; Cardie, Claire; Choi, Yejin; Deng, Yuntian. \"WildChat: 1M ChatGPT Interaction Logs in the Wild\", ICLR 2024. Dataset allenai/WildChat-4.8M, Allen Institute for AI, licenciado sob Open Data Commons Attribution License (ODC-BY) v1.0."
-expected_min = 30000
-expected_max = 45000
-notes = "Fonte principal de pt. Streaming com pushdown de `columns=` (filters= NÃO poupa banda aqui e quebraria a cadência do checkpoint: ver docstring de ingest/wildchat.py); idioma filtrado no cliente com `language == \"Portuguese\"`, por extenso. Checkpoint ds.state_dict() a cada 50k linhas VARRIDAS, part-files em data/raw/_parts/. O split train tem 3.199.860 linhas; a faixa 30k-45k é extrapolação de janela parcial (1,199% de pt) — fora dela é drift de mix, não bug: inspecione a amostra antes de mexer nestes números."
+expected_min = 55959
+expected_max = 55959
+notes = "Fonte principal de pt. Streaming com pushdown de `columns=` (filters= NÃO poupa banda aqui e quebraria a cadência do checkpoint: ver docstring de ingest/wildchat.py); idioma filtrado no cliente com `language == \"Portuguese\"`, por extenso. Checkpoint ds.state_dict() a cada 50k linhas VARRIDAS, part-files em data/raw/_parts/. MEDIDO no M3 (revisão c827c6df do dataset): 3.199.860 linhas varridas, 58.049 com language=Portuguese, 99 sem texto de usuário, 2.090 linhas descartadas por conversation_hash repetido (a coluna NÃO é chave: 1.520 hashes aparecem 2x ou mais, sempre com texto idêntico) => 55.959. Isso é o DOBRO da estimativa de 30k-45k do plano, que extrapolava 1,199% de pt a partir das primeiras 781k linhas: o mix muda ao longo do tempo (pt sobe para ~1,9% nos shards de 2024/2025). Como o passe é determinístico, min == max: qualquer divergência é revisão nova da fonte. ATENÇÃO para o s01/s02: 33,9% dessas linhas são UM template automatizado (\"Usando o seguinte texto:\" sobre diários oficiais), ~3,7% são francês e ~4% inglês mal rotulados pela fonte, e 15% trazem marcadores \"User:\"/\"Assistant:\" embutidos no próprio texto."
 
 [aya]
 enabled = true
@@ -90,7 +90,7 @@ redistributable = true
 attribution = "Zhao, Wenting; Ren, Xiang; Hessel, Jack; Cardie, Claire; Choi, Yejin; Deng, Yuntian. \"WildChat: 1M ChatGPT Interaction Logs in the Wild\", ICLR 2024. Dataset allenai/WildChat-4.8M, Allen Institute for AI, licenciado sob Open Data Commons Attribution License (ODC-BY) v1.0."
 expected_min = 100000
 expected_max = 100000
-notes = "Dois estágios. 1) `pf ingest wildchat-en` varre o split e guarda o POOL em data/raw/wildchat_en_pool.parquet: language == \"English\" + hash-gate determinístico int(sha256(conversation_hash).hexdigest()[:8],16) < 0.11*2**32 (11%, não 8%: 0,11 x ~1,79M linhas EN ~= 197k, com folga para os pisos do estrato). 2) `pf ingest wildchat-en --downsample` (sem rede) corta para EXATAMENTE 100.000 com default_rng(42) sobre família-do-modelo x faixa-de-tamanho x ano; o expected_min/max abaixo vale para ESTE arquivo final, não para o pool (a faixa do pool, 130k-300k, é só WARN e mora em ingest/wildchat.py)."
+notes = "Dois estágios. 1) `pf ingest wildchat-en` varre o split e guarda o POOL em data/raw/wildchat_en_pool.parquet: language == \"English\" + hash-gate determinístico int(sha256(conversation_hash).hexdigest()[:8],16) < 0.11*2**32 (11%, não 8%: 0,11 x ~1,79M linhas EN ~= 197k, com folga para os pisos do estrato). 2) `pf ingest wildchat-en --downsample` (sem rede) corta para EXATAMENTE 100.000 com default_rng(42) sobre família-do-modelo x faixa-de-tamanho x ano; o expected_min/max abaixo vale para ESTE arquivo final, não para o pool (a faixa do pool, 130k-300k, é só WARN e mora em ingest/wildchat.py). MEDIDO no M3: 183.300 linhas passaram no gate, 296 sem texto de usuário e 24.640 caíram por conversation_hash repetido => pool de 158.660 (dentro da faixa; a taxa de repetição de 13,4% é bem maior que a do pt porque duas conversas automatizadas sozinhas somam 12.196 cópias). O downsample achou 36 estratos dos 63 possíveis (gpt-4.1-mini só existe em 2025, gpt-3.5-turbo só em 2023/2024) e levou 9 deles inteiros; relatório completo em data/raw/wildchat_en.strata.txt."
 
 [no_robots]
 enabled = true

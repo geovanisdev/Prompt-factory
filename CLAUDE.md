@@ -75,3 +75,9 @@ Um passe = varrer as **3.199.860** linhas do split `train` com `columns=` (pushd
 * `wildchat_en` sai em dois arquivos: `wildchat_en_pool.parquet` (~200k, hash-gate de 11%) e, depois de `--downsample` (sem rede), `wildchat_en.parquet` com **100.000 exatos** + `wildchat_en.strata.txt`.
 * Os parquets do wildchat **não gravam `pf_ingested_at`** no metadata: com um relógio no footer o downsample não seria byte-idêntico entre re-runs, que é como se prova o determinismo (`Get-FileHash`).
 * `toxic` é sempre `False` neste release (as linhas tóxicas foram removidas antes da publicação): `nsfw_hint` constante `False` é o valor correto, não bug.
+
+**Medido no M3** (revisão `c827c6df`, ~45 min por passe, ~64 checkpoints, 30–70 s entre eles): pt 3.199.860 varridas → 58.049 com `language=Portuguese` → **55.959** depois do dedup; en 183.300 no gate → **158.660** de pool → **100.000** no downsample (36 estratos, 9 levados inteiros).
+
+* **`conversation_hash` NÃO é chave.** 1.520 hashes repetem no pt (2.090 linhas a mais) e 2.543 no pool en (24.640 a mais) — sempre com texto idêntico, porque o hash é do conteúdo. O dedup da consolidação é obrigatório, não paranoia.
+* **A `language` da fonte erra.** O mesmo template automatizado em francês aparece 7.553× rotulado `English` e 2.049× rotulado `Portuguese`. No pt, ~34% das linhas são UM robô só ("Usando o seguinte texto:" sobre diários oficiais). O s02 não é opcional.
+* **`HTTP_RANGE_LIMIT` (2 MiB) é obrigatório nesta máquina.** Sem ele o pyarrow coalesce column chunks em ranges de até 32 MiB, o middlebox de TLS corta a resposta em ~4 MB e o passe morre em 76% — sempre no mesmo shard, então os 5 retries do `huggingface_hub` refazem a mesma requisição gigante e falham igual. Acima disso, `wildchat._passe` reabre o stream sozinho a partir do último checkpoint (`MAX_TENTATIVAS_REDE`).

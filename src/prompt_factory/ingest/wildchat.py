@@ -99,6 +99,23 @@ TOTAL_ROWS = 3_199_860
 #: arquivo final de 100.000, não para o pool). Fora disso: WARN, nunca erro.
 POOL_MIN, POOL_MAX = 130_000, 300_000
 
+#: Teto de bytes de UMA leitura HTTP do parquet.
+#:
+#: MEDIDO, não estimado. Por padrão o pyarrow coalesce column chunks vizinhos em
+#: ranges de até 32 MiB, e o `train-00066-of-00086.parquet` pedia 6.516.029 bytes
+#: de uma vez. O middlebox de TLS desta máquina (ver CLAUDE.md) corta a resposta
+#: em ~4 MB: `IncompleteRead(3.970.004..4.011.148 bytes read)`, SEMPRE o mesmo
+#: total esperado. Como o retry do huggingface_hub refaz a MESMA requisição
+#: gigante, as 5 tentativas dele falham igual e o passe morre em 76% — foi o que
+#: aconteceu três vezes seguidas antes deste teto existir.
+#: Custo de limitar: mais requisições, todas na mesma conexão keep-alive.
+HTTP_RANGE_LIMIT = 2 * 1024 * 1024
+
+#: Quantas vezes reabrir o stream depois de um erro de rede SEM avançar nenhum
+#: checkpoint. Zerado a cada checkpoint novo: uma rede ruim a noite inteira ainda
+#: termina o passe, mas uma falha determinística desiste em vez de girar.
+MAX_TENTATIVAS_REDE = 6
+
 #: Alvo do downsample e piso por estrato.
 DOWNSAMPLE_TARGET = 100_000
 DOWNSAMPLE_FLOOR = 500
@@ -534,11 +551,27 @@ def _row(modo: Modo, rec: Mapping[str, Any], texto: str) -> dict[str, Any]:
     )
 
 
-def _abrir(hf_id: str, nome: str) -> Any:
-    """`load_dataset` em streaming com pushdown de colunas + fail-fast de schema."""
+def _abrir(hf_id: str, nome: str, *, quieto: bool = False) -> Any:
+    """`load_dataset` em streaming com pushdown de colunas + fail-fast de schema.
+
+    `fragment_scan_options` existe só para segurar o tamanho de cada GET — ver
+    `HTTP_RANGE_LIMIT`. Não muda a ORDEM nem o agrupamento dos exemplos, então um
+    `state_dict` gravado sem ele continua válido (e vice-versa).
+    """
+    import pyarrow.dataset as pads
     from datasets import load_dataset
 
-    ds = load_dataset(hf_id, split=SPLIT, streaming=True, columns=list(COLUMNS))
+    ds = load_dataset(
+        hf_id,
+        split=SPLIT,
+        streaming=True,
+        columns=list(COLUMNS),
+        fragment_scan_options=pads.ParquetFragmentScanOptions(
+            cache_options=pa.CacheOptions(range_size_limit=HTTP_RANGE_LIMIT)
+        ),
+    )
+    if quieto:
+        return ds
     if not ds.features:
         # Features não resolvidas (repo sem metadados): segue, o extractor é
         # defensivo o bastante. Melhor um passe caro que um passe recusado.
@@ -618,7 +651,81 @@ def _passe(nome: str, modo: Modo, cfg: Mapping[str, Any], args: argparse.Namespa
         )
         return _finalizar(nome, modo, cfg, estado, max_rows)
 
-    ds = _abrir(hf_id, nome)
+    print(
+        f"[{nome}] filtro: language == {modo.language!r}"
+        + (f" + hash_gate({modo.fraction})" if modo.fraction < 1.0 else "")
+        + (f" | --max-rows {max_rows} (linhas VARRIDAS)" if max_rows else ""),
+        flush=True,
+    )
+
+    # Cada tentativa recomeça do ÚLTIMO CHECKPOINT, nunca do zero: o buffer em
+    # memória é descartado (aquelas linhas serão re-varridas) e o índice do part
+    # continua vindo do state. O contador só zera quando um checkpoint novo
+    # entra no disco, para que uma falha determinística desista em vez de girar.
+    tentativa = 0
+    while True:
+        marca = int(estado["scanned"])
+        try:
+            status = _varrer(nome, modo, hf_id, estado, max_rows, quieto=tentativa > 0)
+        except _erros_de_rede() as exc:
+            tentativa = tentativa + 1 if int(estado["scanned"]) == marca else 1
+            if tentativa > MAX_TENTATIVAS_REDE:
+                print(
+                    f"[{nome}] rede falhou {MAX_TENTATIVAS_REDE}x sem avançar nenhum "
+                    f"checkpoint - desistindo em scanned={estado['scanned']}. "
+                    f"Os parts estão salvos: retome com o MESMO comando.",
+                    flush=True,
+                )
+                raise
+            espera = min(60, 5 * 2 ** (tentativa - 1))
+            print(
+                f"[{nome}] rede caiu ({type(exc).__name__}: {str(exc)[:160]}). "
+                f"Tentativa {tentativa}/{MAX_TENTATIVAS_REDE} em {espera}s, "
+                f"reabrindo o stream em scanned={estado['scanned']}.",
+                flush=True,
+            )
+            time.sleep(espera)
+            continue
+        if status == "interrompido":
+            return 1
+        break
+
+    return _finalizar(nome, modo, cfg, estado, max_rows)
+
+
+def _erros_de_rede() -> tuple[type[BaseException], ...]:
+    """Exceções que valem reabrir o stream. Montada tarde: `requests` é do passe."""
+    erros: list[type[BaseException]] = [OSError]  # ConnectionError/TimeoutError entram aqui
+    try:
+        import requests
+
+        erros.append(requests.exceptions.RequestException)
+    except ImportError:  # pragma: no cover - requests vem com huggingface_hub
+        pass
+    try:
+        import urllib3
+
+        erros.append(urllib3.exceptions.HTTPError)
+    except ImportError:  # pragma: no cover
+        pass
+    return tuple(erros)
+
+
+def _varrer(
+    nome: str,
+    modo: Modo,
+    hf_id: str,
+    estado: dict[str, Any],
+    max_rows: int | None,
+    *,
+    quieto: bool = False,
+) -> str:
+    """UMA tentativa de varredura a partir do state. `"ok"` ou `"interrompido"`.
+
+    Mutar `estado` é o contrato: quem chama usa `estado["scanned"]` para saber se
+    a tentativa avançou algum checkpoint antes de morrer.
+    """
+    ds = _abrir(hf_id, nome, quieto=quieto)
     hf_state = estado.get("hf_state")
     if hf_state:
         ds.load_state_dict(hf_state)
@@ -627,15 +734,8 @@ def _passe(nome: str, modo: Modo, cfg: Mapping[str, Any], args: argparse.Namespa
             f"{estado['kept']} mantidas, próximo part {estado['next_part']:03d}",
             flush=True,
         )
-    else:
+    elif not quieto:
         print(f"[{nome}] começando do zero (nenhum checkpoint válido)", flush=True)
-
-    print(
-        f"[{nome}] filtro: language == {modo.language!r}"
-        + (f" + hash_gate({modo.fraction})" if modo.fraction < 1.0 else "")
-        + (f" | --max-rows {max_rows} (linhas VARRIDAS)" if max_rows else ""),
-        flush=True,
-    )
 
     scanned = int(estado["scanned"])
     kept = int(estado["kept"])
@@ -720,10 +820,10 @@ def _passe(nome: str, modo: Modo, cfg: Mapping[str, Any], args: argparse.Namespa
             f"Retome com o MESMO comando (sem --restart).",
             flush=True,
         )
-        return 1
+        return "interrompido"
 
     flush(final=True)
-    return _finalizar(nome, modo, cfg, estado, max_rows)
+    return "ok"
 
 
 def _finalizar(
