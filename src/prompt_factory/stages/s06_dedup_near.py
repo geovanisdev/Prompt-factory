@@ -125,7 +125,11 @@ def run(cfg: StageConfig) -> int:
     licencas = tabela_chaves.column("license").to_pylist()
     fontes = tabela_chaves.column("source").to_pylist()
     sids = tabela_chaves.column("source_id").to_pylist()
+    # combine_chunks dá acesso posicional O(1) ao texto (o Jaccard consulta linhas
+    # esparsas); soltar a tabela logo depois evita segurar a coluna duas vezes -
+    # são ~1 GB de texto cada.
     textos = tabela_chaves.column("text").combine_chunks()
+    del tabela_chaves
 
     emb = np.load(origem_emb, mmap_mode="r")
     if emb.shape[0] != n:
