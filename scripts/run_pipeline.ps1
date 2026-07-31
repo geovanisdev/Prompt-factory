@@ -21,8 +21,12 @@
         pf labels ...          -- campanha (ver .claude/skills/rotular-prompts)
         pf merge-labels        -- s08 -> data/final/seed_labels.parquet
 
-    Ainda stubs: pf train / pf apply (M7), pf load-db --swap (M8),
-    pf export (M9), pf serve (M9).
+    Depois dos rotulos vem a carga do banco (M8), que tambem fica FORA do
+    `pf run all` -- ela troca o arquivo que o `pf serve` esta lendo:
+        pf load-db             -- s11 -> data/db/prompts.sqlite (build + swap)
+        pf db-check --bench    -- mede as consultas da interface no banco real
+
+    Ainda stubs: pf train / pf apply (M7), pf export (M9), pf serve (M9).
 
 .PARAMETER Ingest
     Roda `pf ingest` antes (todas as fontes default_on). Sem isso o script

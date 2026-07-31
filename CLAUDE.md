@@ -18,7 +18,7 @@ Plano completo (fontes, decisões de engenharia, marcos M0–M10): `C:\Users\gig
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve         # interface local em http://127.0.0.1:8765
 ```
 
-Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1), `make-seed`/`labels`/`merge-labels` (M5). Ainda stub: `train` (M7), `apply` (M7), `load-db` (M8), `export` (M9), `serve` (M9) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
+Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1) e `db-check --bench` (M8), `make-seed`/`labels`/`merge-labels` (M5), `load-db` (M8). Ainda stub: `train` (M7), `apply` (M7), `export` (M9), `serve` (M9) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
 
 ```powershell
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf run                 # s01..s06 (= `all`)
@@ -38,6 +38,15 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf labels submit --batch batch_0007 --file r.jsonl --model haiku
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf labels gold --file pregold.jsonl # importa a calibração revisada
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf merge-labels              # s08: final/seed_labels.parquet
+```
+
+```powershell
+# Carga do banco (M8). Constrói ao lado e troca por os.replace no fim.
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf load-db                        # s11: build + swap
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf load-db --allow-unlabeled-pct 100  # antes do M7: universo sem rótulo
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf load-db --no-swap              # constrói e PARA
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf load-db --swap-only            # retry do swap recusado por lock
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf db-check --bench               # mede o banco real (só leitura)
 ```
 
 ```powershell
@@ -70,12 +79,12 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 1. Estágios `s01`–`s12` são funções puras arquivo→arquivo; cada um lê e escreve **Parquet imutável** em `data/`, então tudo é retomável e replayável.
 2. `raw/{fonte}.parquet` → s01 normalize → s02 idioma+variante pt-BR/pt-PT → s03 PII → s04 dedup exato → s05 embed (e5-small, `.npy` f16) → s06 dedup próximo → `final/universe.parquet`.
 3. s07 amostra-semente → campanha de rotulagem por agentes → s08 merge → s09 treino → s10 aplica com limiares de confiança.
-4. s11 carrega o universo rotulado num **SQLite** (WAL + FTS5 `remove_diacritics 2`), construído à parte e trocado por swap de arquivo.
+4. s11 carrega o universo rotulado num **SQLite** (WAL + FTS5 `remove_diacritics 2`), construído à parte e trocado por swap de arquivo (`pf load-db`).
 5. s12/app: FastAPI toca **apenas** o SQLite (mais os `.npy` por mmap na busca semântica) e serve um `static/index.html` único, sem build.
 
 ## Arquivos críticos
 
-`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `stages/__init__.py` (`StageConfig` + `STAGES`/`CADEIA`, único ponto de contato do `cli.py` com a pipeline) · `labeling_io.py` (manifest atômico, máquina de estados dos lotes e validação estrita) · `db.py` (DDL/FTS/conexão) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `labeling/mappings/*.json` (categoria nativa → task_type) · `config/sources.toml` (licença e atribuição por fonte — **a ordem das seções é o desempate do dedup**) · `.claude/skills/rotular-prompts/SKILL.md`.
+`src/prompt_factory/schema.py` (contrato canônico das 27 colunas) · `ingest/base.py` (contrato das 12 colunas do raw + `write_raw`) · `stages/__init__.py` (`StageConfig` + `STAGES`/`CADEIA`, único ponto de contato do `cli.py` com a pipeline) · `labeling_io.py` (manifest atômico, máquina de estados dos lotes e validação estrita) · `db.py` (DDL/FTS/`INDEXES`/conexão — o `executescript(DDL)` idempotente é o pivô da carga bulk) · `cli.py` (entrypoint) · `labeling/taxonomy.json` (fonte única da taxonomia) · `labeling/mappings/*.json` (categoria nativa → task_type) · `config/sources.toml` (licença e atribuição por fonte — **a ordem das seções é o desempate do dedup**) · `.claude/skills/rotular-prompts/SKILL.md`.
 
 ## Preparo do universo (M4)
 
@@ -129,6 +138,29 @@ Pegadinhas deste bloco:
 - **Rótulo de agente sobre item de calibração é descartado no s08** — cada ouro reaparece em ~4,7 lotes e serve para medir, não para rotular.
 - **`labeling/labels/`, `labeling/seed/` e `labeling/batches/` são gitignorados**; versionados são `taxonomy.json`, `mappings/*.json` e o `manifest.json`.
 - **A saída de ferramenta do harness trunca em ~30k caracteres**, e um lote de 80 itens chega a ~120k. Por isso `pf labels next` tem `--out`/`--out-dir`: o fluxo real é sempre por arquivo.
+
+## Carga do banco (M8)
+
+`pf load-db` (s11) constrói `data/db/prompts.build.sqlite` **do zero** a partir de `final/universe.parquet` (obrigatório) + `final/labeled.parquet` (s10, opcional) + `final/seed_labels.parquet` (s08, opcional), e no fim troca o `data/db/prompts.sqlite` com um `os.replace`. `pf db-check --bench` mede o banco resultante em somente leitura.
+
+| estágio | entrada → saída | o que decide |
+| --- | --- | --- |
+| s11 | `final/universe.parquet` + rótulos → `db/prompts.sqlite` | precedência dos rótulos, needs_review, swap |
+
+Pegadinhas deste bloco:
+
+- **O s11 está em `STAGES` mas FORA da `CADEIA`**, como o s07/s08 e por um motivo pior: é o único estágio cuja saída alguém está LENDO enquanto a pipeline roda (`pf serve`), e a última coisa que ele faz é trocar esse arquivo. Um `pf run` de rotina publicaria um banco com os rótulos que estivessem por ali — inclusive nenhum. `pf run s11` funciona; `pf run all` nunca o inclui.
+- **Escalar numpy no sqlite3 vira BLOB em silêncio.** O sqlite3 do 3.12 aceita o buffer protocol: `np.int32(123)` grava `typeof='blob'`. As colunas com CHECK explodem na hora, mas `n_chars`, `n_words`, `variant_confidence`, `label_confidence`, `n_exact_dups` e `n_near_dups` **não têm CHECK e passam podres** — e um BLOB compara MAIOR que qualquer INTEGER, então `n_chars > 100` continua devolvendo TRUE e `sum(n_chars)` ignora a linha. Toda linha sai de `RecordBatch.to_pydict()`, nunca de iterar um `ndarray` ou uma coluna pyarrow. A guarda é `s11.SQL_TIPOS`.
+- **`SELECT count(*) FROM prompts_fts` NÃO detecta índice vazio.** Numa tabela de conteúdo externo o count lê a tabela de conteúdo: medido, ele devolveu 3.000 depois de um `'delete-all'` esvaziar o índice. Quem detecta é `INSERT INTO prompts_fts(prompts_fts, rank) VALUES('integrity-check', 1)` — **com o argumento 1**; sem ele (rank 0) passa numa base vazia, porque só valida coerência interna.
+- **O `integrity-check` exige conexão de ESCRITA.** Os comandos do FTS5 viajam como INSERT na tabela virtual; num `mode=ro` a resposta é `attempt to write a readonly database` antes de verificar coisa alguma. Por isso `s11.verificar()` abre read-write (ele não altera dado).
+- **Conexão só-leitura deixa `-shm` órfão.** O SQLite remove `-wal`/`-shm` quando a última conexão fecha, mas só se ela puder escrever. Como um `-shm` ao lado do banco é justamente o sinal que o pré-voo do swap usa para dizer "alguém está com isto aberto", todo caminho readonly do s11 chama `_limpar_sidecars()` no fim.
+- **Carga bulk = sem índice e sem trigger.** Popular o FTS pelo trigger, linha a linha, é ordens de grandeza mais lento; e o comando `'delete'` de um FTS externo exige que `old.text` seja EXATAMENTE o texto indexado — divergir **corrompe em silêncio**. A ordem é: derruba 3 triggers + 11 índices → `BEGIN` explícito (a conexão é autocommit!) → executemany → COMMIT → `'rebuild'` do FTS → `conn.executescript(db.DDL)`, que recria índices e triggers de uma vez porque todo o DDL é `IF NOT EXISTS`.
+- **`text_original` é NULL até alguém editar.** A carga grava NULL em 100% das linhas (~800 MB a menos); quem lê usa `COALESCE(text_original, text)` e o `edited` já diz o estado. Copiar `text` ali seria duplicar o corpus para dizer "nada mudou".
+- **`idx_prompts_facets` existe porque o SQLite não combina dois índices de igualdade.** Com só os simples, `WHERE lang=? AND task_type=? AND domain=?` escolhe UM e varre o resto. Medido em 180k linhas: contagem por faceta 89,7 → 13,2 ms (6,8x), filtro triplo 11,6 → 0,16 ms (70x), e os planos passam a dizer `USING COVERING INDEX`.
+- **Rótulo observado vence rótulo inferido.** `labeled.parquet` cobre todo mundo; por cima, `seed_labels` com `label_method` `manual`/`agent` sobrescreve — o classificador TREINOU nessas linhas, deixá-lo reescrevê-las fecharia um laço em que o modelo audita a si mesmo. `native` do seed **não** vence a predição, mas entra quando não há predição nenhuma. Rótulo humano grava `label_confidence` NULL: confiança de humano não é probabilidade, e um 1.0 inventado poluiria a fila de revisão ordenada por essa coluna.
+- **`--allow-unlabeled-pct` (default 1) recusa a carga ANTES de construir**, com um pré-voo que lê só a coluna `uid` do universo. Sem isso, um banco carregado com o parquet de rótulos ausente fica plausível, abre na interface e só denuncia o erro semanas depois. Antes do M7 a falta de rótulo é intencional: `--allow-unlabeled-pct 100`.
+- **Swap recusado sai com código 3**, não 1: o banco novo está PRONTO em `db/prompts.build.sqlite` e o conserto é parar o `pf serve` e rodar `pf load-db --swap-only`. O build **nunca** é apagado no erro — ele é o produto.
+- **`db_build_id` é `sha256(universe_sha + labels_sha)[:16]`, não um uuid4.** O projeto inteiro se apoia em "mesmas entradas ⇒ mesmo resultado"; um id aleatório faria dois bancos idênticos parecerem diferentes. A carga NÃO é byte-idêntica entre re-runs (`ingested_at`/`updated_at` usam `strftime('now')`) — o que se repete são as contagens e o build_id.
 
 ## Camada raw (M2/M3)
 

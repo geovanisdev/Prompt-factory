@@ -53,6 +53,14 @@ MAPA_PROXIMO = "final/dedup_near_map.parquet"
 UNIVERSE_EMB = "emb/universe.f16.npy"
 UNIVERSE_UIDS = "emb/universe_uids.txt"
 SEED_LABELS = "final/seed_labels.parquet"
+LABELED = "final/labeled.parquet"
+DB_SQLITE = "db/prompts.sqlite"
+DB_BUILD_SQLITE = "db/prompts.build.sqlite"
+
+#: Outros nomes que a saída do s10 já teve em projeto. O s11 aceita os dois: o
+#: desfecho de não aceitar é uma carga que roda inteira sem rótulo nenhum e só
+#: denuncia o engano no teto de ``allow_unlabeled_pct``.
+LABELED_ALIASES: tuple[str, ...] = ("final/labels_all.parquet",)
 
 #: Saídas do s07 — relativas a ``cfg.labeling_dir``, não a ``cfg.data_dir``: a
 #: semente é insumo da campanha de rotulagem (versionável em espírito, revisável
@@ -85,6 +93,18 @@ class StageConfig:
     #: Só o s08 lê (``pf merge-labels --strict``): falha em vez de avisar quando
     #: um lote está done sem arquivo de rótulos.
     strict: bool = False
+    #: --- só o s11 lê (``pf load-db``) -------------------------------------
+    #: Teto de linhas sem ``task_type`` (em %). ``None`` = o de
+    #: ``[loaddb] allow_unlabeled_pct``.
+    allow_unlabeled_pct: float | None = None
+    #: Trocar o banco vivo pelo recém-construído ao final (``--no-swap`` desliga).
+    swap: bool = True
+    #: Só a troca, sem construir nada: é o retry de um swap recusado por lock.
+    swap_only: bool = False
+    #: ``.bak`` do banco anterior antes de trocar.
+    backup: bool = False
+    #: ``PRAGMA integrity_check`` (varre tudo) no lugar do ``quick_check``.
+    deep: bool = False
 
     def caminho(self, relativo: str) -> Path:
         return self.data_dir / relativo
@@ -271,6 +291,7 @@ STAGES: dict[str, Callable[[StageConfig], int]] = {
     "s06": _despacho("s06_dedup_near"),
     "s07": _despacho("s07_seed_sample"),
     "s08": _despacho("s08_merge_labels"),
+    "s11": _despacho("s11_load_db"),
 }
 
 #: O que ``pf run`` (e ``pf run all``) encadeia.
@@ -280,6 +301,13 @@ STAGES: dict[str, Callable[[StageConfig], int]] = {
 #: calibração no meio. Se ``all`` os incluísse, um ``pf run`` de rotina
 #: regeraria a semente e apagaria o manifest de uma campanha em andamento — sem
 #: perguntar nada. Cada um tem comando próprio: `pf make-seed` e `pf merge-labels`.
+#:
+#: O s11 fica fora pelo mesmo motivo, agravado: ele é o único estágio cuja saída
+#: alguém está LENDO enquanto a pipeline roda (``pf serve``), e a última coisa
+#: que faz é trocar esse arquivo. Um ``pf run`` de rotina — o comando que se
+#: repete depois de mexer num threshold do s02 — publicaria um banco carregado
+#: com os rótulos que estivessem por ali no momento, inclusive nenhum. Comando
+#: próprio: `pf load-db`.
 CADEIA: tuple[str, ...] = ("s01", "s02", "s03", "s04", "s05", "s06")
 
 #: Descrição de uma linha para o `pf run --help` e mensagens de erro.
@@ -292,17 +320,22 @@ DESCRICOES: dict[str, str] = {
     "s06": "dedup próximo (cosseno + jaccard) -> final/universe.parquet",
     "s07": "amostra-semente estratificada + lotes de rotulagem (fora da cadeia)",
     "s08": "funde rótulos de agente + nativos -> final/seed_labels.parquet (fora da cadeia)",
+    "s11": "carga bulk no SQLite + rebuild do FTS + swap de arquivo (fora da cadeia)",
 }
 
 
 __all__ = [
     "BATCH_LEITURA",
     "CADEIA",
+    "DB_BUILD_SQLITE",
+    "DB_SQLITE",
     "DEDUP1",
     "DESCRICOES",
     "EMBEDDINGS",
     "EMB_SIDECAR",
     "EMB_UIDS",
+    "LABELED",
+    "LABELED_ALIASES",
     "LANG",
     "MAPA_EXATO",
     "MAPA_PROXIMO",

@@ -101,6 +101,26 @@ mapping_warn = 0.30
 conf_accept = 0.50     # >= aceita o rótulo
 conf_review = 0.35     # entre review e accept: aceita mas marca needs_review
 
+[loaddb]
+# s11 (`pf load-db`). Teto de linhas SEM rótulo (task_type nulo) que a carga
+# aceita antes de recusar o banco. O ponto não é a estética: um banco carregado
+# com o parquet de rótulos ausente ou vazio fica plausível, abre na interface e
+# só denuncia o erro semanas depois. 1% é folga para a cauda que o classificador
+# legitimamente não decidiu; `--allow-unlabeled-pct` sobrescreve para os casos
+# em que a falta de rótulo é intencional (carga do universo cru, antes do M7).
+allow_unlabeled_pct = 1.0
+# Linhas por executemany e por lote de leitura do parquet. Os dois andam juntos:
+# o universo é lido em streaming (`iter_batches`) porque `text` sozinho passa de
+# 750 MB e read_table inteiro estouraria a RAM.
+insert_chunk_rows = 10000
+read_batch_rows = 10000
+# Cache de página durante a carga, em MB (vira PRAGMA cache_size negativo). O
+# rebuild do FTS5 é o passo caro e é ele que consome esse cache.
+cache_size_mb = 256
+# `pf db-check --bench`: medições por consulta, além de 1 aquecimento fora do
+# cronômetro. Reporta mediana e p95 — média mente no Windows com antivírus.
+bench_repeats = 5
+
 [embed]
 model = "intfloat/multilingual-e5-small"
 dim = 384

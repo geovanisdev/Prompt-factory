@@ -3,7 +3,8 @@
 Cada subcomando corresponde a um estágio da pipeline e vai saindo do stub no
 marco indicado em `_Cmd.milestone` (implementados: `db-check` no M1; `ingest` e
 `report raw` no M2; `run` s01-s06 e `report universe`/`dedup-sample` no M4;
-`make-seed`, `labels` e `merge-labels` no M5).
+`make-seed`, `labels` e `merge-labels` no M5; `load-db` e `db-check --bench` no
+M8).
 Enquanto é stub, o comando imprime em que marco chega e sai com código 2.
 `pf --help` e `pf <cmd> --help` funcionam e saem 0 — é isso que a DoD do M0
 exige.
@@ -87,12 +88,15 @@ class _Cmd:
 def _db_check(args: argparse.Namespace) -> int:
     """``pf db-check`` (M1) — autoteste do SQLite num banco temporário.
 
+    Com ``--bench`` (M8), depois do autoteste ele mede o banco REAL em somente
+    leitura: sem banco carregado, avisa e sai 0.
+
     Import lazy de propósito: ``pf --help`` não precisa carregar o DDL nem o
     módulo ``sqlite3``.
     """
     from .db import run_db_check
 
-    return run_db_check(bench=args.bench, query=args.query)
+    return run_db_check(bench=args.bench, query=args.query, db_path=args.db)
 
 
 def _ingest(args: argparse.Namespace) -> int:
@@ -297,6 +301,29 @@ def _merge_labels(args: argparse.Namespace) -> int:
 
     cfg = _stage_config(args, strict=bool(args.strict))
     return int(STAGES["s08"](cfg))  # type: ignore[arg-type]
+
+
+def _load_db(args: argparse.Namespace) -> int:
+    """``pf load-db`` (M8) — s11: constrói o SQLite do zero e troca por swap.
+
+    Sai **3** quando o banco novo está pronto mas a troca foi recusada (destino
+    aberto por outro processo). É um código distinto de propósito: um script que
+    veja 3 sabe que basta parar o servidor e rodar ``--swap-only``, sem
+    reconstruir nada.
+    """
+    from .stages import STAGES
+
+    if args.swap:
+        print("[pf] --swap é o comportamento PADRÃO (use --no-swap para só construir)")
+    cfg = _stage_config(
+        args,
+        allow_unlabeled_pct=args.allow_unlabeled_pct,
+        swap=not args.no_swap,
+        swap_only=bool(args.swap_only),
+        backup=bool(args.backup),
+        deep=bool(args.deep),
+    )
+    return int(STAGES["s11"](cfg))  # type: ignore[arg-type]
 
 
 def _labels(args: argparse.Namespace) -> int:
@@ -563,7 +590,11 @@ COMMANDS: tuple[_Cmd, ...] = (
         "sanidade do SQLite: DDL, WAL e busca FTS sem acento ('coracao' acha 'coração')",
         [
             (("--query",), {"metavar": "Q", "help": "termo de teste do FTS5"}),
-            (("--bench",), {"action": "store_true", "help": "mede tempos (chega no M8, com o banco carregado)"}),
+            (
+                ("--bench",),
+                {"action": "store_true", "help": "mede as consultas da interface no banco carregado (só leitura)"},
+            ),
+            (("--db",), {"metavar": "PATH", "help": "banco a medir no --bench (padrão: data/db/prompts.sqlite)"}),
         ],
         implemented=True,
         handler=_db_check,
@@ -659,7 +690,39 @@ COMMANDS: tuple[_Cmd, ...] = (
         "load-db",
         "M8",
         "s11: carga bulk no SQLite (build + rebuild do FTS + swap de arquivo)",
-        [(("--swap",), {"action": "store_true", "help": "troca o banco vivo pelo recém-construído"})],
+        [
+            (
+                ("--swap",),
+                {"action": "store_true", "help": "alias explícito do padrão: trocar o banco no fim"},
+            ),
+            (
+                ("--no-swap",),
+                {"action": "store_true", "help": "constrói db/prompts.build.sqlite e PARA (não troca)"},
+            ),
+            (
+                ("--swap-only",),
+                {
+                    "action": "store_true",
+                    "help": "só a troca, sem reconstruir — é o retry de um swap recusado por lock",
+                },
+            ),
+            (
+                ("--allow-unlabeled-pct",),
+                {
+                    "type": float,
+                    "metavar": "PCT",
+                    "help": "teto de linhas sem task_type (padrão: [loaddb] allow_unlabeled_pct = 1)",
+                },
+            ),
+            (("--backup",), {"action": "store_true", "help": "grava um .bak do banco anterior antes de trocar"}),
+            (
+                ("--deep",),
+                {"action": "store_true", "help": "PRAGMA integrity_check (varre tudo) no lugar do quick_check"},
+            ),
+            _DATA_DIR,
+        ],
+        implemented=True,
+        handler=_load_db,
     ),
     _Cmd(
         "export",

@@ -33,6 +33,14 @@ MODELS: Path = DATA / "models"    # classificadores joblib
 DB: Path = DATA / "db"            # prompts.sqlite (+ build/swap)
 EXPORTS: Path = DATA / "exports"  # JSONL/CSV + manifests
 
+#: O banco que a interface abre. Nunca é escrito no lugar: o s11 constrói o
+#: ``DB_BUILD`` inteiro ao lado e só então faz ``os.replace``, que é atômico.
+#: (Os estágios usam ``StageConfig.caminho("db/prompts.sqlite")``, para que
+#: ``--data-dir`` redirecione também o banco; estas duas constantes são o
+#: caminho absoluto de quem não tem StageConfig — a app e o ``pf db-check``.)
+DB_FILE: Path = DB / "prompts.sqlite"
+DB_BUILD: Path = DB / "prompts.build.sqlite"
+
 LABELING: Path = ROOT / "labeling"
 TAXONOMY_JSON: Path = LABELING / "taxonomy.json"
 LABEL_MANIFEST: Path = LABELING / "manifest.json"
@@ -61,6 +69,8 @@ __all__ = [
     "DATA",
     "DATA_DIRS",
     "DB",
+    "DB_BUILD",
+    "DB_FILE",
     "EMB",
     "EXPORTS",
     "FINAL",

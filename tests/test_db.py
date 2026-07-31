@@ -18,7 +18,9 @@ from prompt_factory import db, schema
 _DEFAULTS: dict[str, object] = {
     "uid": "0123456789abcdef",
     "text": "Meu coração está partido",
-    "text_original": "Meu coração está partido",
+    # text_original fica FORA: NULL é o estado "nunca editado", e é o que a
+    # carga do s11 grava em 100% das linhas (~800 MB a menos de string
+    # duplicada). Quem lê usa COALESCE(text_original, text).
     "lang": "pt",
     "source": "teste",
     "license": "unknown",
@@ -107,6 +109,29 @@ def test_fts_ressincroniza_no_delete(conn: sqlite3.Connection) -> None:
     rowid = _insert(conn)
     conn.execute("DELETE FROM prompts WHERE id = ?", (rowid,))
     assert db.fts_search(conn, "coracao") == []
+
+
+def test_text_original_e_nulo_ate_alguem_editar(conn: sqlite3.Connection) -> None:
+    rowid = _insert(conn)
+    linha = conn.execute(
+        "SELECT text_original, edited, COALESCE(text_original, text) AS exibir "
+        "FROM prompts WHERE id = ?",
+        (rowid,),
+    ).fetchone()
+    assert linha["text_original"] is None
+    assert linha["edited"] == 0
+    assert linha["exibir"] == _DEFAULTS["text"]
+
+    # Depois da edição, o original guardado é o que o "reverter" devolve.
+    conn.execute(
+        "UPDATE prompts SET text_original = text, text = ?, edited = 1 WHERE id = ?",
+        ("Texto corrigido à mão", rowid),
+    )
+    linha = conn.execute(
+        "SELECT text_original, COALESCE(text_original, text) AS exibir FROM prompts WHERE id = ?",
+        (rowid,),
+    ).fetchone()
+    assert linha["text_original"] == _DEFAULTS["text"] == linha["exibir"]
 
 
 def test_check_de_lang(conn: sqlite3.Connection) -> None:

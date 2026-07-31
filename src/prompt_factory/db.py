@@ -12,8 +12,10 @@ Notas de projeto que valem a leitura antes de mexer no DDL:
 * ``id`` é ``INTEGER PRIMARY KEY``, ou seja, alias do rowid — requisito do
   ``content_rowid`` da tabela FTS externa.
 * ``text_raw`` **não** entra no SQLite (ele mora no Parquet). ``text_original``
-  recebe o texto normalizado no momento da carga e existe só para o "reverter"
-  da interface depois de uma edição manual.
+  é **NULL enquanto ninguém editou** e só recebe conteúdo quando a interface
+  guarda o texto de antes de uma edição manual, para o "reverter". Copiar
+  ``text`` nele na carga duplicaria ~800 MB de string para dizer "nada mudou",
+  que o ``edited`` já diz. Quem lê usa ``COALESCE(text_original, text)``.
 * Os triggers do FTS espelham apenas ``text``; o de UPDATE é
   ``AFTER UPDATE OF text`` para que corrigir um rótulo não reindexe nada.
 * Não há trigger de ``updated_at``: quem faz PATCH na API seta a coluna. Trigger
@@ -26,8 +28,10 @@ Notas de projeto que valem a leitura antes de mexer no DDL:
 from __future__ import annotations
 
 import hashlib
+import math
 import sqlite3
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +49,7 @@ CREATE TABLE IF NOT EXISTS prompts (
   id                 INTEGER PRIMARY KEY,
   uid                TEXT NOT NULL UNIQUE,
   text               TEXT NOT NULL,
-  text_original      TEXT NOT NULL,
+  text_original      TEXT,
   edited             INTEGER NOT NULL DEFAULT 0 CHECK (edited IN (0,1)),
   lang               TEXT NOT NULL CHECK (lang IN ('pt','en')),
   lang_variant       TEXT CHECK (lang_variant IS NULL OR lang_variant IN ('pt-BR','pt-PT','pt-indef')),
@@ -87,6 +91,15 @@ CREATE INDEX IF NOT EXISTS idx_prompts_quality ON prompts(quality);
 CREATE INDEX IF NOT EXISTS idx_prompts_nsfw    ON prompts(nsfw);
 CREATE INDEX IF NOT EXISTS idx_prompts_review  ON prompts(needs_review);
 CREATE INDEX IF NOT EXISTS idx_prompts_hash    ON prompts(hash_norm);
+-- Índice de COBERTURA das facetas. O SQLite não combina dois índices de
+-- igualdade: com só os simples acima, `WHERE lang=? AND task_type=? AND
+-- domain=?` escolhe UM deles e varre o resto. Medido em 180k linhas sintéticas:
+-- contagem por faceta 89,7 -> 13,2 ms (6,8x), filtro triplo 11,6 -> 0,16 ms
+-- (70x), lang+task+needs_review 9,6 -> 0,46 ms (21x); os planos passam a dizer
+-- "USING COVERING INDEX" (nem toca na tabela). A ordem das colunas é a ordem em
+-- que a interface filtra: idioma sempre, depois tarefa, domínio e a fila de
+-- revisão.
+CREATE INDEX IF NOT EXISTS idx_prompts_facets  ON prompts(lang, task_type, domain, needs_review);
 
 -- Índice externo (content='prompts'): o texto não é duplicado, o FTS guarda só
 -- o índice invertido. remove_diacritics 2 dobra acento em TODO o Unicode.
@@ -169,6 +182,23 @@ TABLES: tuple[str, ...] = (
 
 #: Triggers de sincronia do índice FTS.
 TRIGGERS: tuple[str, ...] = ("prompts_fts_ai", "prompts_fts_ad", "prompts_fts_au")
+
+#: Índices de ``prompts``, na ordem do DDL. A carga bulk do s11 derruba os onze
+#: antes de inserir (onze B-trees crescendo a cada linha custam mais do que
+#: construí-los de uma vez no fim) e recria tudo com ``executescript(DDL)``.
+INDEXES: tuple[str, ...] = (
+    "idx_prompts_lang",
+    "idx_prompts_variant",
+    "idx_prompts_task",
+    "idx_prompts_domain",
+    "idx_prompts_source",
+    "idx_prompts_license",
+    "idx_prompts_quality",
+    "idx_prompts_nsfw",
+    "idx_prompts_review",
+    "idx_prompts_hash",
+    "idx_prompts_facets",
+)
 
 
 def connect(db_path: str | Path, *, readonly: bool = False) -> sqlite3.Connection:
@@ -263,13 +293,14 @@ def _insert_check_row(conn: sqlite3.Connection, text_raw: str) -> int:
     hash_norm = hashlib.sha256(textnorm.norm_for_hash(text).encode("utf-8")).hexdigest()
     n_chars, n_words = schema.text_stats(text)
     uid = schema.make_uid("db-check", "1", text_raw)
+    # ``text_original`` fica de fora de propósito: NULL é o estado "nunca
+    # editado", o mesmo que a carga do s11 grava em 100% das linhas.
     cur = conn.execute(
         "INSERT INTO prompts "
-        "(uid, text, text_original, lang, source, license, hash_norm, n_chars, n_words) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(uid, text, lang, source, license, hash_norm, n_chars, n_words) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             uid,
-            text,
             text,
             schema.Lang.PT.value,
             "db-check",
@@ -282,24 +313,164 @@ def _insert_check_row(conn: sqlite3.Connection, text_raw: str) -> int:
     return int(cur.lastrowid or 0)
 
 
-def run_db_check(bench: bool = False, query: str | None = None) -> int:
+#: Consultas do ``--bench``, na ordem. ``{f}`` = termo frequente (pior caso da
+#: posting list), ``{s}`` = termo seletivo tirado do próprio corpus.
+_BENCH_META_MS = 100.0
+
+
+def _termos_do_corpus(conn: sqlite3.Connection) -> tuple[str, str]:
+    """``(termo frequente, termo seletivo)`` extraídos do banco.
+
+    Chutar termos fixos mediria o corpus errado: "the" não existe num banco só
+    de português. O frequente sai do idioma majoritário, o seletivo sai de uma
+    linha de verdade — assim os dois sempre casam com alguma coisa.
+    """
+    linha = conn.execute(
+        "SELECT lang, count(*) AS n FROM prompts GROUP BY lang ORDER BY n DESC LIMIT 1"
+    ).fetchone()
+    frequente = "the" if (linha and str(linha["lang"]) == "en") else "de"
+    seletivo = frequente
+    amostra = conn.execute("SELECT text FROM prompts WHERE n_chars > 200 LIMIT 1").fetchone()
+    if amostra is not None:
+        palavras = [p for p in str(amostra["text"]).split() if p.isalpha() and len(p) >= 8]
+        if palavras:
+            seletivo = palavras[0]
+    return frequente, seletivo
+
+
+def _medir(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...], repeticoes: int) -> tuple[float, float, int]:
+    """``(mediana ms, p95 ms, linhas)`` — 1 aquecimento fora do cronômetro.
+
+    Mediana e p95, nunca média: neste Windows o antivírus injeta picos de
+    dezenas de ms que puxam a média e não representam nada.
+    """
+    import statistics
+
+    linhas = len(conn.execute(sql, params).fetchall())
+    tempos: list[float] = []
+    for _ in range(max(repeticoes, 1)):
+        inicio = time.perf_counter()
+        conn.execute(sql, params).fetchall()
+        tempos.append((time.perf_counter() - inicio) * 1000)
+    tempos.sort()
+    indice = min(len(tempos) - 1, math.ceil(0.95 * len(tempos)) - 1)
+    return statistics.median(tempos), tempos[max(indice, 0)], linhas
+
+
+def run_bench(db_path: str | Path | None = None, repeticoes: int | None = None) -> int:
+    """Mede as consultas que a interface do M9 vai fazer. 0 = dentro da meta.
+
+    Sem banco carregado não há o que medir — avisa e devolve 0, para que
+    ``pf db-check --bench`` continue sendo um comando seguro de rodar sempre.
+    """
+    from .config import get as _get
+    from .paths import DB_FILE
+
+    caminho = Path(db_path) if db_path else DB_FILE
+    if not caminho.is_file():
+        print(f"db-check: --bench sem banco em {caminho} — rode `pf load-db` antes")
+        return 0
+    if repeticoes is None:
+        repeticoes = int(_get("loaddb", "bench_repeats", default=5))
+
+    conn = connect(caminho, readonly=True)
+    try:
+        n = int(conn.execute("SELECT count(*) AS n FROM prompts").fetchone()["n"])
+        page_count = int(conn.execute("PRAGMA page_count").fetchone()[0])
+        page_size = int(conn.execute("PRAGMA page_size").fetchone()[0])
+        print(
+            f"db-check: {caminho} — {n} linhas, {caminho.stat().st_size / 1e6:.1f} MB "
+            f"({page_count} páginas x {page_size} B = {page_count * page_size / 1e6:.1f} MB)"
+        )
+        for chave, valor in conn.execute("SELECT key, value FROM app_meta ORDER BY key"):
+            texto = str(valor)
+            print(f"db-check: app_meta[{chave}] = {texto[:110]}{'…' if len(texto) > 110 else ''}")
+        if n == 0:
+            print("db-check: banco vazio, nada a medir")
+            return 0
+
+        frequente, seletivo = _termos_do_corpus(conn)
+        junta = (
+            "SELECT p.id, p.uid FROM prompts_fts JOIN prompts p ON p.id = prompts_fts.rowid "
+            "WHERE prompts_fts MATCH ? LIMIT 50"
+        )
+        consultas: list[tuple[str, str, tuple[Any, ...], bool]] = [
+            (f"Q1 FTS seletiva ({seletivo!r}) LIMIT 50", junta, (fts_query(seletivo),), True),
+            (f"Q2 FTS frequente ({frequente!r}) LIMIT 50", junta, (fts_query(frequente),), True),
+            (
+                f"Q3 COUNT(*) do MATCH {frequente!r}",
+                "SELECT count(*) FROM prompts_fts WHERE prompts_fts MATCH ?",
+                (fts_query(frequente),),
+                False,  # varre a posting list inteira: não se cobra meta aqui
+            ),
+            (
+                "Q4 filtro facetado (lang+task+domain)",
+                "SELECT id FROM prompts WHERE lang = ? AND task_type IS NOT NULL "
+                "AND domain IS NOT NULL LIMIT 50",
+                ("pt",),
+                True,
+            ),
+            (
+                "Q5 GROUP BY task_type WHERE lang=?",
+                "SELECT task_type, count(*) FROM prompts WHERE lang = ? GROUP BY task_type",
+                ("pt",),
+                True,
+            ),
+            (
+                "Q6 paginação OFFSET 1000",
+                "SELECT id, uid FROM prompts ORDER BY id LIMIT 50 OFFSET 1000",
+                (),
+                True,
+            ),
+        ]
+
+        linhas: list[list[Any]] = []
+        estourou = 0
+        for rotulo, sql, params, cobra in consultas:
+            mediana, p95, achou = _medir(conn, sql, params, repeticoes)
+            estado = "-" if not cobra else ("ok" if mediana < _BENCH_META_MS else "ACIMA DA META")
+            if cobra and mediana >= _BENCH_META_MS:
+                estourou += 1
+            linhas.append([rotulo, f"{mediana:.1f}", f"{p95:.1f}", achou, estado])
+            plano = " | ".join(str(r[3]) for r in conn.execute("EXPLAIN QUERY PLAN " + sql, params))
+            linhas.append(["  plano: " + plano[:96], "", "", "", ""])
+
+        larguras = [max(len(str(linha[i])) for linha in linhas) for i in range(5)]
+        print(f"db-check: {'consulta'.ljust(larguras[0])}  mediana  p95      linhas  meta {_BENCH_META_MS:.0f} ms")
+        for linha in linhas:
+            print(
+                f"db-check: {str(linha[0]).ljust(larguras[0])}  "
+                f"{str(linha[1]).rjust(7)}  {str(linha[2]).rjust(7)}  "
+                f"{str(linha[3]).rjust(6)}  {linha[4]}"
+            )
+        if estourou:
+            print(f"db-check: {estourou} consulta(s) acima de {_BENCH_META_MS:.0f} ms")
+        return 0
+    finally:
+        conn.close()
+
+
+def run_db_check(
+    bench: bool = False, query: str | None = None, db_path: str | Path | None = None
+) -> int:
     """Autoteste do SQLite: DDL, WAL, FTS5 e busca sem acento. 0 = PASS.
 
-    Roda inteiro num diretório temporário — nunca toca ``data/db/``.
+    O autoteste roda inteiro num diretório temporário — nunca toca ``data/db/``.
+    O ``--bench``, esse sim, mede o banco REAL (só leitura).
     """
-    if bench:
-        print("db-check: --bench adiado para o M8 (precisa do banco carregado); segue o check")
-
     print(f"db-check: SQLite {sqlite3.sqlite_version} (mínimo exigido {'.'.join(map(str, MIN_SQLITE))})")
 
     falhas: list[str] = []
     # ignore_cleanup_errors: no Windows os arquivos -wal/-shm às vezes seguem
     # com handle aberto por um instante depois do close().
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        db_path = Path(tmp) / "db-check.sqlite"
+        # NÃO reaproveitar o nome ``db_path``: ele é o parâmetro que diz qual
+        # banco REAL o --bench mede, e sombreá-lo aqui faria o bench medir um
+        # temporário já apagado (e reportar "sem banco" sempre).
+        temporario = Path(tmp) / "db-check.sqlite"
         conn: sqlite3.Connection | None = None
         try:
-            conn = connect(db_path)
+            conn = connect(temporario)
             try:
                 init_db(conn)
             except sqlite3.OperationalError as exc:
@@ -352,11 +523,16 @@ def run_db_check(bench: bool = False, query: str | None = None) -> int:
         print("db-check: FAIL")
         return 1
     print("db-check: PASS")
+    # O bench vem depois do PASS de propósito: medir um banco real não faz
+    # sentido se a própria build do SQLite estiver quebrada.
+    if bench:
+        return run_bench(db_path)
     return 0
 
 
 __all__ = [
     "DDL",
+    "INDEXES",
     "MIN_SQLITE",
     "SCHEMA_VERSION",
     "TABLES",
@@ -366,6 +542,7 @@ __all__ = [
     "fts_search",
     "get_meta",
     "init_db",
+    "run_bench",
     "run_db_check",
     "set_meta",
 ]
