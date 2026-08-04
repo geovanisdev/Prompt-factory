@@ -380,13 +380,82 @@ def test_o_selo_do_campo_de_dado_segue_a_lingua_do_prompt(js: str) -> None:
     assert '"lingua.dado_pt"' in dica and '"lingua.dado_en"' in dica
 
 
-def test_os_modelos_de_rubrica_saem_em_ingles(js: str) -> None:
-    """Um critério de rubrica é METADADO. Um modelo em português produziria, a
-    cada clique, uma rubrica que nasce violando a convenção que a tela acabou de
-    declarar ao lado do campo."""
-    modelos = js.split("const MODELOS_RUBRICA = [", 1)[1].split("\n];", 1)[0]
-    assert not _ACENTOS.search(modelos), "modelo de rubrica com texto em português"
-    assert "The answer does what was asked" in modelos
+def _canonico_do_modelo(m: dict) -> str:
+    """Só os campos de IDENTIDADE, nunca os sidecares ``*_i18n``.
+
+    Varrer o sidecar acusaria a tradução de ser uma tradução. O que a convenção
+    manda estar em inglês é o canônico — é ele que vai para
+    ``anotacoes.payload_json`` e para o arquivo entregue.
+    """
+    return " ".join(
+        [m["titulo"]]
+        + [c["nome"] + " " + c.get("descricao", "") for c in m["criterios"]]
+        + [
+            str(a.get("rotulo", "")) + " " + str(a.get("exemplo", ""))
+            for c in m["criterios"]
+            for a in (c.get("escala", {}).get("ancoras") or [])
+        ]
+        + [
+            str(x.get("id", "")) + " " + str(x.get("rotulo", ""))
+            for c in m["criterios"]
+            for x in (c.get("tipos_issue") or [])
+        ]
+    )
+
+
+def test_os_modelos_de_rubrica_saem_em_ingles() -> None:
+    """Um critério de rubrica é METADADO. Um modelo com canônico em português
+    produziria, a cada clique, uma rubrica que nasce violando a convenção que a
+    tela acabou de declarar ao lado do campo.
+
+    Lê a FIXTURE, e não o JS: desde o P8 os modelos são dado. A convenção não
+    mudou de lugar por isso — ela só passou a valer sobre o arquivo que o
+    construtor do admin vai editar, que é onde ela realmente precisa valer.
+    """
+    from prompt_factory.annotate import rubricas_modelo
+
+    modelos = rubricas_modelo.carregar()
+    for m in modelos:
+        texto = _canonico_do_modelo(m)
+        assert not _ACENTOS.search(texto), f"modelo {m['id']!r} com canônico em português"
+    assert any(m["titulo"] == "The answer does what was asked" for m in modelos)
+
+
+def test_quem_leva_sidecar_e_decidido_por_caber_no_formulario() -> None:
+    """A assimetria de tradução entre os modelos é REGRA, não esquecimento.
+
+    Um modelo que **cabe no formulário** é aplicado ATRAVÉS dele, e o formulário
+    só tem os campos canônicos (nome, descrição, escala, as duas pontas): a
+    tradução seria descartada no clique. Decorá-lo com ``*_i18n`` prometeria uma
+    coisa que o caminho joga fora.
+
+    Um modelo que **não cabe** só pode ser materializado verbatim — o JSON é
+    literalmente o que a pessoa lê. Sem sidecar, um leitor de pt-BR abre o
+    instrumento inteiro em inglês, no meio de um pacote que é bilíngue.
+    """
+    from prompt_factory.annotate import rubricas_modelo
+
+    def tem_sidecar(m: dict) -> bool:
+        return bool(m.get("titulo_i18n")) or any(
+            c.get("nome_i18n") or c.get("descricao_i18n") for c in m["criterios"]
+        )
+
+    modelos = rubricas_modelo.carregar()
+    assert modelos, "sem modelo nenhum a regra não diz nada"
+    for m in modelos:
+        assert tem_sidecar(m) is not m["cabe_no_formulario"], m["id"]
+    # E o materializado traduz TUDO o que a tela desenha, não só o título: a
+    # matriz lê nome, descrição, grupo, âncora e chip por `bi()`.
+    sev = next(m for m in modelos if not m["cabe_no_formulario"])
+    for c in sev["criterios"]:
+        assert set(c["nome_i18n"]) == {"en", "pt"}, c["nome"]
+        assert set(c["descricao_i18n"]) == {"en", "pt"}, c["nome"]
+        if c.get("grupo"):
+            assert set(c["grupo_i18n"]) == {"en", "pt"}, c["nome"]
+        for a in c["escala"]["ancoras"]:
+            assert set(a["rotulo_i18n"]) == {"en", "pt"}, (c["nome"], a["valor"])
+        for x in c.get("tipos_issue") or []:
+            assert set(x["rotulo_i18n"]) == {"en", "pt"}, (c["nome"], x["id"])
 
 
 # ---------------------------------------------------------------------------
