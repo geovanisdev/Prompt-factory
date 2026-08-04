@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-slot="titulo">PRD — Bancada: redesign UI/UX &amp; camada Data Scientist</title>
+<!--
+  TEMPLATE CANÔNICO: PRD/Especificação (Tier 0). Herda DESIGN_SYSTEM.html.
+  Single-file, zero rede (D5). Cobre /to-prd e /write-a-prd como artefato durável (D10).
+  Aba Machine-Readable = resumo estruturado p/ prd-to-issues / to-issues (D4).
+  data-skel="fixo" = esqueleto; data-slot = preenchido pela Skill B (D9).
+-->
+<style data-skel="fixo">
+  :root{--paper:#faf8f4;--paper-sunk:#f1eee7;--ink:#1c1b18;--ink-soft:#4a4843;--ink-faint:#8a877f;--rule:#d9d4c8;--rule-strong:#b8b2a3;--accent:#2f5d57;--accent-soft:#e4ece9;--ok:#3f6b3a;--ok-bg:#e8efe5;--warn:#8a6d1f;--warn-bg:#f4ecd6;--danger:#9c3a32;--danger-bg:#f3e0dd;--info:#355c7a;--info-bg:#e1e9ef;--neutral:#5c5a53;--neutral-bg:#eceae3;--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,Cambria,"Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"Cascadia Code","Source Code Pro",Menlo,Consolas,"DejaVu Sans Mono",monospace;--t-xs:.75rem;--t-sm:.875rem;--t-base:1rem;--t-md:1.25rem;--t-lg:1.5625rem;--t-xl:1.953rem;--t-xxl:2.441rem;--s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.5rem;--s6:2rem;--s7:3rem;--s8:4rem;--measure:74ch;--radius:3px}
+  @media (prefers-color-scheme:dark){:root{--paper:#16150f;--paper-sunk:#1f1d16;--ink:#ece8df;--ink-soft:#b9b4a6;--ink-faint:#807c70;--rule:#33302a;--rule-strong:#4a463c;--accent:#7fb3aa;--accent-soft:#1d2b29;--ok:#8fb886;--ok-bg:#1b251a;--warn:#cdae6a;--warn-bg:#2a2415;--danger:#d28a82;--danger-bg:#2c1916;--info:#8fb2cc;--info-bg:#15222b;--neutral:#a8a59c;--neutral-bg:#23211b}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:var(--t-base);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:var(--s6) var(--s5) var(--s8)}
+  .measure{max-width:var(--measure)}
+  .doc-head{border-bottom:2px solid var(--ink);padding-bottom:var(--s4);margin-bottom:var(--s5)}
+  .doc-kicker{font-family:var(--sans);font-size:var(--t-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 var(--s2)}
+  .doc-title{font-size:var(--t-xxl);line-height:1.15;margin:0 0 var(--s3);font-weight:600}
+  .doc-meta{font-family:var(--sans);font-size:var(--t-sm);color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:0}
+  .doc-meta b{color:var(--ink);font-weight:600}
+  .canon{font-family:var(--sans);font-size:var(--t-sm);margin-top:var(--s3)}
+  .canon a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
+  .canon a:hover{border-bottom-color:var(--accent)}
+  h2{font-size:var(--t-xl);font-weight:600;margin:var(--s7) 0 var(--s3);line-height:1.2}
+  h3{font-size:var(--t-lg);font-weight:600;margin:var(--s5) 0 var(--s3)}
+  h4{font-family:var(--sans);font-size:var(--t-base);font-weight:700;margin:var(--s4) 0 var(--s2)}
+  p{margin:0 0 var(--s4)}
+  code,kbd{font-family:var(--mono);font-size:.92em;background:var(--paper-sunk);padding:.1em .35em;border-radius:var(--radius)}
+  .tabs{margin:var(--s5) 0}
+  .tab-strip{display:flex;flex-wrap:wrap;gap:var(--s1);border-bottom:1px solid var(--rule-strong);font-family:var(--sans)}
+  .tab-btn{appearance:none;background:none;border:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;color:var(--ink-faint);padding:var(--s2) var(--s4);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab-btn:hover{color:var(--ink)}
+  .tab-btn[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-btn.machine{margin-left:auto;color:var(--neutral)}
+  .tab-btn.machine[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+  .tab-panel{padding:var(--s5) 0}
+  .tab-panel[hidden]{display:none}
+  .lang-bar{display:flex;align-items:center;gap:var(--s2);margin:0 0 var(--s4);font-family:var(--sans)}
+  .lang-bar .lang-lbl{color:var(--ink-faint);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .lang-btn{appearance:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;background:none;color:var(--ink-faint);border:1px solid var(--rule);border-radius:100px;padding:.2em .9em}
+  .lang-btn:hover{color:var(--ink);border-color:var(--rule-strong)}
+  .lang-btn[aria-pressed="true"]{color:#fff;background:var(--accent);border-color:var(--accent)}
+  [data-lang="pt"] .lang-en,[data-lang="en"] .lang-pt{display:none}
+  .badge{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.15em .6em;border-radius:100px;display:inline-block;line-height:1.6}
+  .badge.ok{color:var(--ok);background:var(--ok-bg)}.badge.warn{color:var(--warn);background:var(--warn-bg)}.badge.danger{color:var(--danger);background:var(--danger-bg)}.badge.info{color:var(--info);background:var(--info-bg)}.badge.neutral{color:var(--neutral);background:var(--neutral-bg)}
+  table.grid{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:var(--t-sm);margin:var(--s4) 0}
+  table.grid caption{text-align:left;font-size:var(--t-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:var(--s2)}
+  table.grid th{text-align:left;font-weight:700;color:var(--ink);border-bottom:2px solid var(--rule-strong);padding:var(--s2) var(--s3)}
+  table.grid td{border-bottom:1px solid var(--rule);padding:var(--s2) var(--s3);vertical-align:top}
+  table.grid tr:hover td{background:var(--paper-sunk)}
+  .callout{border-left:3px solid var(--rule-strong);background:var(--paper-sunk);padding:var(--s3) var(--s4);margin:var(--s4) 0;border-radius:0 var(--radius) var(--radius) 0}
+  .callout .lbl{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:var(--s1)}
+  .callout.note{border-color:var(--info)}.callout.note .lbl{color:var(--info)}
+  .callout.warn{border-color:var(--warn)}.callout.warn .lbl{color:var(--warn)}
+  .callout.danger{border-color:var(--danger)}.callout.danger .lbl{color:var(--danger)}
+  .callout p:last-child{margin-bottom:0}
+  ul.check{list-style:none;padding:0;font-family:var(--sans);font-size:var(--t-sm)}
+  ul.check li{display:flex;gap:var(--s2);align-items:flex-start;padding:var(--s2) 0;border-bottom:1px solid var(--rule)}
+  ul.check input{margin-top:.25em;accent-color:var(--accent)}
+  ul.check li.done label{color:var(--ink-faint);text-decoration:line-through}
+  .btn{font-family:var(--sans);font-size:var(--t-sm);font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:var(--s2) var(--s4);cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:none;color:var(--accent);border:1px solid var(--accent)}
+  .btn-row{display:flex;gap:var(--s2);flex-wrap:wrap;margin:var(--s4) 0}
+  .toast{font-family:var(--sans);font-size:var(--t-sm);color:var(--ok);margin-left:var(--s2);opacity:0;transition:opacity .2s}
+  .toast.show{opacity:1}
+  .machine-block{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:var(--t-sm);line-height:1.6;padding:var(--s5);border-radius:var(--radius);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  @media (prefers-color-scheme:dark){.machine-block{background:#000}}
+  footer.doc-foot{margin-top:var(--s8);padding-top:var(--s4);border-top:1px solid var(--rule);font-family:var(--sans);font-size:var(--t-xs);color:var(--ink-faint)}
+  @media print{.tab-btn{display:none}.lang-bar{display:none}.tab-panel[hidden]{display:block!important}.btn,.btn-row{display:none}body{background:#fff;color:#000}a{color:#000}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  .save-bar{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px solid var(--rule);padding:var(--s2) var(--s5);display:flex;align-items:center;gap:var(--s3);font-family:var(--sans);font-size:var(--t-sm);margin:0 calc(-1*var(--s5))}
+  .save-hint{font-size:var(--t-xs);color:var(--ink-faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc-head" data-skel="fixo">
+    <p class="doc-kicker">PRD · Especificação</p>
+    <h1 class="doc-title" data-slot="titulo">Bancada — redesign UI/UX &amp; camada Data Scientist</h1>
+    <p class="doc-meta">
+      <span><b>Estado:</b> <span data-slot="estado"><span class="badge ok">aprovado</span></span></span>
+      <span><b>Autor:</b> <span data-slot="autor">Geovani H. S. de Souza · redigido com Claude Code</span></span>
+      <span><b>Data:</b> <span data-slot="data">2026-08-03</span></span>
+    </p>
+    <p class="canon" data-slot="canon">Links canônicos: plano aprovado em <code>C:\Users\gigio\.claude\plans\fable-eu-queria-que-stateless-micali.md</code> · contexto do produto em <code>CLAUDE.md</code> (seções "Bancada") · interface em <code>src/prompt_factory/annotate/static/index.html</code></p>
+  </header>
+
+  <div class="save-bar" data-skel="fixo">
+    <button type="button" class="btn" id="btn-save">💾 Salvar HTML</button>
+    <span class="toast" id="toast-save">salvo ✓</span>
+    <span class="save-hint">Autosave local ativo · Chrome/Edge: reescreve o arquivo · Firefox: baixa cópia · <kbd>Ctrl+S</kbd></span>
+  </div>
+
+  <div class="tabs" data-skel="fixo">
+    <div class="tab-strip" role="tablist" aria-label="Seções do PRD">
+      <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="p-prod">Produto</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-req">Requisitos</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-dec">Decisões &amp; Riscos</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-exp">Explicador</button>
+      <button class="tab-btn machine" role="tab" aria-selected="false" aria-controls="p-machine">Machine-Readable</button>
+    </div>
+
+    <!-- ===== PRODUTO ===== -->
+    <section class="tab-panel" id="p-prod" role="tabpanel">
+      <h2 data-skel="fixo">Problema &amp; contexto</h2>
+      <div class="measure" data-slot="problema">
+        <p>A Bancada (plataforma local de anotação, porta 8766) é a peça central do portfólio
+        para um processo seletivo de <b>Admin ou Data Scientist</b> em empresa de data
+        annotation. A auditoria de 2026-08-03, feita pelas lentes das três personas, encontrou
+        um produto desequilibrado: quem anota tem a melhor experiência da casa; quem revisa tem
+        fluxo completo mas uma tela de Rate and Review de ~3.500px de rolagem; quem administra
+        vê um esqueleto — decide escalações, cria personas e mais nada. A quarta persona
+        (Data Scientist) não tem superfície nenhuma, embora <code>entrega.py</code> já compute
+        calibração do revisor, vazamento da triagem e panorama — tudo restrito à CLI.</p>
+        <table class="grid">
+          <caption>Estado por persona (auditoria 2026-08-03)</caption>
+          <tr><th>Persona</th><th>Estado</th><th>Dor principal</th></tr>
+          <tr><td>Anotador</td><td><span class="badge ok">bem servido</span></td><td>Atalhos da matriz invisíveis; prazo da tarefa oculto; 19 campos sem label acessível; jargão de CLI na tela</td></tr>
+          <tr><td>Revisor</td><td><span class="badge warn">completo, denso</span></td><td>RR em ~3.500px; sub-aba morta com badge "P4"; rascunho do comentário se perde no F5</td></tr>
+          <tr><td>Admin</td><td><span class="badge danger">esqueleto</span></td><td>Sem métricas na tela; sem gerar tarefas em lote; roadmap interno (P4–P7) vazando no produto</td></tr>
+          <tr><td>Data Scientist</td><td><span class="badge danger">inexistente</span></td><td>Métricas de QC só saem por arquivo via CLI; agreement inviável (n_anotacoes_alvo nunca sai de 1)</td></tr>
+        </table>
+        <p>Bugs confirmados: teclar <kbd>a</kbd> no painel do admin dispara um POST de aprovação
+        invisível (o despacho do teclado lê a fonte errada de papel); contraste 2.4:1 no tema
+        escuro no controle mais visível da barra (AA exige 4.5:1); elementos sticky grudam
+        atrás da faixa de papel; live region de erro anunciada como status educado.</p>
+      </div>
+      <h2 data-skel="fixo">Objetivos</h2>
+      <div data-slot="objetivos">
+        <ol class="measure">
+          <li>Zerar os bugs de gating/contraste e as falhas de acessibilidade de formulário (AA no escuro; navegação completa por teclado).</li>
+          <li>Nenhum código interno de planejamento (P4–P7) nem comando de CLI nas telas de quem anota.</li>
+          <li>Admin com métricas servidas por rota (<code>/api/admin/metricas</code>) e geração de tarefas em lote — habilitando <code>n_anotacoes_alvo &gt; 1</code> (pré-condição de agreement).</li>
+          <li>Rate and Review navegável como passo-a-passo, sem rolagem de retorno (alturas antes/depois registradas).</li>
+          <li>Persona Data Scientist servida por dashboard in-app + 2 notebooks de análise (EN) com HTML renderizado commitado.</li>
+          <li>Suíte <code>pytest</code> verde ao fim de cada sprint; só os 2 testes listados mudam de propósito.</li>
+        </ol>
+        <table class="grid">
+          <caption>Roadmap de sprints (F1–F5)</caption>
+          <tr><th>Sprint</th><th>Entrega</th><th>Tamanho</th><th>Depende de</th><th>Prova de pronto</th></tr>
+          <tr><td><b>F1</b></td><td>Bugs &amp; a11y — 11 correções no <code>index.html</code> (teclado, contraste, roving, aria-label, alert, faixa+sticky, higiene CSS, âncoras &lt;900px, badge de prazo, rascunhos, Intl)</td><td><span class="badge info">M</span></td><td>—</td><td>pytest verde; teclas <kbd>a</kbd>/<kbd>r</kbd>/<kbd>j</kbd> no admin sem nenhuma request; contraste ≥4.5:1</td></tr>
+          <tr><td><b>F2</b></td><td>Profissionalização — sub-aba Criações removida, roteiro sem códigos, jargão de CLI fora, rótulos legíveis no diff, botão estável, folha de atalhos <kbd>?</kbd>, skeleton</td><td><span class="badge info">M</span></td><td>F1</td><td>zero "P4"/"pf annotate" em tela de anotador; <kbd>?</kbd> abre a folha em cada contexto</td></tr>
+          <tr><td><b>F3</b></td><td>Admin/P5a — <code>routes_admin.py</code> (métricas reusando <code>entrega.coletar()</code>, prévia+geração em lote, trilha de eventos), tela do admin em abas com dashboard SVG</td><td><span class="badge warn">L</span></td><td>F1, F2</td><td>números da tela batem com o quality-report do export; 10 tarefas geradas via UI com evento na trilha</td></tr>
+          <tr><td><b>F4</b></td><td>RR em stepper — resumo sticky com 4 passos e estado, seções ancoradas, sem tocar no contrato do diff</td><td><span class="badge info">M</span></td><td>F2</td><td>completar um RR sem rolar de volta; scrollHeight antes/depois registrado</td></tr>
+          <tr><td><b>F5</b></td><td>Camada DS — <code>analysis/</code> com 2 notebooks (EN) + HTML renderizado + grupo uv <code>analysis</code></td><td><span class="badge info">M</span></td><td>F3 (narrativa); paralelizável com F4</td><td><code>nbconvert --execute</code> limpo; HTML sem texto de prompt em massa</td></tr>
+        </table>
+      </div>
+      <h2 data-skel="fixo">Não-objetivos</h2>
+      <div data-slot="nao-objetivos"><div class="callout note"><span class="lbl">Fora de escopo</span>
+        <p>Migrar a interface para framework/build (a tese "arquivo único, zero dependência" é
+        diferencial do portfólio e é provada por teste). Construir o construtor de instrumento
+        do admin (perguntas/user goal, <code>avaliar_rubrica@3</code>) — primitivas já existem,
+        fica como fase futura. Reformar a ferramenta de curadoria (:8765) além do que já é.
+        Prometer medida real de agreement entre anotadores: com uma pessoa só operando a
+        plataforma, o que se entrega é a <i>capacidade</i> de medir (tarefas com duas vagas),
+        não a medida. Modo "criar prompts" (tabela <code>criacoes</code>) segue fora.</p>
+      </div></div>
+    </section>
+
+    <!-- ===== REQUISITOS ===== -->
+    <section class="tab-panel" id="p-req" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Requisitos</h2>
+      <table class="grid" data-slot="requisitos">
+        <tr><th>#</th><th>Requisito</th><th>Prioridade</th><th>Sprint</th></tr>
+        <tr><td>R1</td><td>Despacho do teclado por <code>est.papelEscolhido</code>; estado de triagem/RR zerado ao entrar no admin; guard no <code>tecladoRevisor</code> — mata o POST invisível</td><td><span class="badge danger">must</span></td><td>F1</td></tr>
+        <tr><td>R2</td><td>Contraste AA nos controles selecionados no escuro; roving tabindex + setas no radiogroup de papéis; <code>aria-label</code> nos ~19 campos criados por JS; <code>role="alert"</code> para erro</td><td><span class="badge danger">must</span></td><td>F1</td></tr>
+        <tr><td>R3</td><td>Faixa de papel só na 1ª visita por sessão + sticky corrigido via <code>--faixa-h</code>; badge "expira às HH:MM" sem timer; rascunho persistente de devolução/escalação; datas via <code>Intl.DateTimeFormat</code></td><td><span class="badge danger">must</span></td><td>F1</td></tr>
+        <tr><td>R4</td><td>Higiene de CSS: <code>.guia</code> duplicada renomeada, <code>var(--fonte-mono)</code> consertada, 12 estilos inline → classes utilitárias; âncoras da matriz visíveis &lt;900px</td><td><span class="badge warn">should</span></td><td>F1</td></tr>
+        <tr><td>R5</td><td>Zero código interno (P4–P7) e zero comando de CLI nas telas de anotador; sub-aba Criações removida; roteiro do admin em linguagem de produto</td><td><span class="badge danger">must</span></td><td>F2</td></tr>
+        <tr><td>R6</td><td>Rótulo legível ao lado do caminho cru nos motivos do diff (<code>rotuloDoCampo</code>); <code>payload_schema</code> fora do texto visível; botão primário com rótulo estável + linha "o que falta"</td><td><span class="badge danger">must</span></td><td>F2</td></tr>
+        <tr><td>R7</td><td>Folha de atalhos <kbd>?</kbd> por contexto (inclui 1–9/N/0/↑↓ da matriz); skeleton de loading com reduced-motion; notas do RR em 1 linha + ⓘ; selo de idioma 1×/seção</td><td><span class="badge warn">should</span></td><td>F2</td></tr>
+        <tr><td>R8</td><td><code>GET /api/admin/metricas</code> com gating admin, reusando <code>entrega.coletar()</code>: panorama, calibração do revisor, vazamento da triagem, por-anotador, duelos</td><td><span class="badge danger">must</span></td><td>F3</td></tr>
+        <tr><td>R9</td><td><code>GET /api/admin/tarefas/previa</code> + <code>POST /api/admin/tarefas</code>: tipo, n≤200, filtros lang/fonte, <code>n_anotacoes_alvo</code> 1..5, <code>origem='admin'</code>, evento na mesma transação, respeito ao material</td><td><span class="badge danger">must</span></td><td>F3</td></tr>
+        <tr><td>R10</td><td>Tela do admin em abas (Visão geral · Métricas &amp; equipe · Gerar tarefas · Escalações · Pool &amp; bancos) com dashboard em SVG inline (<code>elSvg</code>, sem lib) e trilha de eventos na escalação</td><td><span class="badge danger">must</span></td><td>F3</td></tr>
+        <tr><td>R11</td><td>RR como stepper de 4 passos com resumo sticky (escala 1 · nº de mudanças · escala 2), sem alterar <code>montarPayload</code>/<code>rrSincronizar</code>/diff/<code>ctxEdicaoRevisor</code></td><td><span class="badge danger">must</span></td><td>F4</td></tr>
+        <tr><td>R12</td><td><code>analysis/</code> com <code>01_annotation_qc.ipynb</code> e <code>02_labeling_campaign_qc.ipynb</code> (EN) + HTML renderizado commitado + grupo uv <code>analysis</code> + README</td><td><span class="badge danger">must</span></td><td>F5</td></tr>
+      </table>
+      <h2 data-skel="fixo">Critérios de aceite</h2>
+      <ul class="check" data-slot="criterios">
+        <li><input type="checkbox" id="a1"><label for="a1">Suíte <code>pytest -q</code> inteira verde ao fim de cada sprint; nenhum teste desativado (só os 2 reescritos documentados em F2)</label></li>
+        <li><input type="checkbox" id="a2"><label for="a2">Painel do admin aberto: teclas <kbd>a</kbd>/<kbd>r</kbd>/<kbd>j</kbd> não geram nenhuma request (aba Network limpa)</label></li>
+        <li><input type="checkbox" id="a3"><label for="a3">Contraste ≥4.5:1 medido nos dois controles selecionados no tema escuro</label></li>
+        <li><input type="checkbox" id="a4"><label for="a4">Troca de papel completa só por teclado (Tab + setas); todos os campos com nome na árvore de acessibilidade</label></li>
+        <li><input type="checkbox" id="a5"><label for="a5">Matriz em 375px mostra o rótulo da âncora nas células; badge "expira às" visível com claim ativo e zero timer no Performance panel</label></li>
+        <li><input type="checkbox" id="a6"><label for="a6">Grep visual: zero "P4"/"pf annotate seed" em qualquer tela de anotador; <kbd>?</kbd> abre a folha de atalhos em cada contexto</label></li>
+        <li><input type="checkbox" id="a7"><label for="a7">Números do dashboard do admin batem com o quality-report gerado por <code>pf annotate export</code> (mesma fonte de cômputo)</label></li>
+        <li><input type="checkbox" id="a8"><label for="a8">Gerar 10 tarefas <code>comparar_ab</code> lang=pt via UI: prévia bate com o criado, fila cresce, evento <code>tarefas_geradas</code> na trilha</label></li>
+        <li><input type="checkbox" id="a9"><label for="a9">Rate and Review completado sem rolagem de retorno; <code>scrollHeight</code> antes/depois registrado no commit</label></li>
+        <li><input type="checkbox" id="a10"><label for="a10"><code>uv sync --group analysis</code> + <code>nbconvert --execute</code> rodam limpos do zero; HTML renderizado sem texto de prompt em massa</label></li>
+      </ul>
+    </section>
+
+    <!-- ===== DECISÕES & RISCOS ===== -->
+    <section class="tab-panel" id="p-dec" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Decisões</h2>
+      <p class="measure" data-skel="fixo">Decisão firme com trade-off real é promovível a ADR.</p>
+      <table class="grid" data-slot="decisoes">
+        <tr><th>#</th><th>Decisão</th><th>Motivo</th><th></th></tr>
+        <tr><td>D1</td><td>Manter vanilla single-file (sem framework/build/CDN)</td><td>É a tese do repo, provada por teste (zero referência externa); para o avaliador é disciplina, não limitação. Migrar custaria semanas e invalidaria todos os testes de frontend.</td><td></td></tr>
+        <tr><td>D2</td><td>P5a no escopo = métricas + geração de tarefas em lote; construtor de instrumento fica fora</td><td>Fecha a persona Admin dentro do prazo (2–4 semanas); as primitivas do construtor já existem e ficam registradas como fase futura.</td><td></td></tr>
+        <tr><td>D3</td><td>Persona DS = dashboard in-app + 2 notebooks (não um só dos dois)</td><td>O dashboard serve a candidatura Admin; os notebooks demonstram análise estatística própria (candidatura DS). Os dois leem os mesmos dados.</td><td></td></tr>
+        <tr><td>D4</td><td><code>/api/admin/metricas</code> reusa <code>entrega.coletar()</code> em vez de SQL dedicado</td><td>Dashboard e relatório de qualidade entregue computam do MESMO código — divergência entre tela e artefato seria o pior bug de portfólio possível.</td><td></td></tr>
+        <tr><td>D5</td><td>Sprints executados serialmente por agentes, um escritor por vez</td><td>F1, F2, F3-front e F4 tocam o mesmo <code>index.html</code> de 8k linhas; paralelismo de escrita colidiria. Preparação read-only pode ser paralela.</td><td></td></tr>
+        <tr><td>D6</td><td>Testes congelados são atualizados JUNTO da mudança, nunca depois</td><td>Os testes de frontend são análise estática do arquivo; mudar microcopy/roteiro sem atualizar o teste no mesmo commit quebra a suíte em silêncio.</td><td></td></tr>
+      </table>
+      <h2 data-skel="fixo">Riscos</h2>
+      <div data-slot="riscos">
+        <div class="callout danger"><span class="lbl">Risco — formatação quebra teste em silêncio</span>
+          <p>Os testes fatiam corpos de função por chave em coluna 0; um formatador (prettier)
+          quebraria dezenas de testes de uma vez. Mitigação: nunca formatar o
+          <code>index.html</code>; funções novas top-level fecham com <code>}</code> na coluna 0;
+          suíte inteira roda ao fim de cada sprint.</p></div>
+        <div class="callout danger"><span class="lbl">Risco — paridade i18n (~+100 chaves ×2)</span>
+          <p>Toda chave nova precisa nascer em inglês E português, JSON estrito, sem órfã.
+          Mitigação: os testes de paridade pegam qualquer deslize; as chaves entram sempre em
+          pares no mesmo edit.</p></div>
+        <div class="callout warn"><span class="lbl">Risco — volume do coletar() em memória</span>
+          <p><code>entrega.coletar()</code> hidrata item a item em memória — adequado ao volume
+          da demo (dezenas), documentar o teto na docstring da rota; o ponto de paginação futuro
+          já está apontado no módulo.</p></div>
+        <div class="callout warn"><span class="lbl">Risco — win-rate do duelo</span>
+          <p>O payload da conversa pode não bastar para o agregado de vitórias; fallback já
+          desenhado: SQL curto em <code>turnos_conversa</code> (rotulo, escolhida=1).</p></div>
+        <div class="callout note"><span class="lbl">Risco — usuário ausente durante a execução</span>
+          <p>Execução autônoma orquestrada com checkpoints automáticos (suíte de testes) entre
+          sprints; qualquer bloqueio genuíno para e fica registrado no baton-pass do sprint, sem
+          avançar por cima de suíte vermelha.</p></div>
+      </div>
+    </section>
+
+    <!-- ===== MACHINE-READABLE (resumo p/ prd-to-issues, D4) ===== -->
+    <!-- ===== FACE LEIGA (ADR 0007/0009): mesmos fatos, outra linguagem, PT/EN ===== -->
+    <section class="tab-panel" id="p-exp" role="tabpanel" data-lang="pt" hidden>
+      <div class="lang-bar" data-skel="fixo">
+        <span class="lang-lbl">Idioma</span>
+        <button type="button" class="lang-btn" data-set-lang="pt" aria-pressed="true">Português</button>
+        <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="false">English</button>
+      </div>
+      <div class="callout note" data-skel="fixo"><span class="lbl">Regra desta aba</span>
+        <p>Linguagem leiga, nos dois idiomas: zero sigla sem expansão, zero jargão sem
+        definição na primeira ocorrência, números com a escala explicada. <b>Nenhum fato
+        novo</b> — tudo aqui existe nas outras abas, e as duas versões dizem o mesmo.</p></div>
+      <h2 data-skel="fixo">O que é isto, em 30 segundos</h2>
+      <div data-slot="exp-resumo">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-resumo-pt"><p>Este documento é o
+        plano de reforma da Bancada — a plataforma local de anotação de dados deste projeto —
+        antes de ela ser apresentada num processo seletivo. Ele registra o que está bom, o que
+        está quebrado e o que será construído em cinco etapas de trabalho (os "sprints"), para
+        que as três pessoas que a usam (quem anota, quem revisa, quem administra) tenham telas
+        completas e profissionais — e para que um cientista de dados tenha números de qualidade
+        para analisar.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-resumo-en"><p>This document is the
+        renovation plan for Bancada — this project's local data-annotation platform — before it
+        is shown in a job selection process. It records what is good, what is broken, and what
+        will be built in five work stages (the "sprints"), so that the three people who use it
+        (the annotator, the reviewer, the administrator) get complete, professional screens —
+        and so that a data scientist has quality numbers to analyze.</p></div>
+      </div>
+      <h2 data-skel="fixo">Por que isto existe</h2>
+      <div data-slot="exp-porque">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-porque-pt"><p>A Bancada nasceu
+        por etapas, e as etapas não terminaram ao mesmo tempo. Quem anota tem a melhor
+        experiência; quem revisa enfrenta uma tela de conferência com mais de três telas de
+        altura de rolagem; quem administra vê quase nada — os indicadores de qualidade que o
+        sistema já calcula só saem por linha de comando, em arquivo. Também encontramos defeitos
+        reais: um atalho de teclado que dispara uma aprovação invisível na tela errada, e texto
+        claro sobre fundo claro-azulado no tema escuro abaixo do contraste mínimo recomendado
+        (a régua internacional de acessibilidade pede 4,5 para 1; um dos botões está em 2,4
+        para 1).</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-porque-en"><p>Bancada was built in
+        stages, and the stages did not finish at the same time. The annotator has the best
+        experience; the reviewer faces a checking screen more than three screens tall; the
+        administrator sees almost nothing — the quality indicators the system already computes
+        only come out through the command line, as files. We also found real defects: a keyboard
+        shortcut that fires an invisible approval on the wrong screen, and text in the dark
+        theme below the recommended minimum contrast (the international accessibility ruler asks
+        for 4.5 to 1; one of the buttons sits at 2.4 to 1).</p></div>
+      </div>
+      <h2 data-skel="fixo">O que muda daqui pra frente</h2>
+      <div data-slot="exp-muda">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-muda-pt"><p>Ao fim dos cinco
+        sprints: os defeitos somem; a tela deixa de mostrar códigos internos de planejamento e
+        comandos de terminal; quem administra ganha um painel com números de qualidade e um botão
+        para criar tarefas em lote; a tela de revisão vira um passo-a-passo guiado; e o
+        repositório ganha dois cadernos de análise estatística em inglês, legíveis no navegador
+        sem instalar nada. O que fica mais caro: o arquivo único da interface cresce, e cada
+        texto novo precisa nascer em inglês e português ao mesmo tempo — é o preço de um produto
+        bilíngue.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-muda-en"><p>By the end of the five
+        sprints: the defects are gone; the screens stop showing internal planning codes and
+        terminal commands; the administrator gets a panel with quality numbers and a button to
+        create tasks in batches; the review screen becomes a guided step-by-step; and the
+        repository gains two statistical-analysis notebooks in English, readable in a browser
+        with nothing to install. What gets more expensive: the interface's single file grows,
+        and every new piece of text must be born in English and Portuguese at the same time —
+        the price of a bilingual product.</p></div>
+      </div>
+      <h2 data-skel="fixo">O que isto NÃO diz</h2>
+      <div data-slot="exp-nao_diz">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-nao_diz-pt"><p>Este plano não
+        troca a tecnologia da interface (continua um arquivo único, sem instalação); não constrói
+        o "montador de questionários" do administrador (registrado para depois); não reforma a
+        ferramenta de curadoria; e não promete medir concordância entre anotadores de verdade —
+        com uma pessoa só usando a plataforma, o que se entrega é a capacidade de medir (tarefas
+        com duas vagas), não a medida em si.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-nao_diz-en"><p>This plan does not
+        change the interface's technology (it remains a single file, nothing to install); it does
+        not build the administrator's "questionnaire builder" (recorded for later); it does not
+        renovate the curation tool; and it does not promise a real inter-annotator agreement
+        measurement — with a single person using the platform, what is delivered is the ability
+        to measure (tasks with two seats), not the measurement itself.</p></div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="p-machine" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Resumo estruturado para issues</h2>
+      <p class="measure" data-skel="fixo">Schema fixo, ingerível por
+      <code>prd-to-issues</code>/<code>to-issues</code> — fatias verticais.</p>
+      <div class="machine-block" id="mr" data-slot="machine-readable">PRD:
+  titulo:     Bancada — redesign UI/UX & camada Data Scientist
+  problema:   Admin sem painel (P5a ausente), RR com ~3.500px de rolagem, bugs de gating de teclado e contraste AA; persona DS sem superfície (métricas só via CLI).
+OBJETIVOS:
+  - Zero bugs de gating/contraste; a11y AA no escuro e navegação por teclado completa
+  - Zero código interno (P4-P7) e zero comando de CLI nas telas de anotador
+  - Admin com GET /api/admin/metricas + geração de tarefas em lote (n_anotacoes_alvo 1..5)
+  - RR em stepper sem rolagem de retorno (alturas registradas)
+  - 2 notebooks de análise (EN) com HTML renderizado commitado
+  - pytest verde ao fim de cada sprint
+REQUISITOS:
+  - id: R1  prioridade: must   texto: teclado despacha por est.papelEscolhido; triagem/RR zerados ao entrar no admin (mata POST invisível)
+  - id: R2  prioridade: must   texto: contraste AA no escuro; roving no radiogroup de papéis; aria-label nos ~19 campos; role=alert para erro
+  - id: R3  prioridade: must   texto: faixa de papel 1ª visita + sticky via --faixa-h; badge "expira às" sem timer; rascunho de devolução/escalação; Intl.DateTimeFormat
+  - id: R4  prioridade: should texto: higiene CSS (.guia duplicada, var --fonte-mono, 12 inline styles -> utilitárias); âncoras da matriz <900px
+  - id: R5  prioridade: must   texto: purga P4-P7 e CLI das telas de anotador; sub-aba Criações removida; roteiro em linguagem de produto
+  - id: R6  prioridade: must   texto: rotuloDoCampo legível ao lado do caminho cru; payload_schema fora do texto; botão primário estável + linha "o que falta"
+  - id: R7  prioridade: should texto: folha de atalhos `?` por contexto; skeleton com reduced-motion; notas RR 1 linha + info; selo de idioma 1x/seção
+  - id: R8  prioridade: must   texto: GET /api/admin/metricas (gating admin) reusando entrega.coletar(): panorama, calibração, vazamento, por-anotador, duelos
+  - id: R9  prioridade: must   texto: GET /api/admin/tarefas/previa + POST /api/admin/tarefas (tipo, n<=200, lang/fonte, n_anotacoes_alvo 1..5, origem=admin, evento na transação)
+  - id: R10 prioridade: must   texto: tela do admin em abas + dashboard SVG inline (elSvg) + trilha de eventos na escalação
+  - id: R11 prioridade: must   texto: RR stepper 4 passos com resumo sticky; montarPayload/rrSincronizar/diff intocados
+  - id: R12 prioridade: must   texto: analysis/ com 2 notebooks EN + HTML renderizado + grupo uv analysis + README
+CRITERIOS_DE_ACEITE:
+  - pytest -q verde após cada sprint; só os 2 testes reescritos documentados
+  - painel admin: teclas a/r/j sem nenhuma request
+  - contraste >=4.5:1 nos controles selecionados no escuro
+  - matriz 375px com rótulo de âncora; badge de prazo sem timer
+  - zero P4/CLI em tela de anotador; `?` abre folha em cada contexto
+  - dashboard bate com quality-report do pf annotate export
+  - 10 tarefas comparar_ab geradas via UI: prévia bate, fila cresce, evento na trilha
+  - RR completo sem rolagem de retorno; scrollHeight antes/depois no commit
+  - nbconvert --execute limpo; HTML sem texto de prompt em massa
+FATIAS_VERTICAIS_SUGERIDAS:
+  - F1 (M): bugs & a11y — 11 correções no index.html; só adições de teste
+  - F2 (M): profissionalização de conteúdo — concentra os 2 testes reescritos
+  - F3 (L): admin/P5a — routes_admin.py + abas + dashboard SVG + geração em lote + test_annotate_p5a.py
+  - F4 (M): RR stepper — desenharDetalheRR reestruturada, contrato do diff intocado
+  - F5 (M): camada DS — analysis/ com 2 notebooks + HTML renderizado + grupo uv
+NAO_OBJETIVOS:
+  - migração para framework/build
+  - construtor de instrumento do admin (avaliar_rubrica@3, perguntas/user goal)
+  - reforma da curadoria (:8765)
+  - medida real de IAA (entrega-se a capacidade, não a medida)
+  - modo criar prompts (tabela criacoes)</div>
+      <div class="btn-row" data-skel="fixo">
+        <button class="btn" id="btn-json">Copiar como JSON</button>
+        <span class="toast" id="toast">copiado ✓</span>
+      </div>
+    </section>
+  </div>
+
+  <footer class="doc-foot" data-skel="fixo">
+    Artefato durável derivado do rascunho /to-prd (D10) · single-file, zero rede (D5) ·
+    aba Machine-Readable para prd-to-issues (D4).
+  </footer>
+</div>
+
+<script data-skel="fixo">
+(function(){"use strict";
+  document.querySelectorAll(".tabs").forEach(function(tabs){
+    var btns=tabs.querySelectorAll(".tab-btn"),panels=tabs.querySelectorAll(".tab-panel");
+    btns.forEach(function(btn){btn.addEventListener("click",function(){
+      btns.forEach(function(b){b.setAttribute("aria-selected","false")});
+      panels.forEach(function(p){p.hidden=true});
+      btn.setAttribute("aria-selected","true");
+      var pn=document.getElementById(btn.getAttribute("aria-controls"));
+      if(pn)pn.hidden=false;});});});
+  document.querySelectorAll("[data-lang]").forEach(function(root){
+    root.querySelectorAll(".lang-btn").forEach(function(btn){btn.addEventListener("click",function(){
+      var lang=btn.getAttribute("data-set-lang");
+      root.setAttribute("data-lang",lang);
+      root.querySelectorAll(".lang-btn").forEach(function(b){
+        b.setAttribute("aria-pressed",String(b.getAttribute("data-set-lang")===lang));});});});});
+  document.querySelectorAll("ul.check input[type=checkbox]").forEach(function(cb){
+    cb.addEventListener("change",function(){cb.closest("li").classList.toggle("done",cb.checked)});});
+  function flash(id){var t=document.getElementById(id||"toast");if(!t)return;t.classList.add("show");setTimeout(function(){t.classList.remove("show")},1400);}
+  function copy(txt){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){flash();},function(){flash();});}else{var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy")}catch(e){}document.body.removeChild(ta);flash();}}
+  // ---- Estado persistente: autosave localStorage + inlineState p/ save durável (ADR 0006) ----
+  var SKEY="artefato:"+location.pathname;
+  function stEls(){return document.querySelectorAll(".wrap input, .wrap select, .wrap textarea, .wrap .pasta");}
+  function stKey(el,i){return el.id?("#"+el.id):(el.tagName+"|"+(el.type||"")+"|"+i);}
+  function captureState(){var s={};stEls().forEach(function(el,i){var k=stKey(el,i);
+    if(el.classList&&el.classList.contains("pasta")) s[k]={p:Array.prototype.map.call(el.querySelectorAll("img"),function(im){return im.src;})};
+    else if(el.type==="checkbox"||el.type==="radio") s[k]={c:el.checked};
+    else s[k]={v:el.value};});return s;}
+  function restoreState(s){if(!s)return;stEls().forEach(function(el,i){var o=s[stKey(el,i)];if(!o)return;
+    if(el.classList&&el.classList.contains("pasta")){el.innerHTML="";(o.p||[]).forEach(function(src){var im=document.createElement("img");im.src=src;el.appendChild(im);});}
+    else if(el.type==="checkbox"||el.type==="radio"){if("c" in o){el.checked=o.c;var li=el.closest("li");if(li&&li.parentNode&&li.parentNode.classList&&li.parentNode.classList.contains("check"))li.classList.toggle("done",el.checked);}}
+    else{if("v" in o)el.value=o.v;}});}
+  function autosave(){try{localStorage.setItem(SKEY,JSON.stringify(captureState()));}catch(e){}}
+  function inlineState(){
+    document.querySelectorAll(".wrap input").forEach(function(el){if(el.type==="checkbox"||el.type==="radio"){if(el.checked)el.setAttribute("checked","checked");else el.removeAttribute("checked");}else el.setAttribute("value",el.value||"");});
+    document.querySelectorAll(".wrap select").forEach(function(el){Array.prototype.forEach.call(el.options,function(o){if(o.value===el.value)o.setAttribute("selected","selected");else o.removeAttribute("selected");});});
+    document.querySelectorAll(".wrap textarea").forEach(function(el){el.textContent=el.value||"";});}
+  var _fsa=null;
+  function saveHtml(){
+    inlineState();
+    var html="<!DOCTYPE html>\n"+document.documentElement.outerHTML;
+    var nm=(document.title||"artefato").replace(/[^\w\-.]+/g,"_")+".html";
+    function blobFallback(){
+      var blob=new Blob([html],{type:"text/html;charset=utf-8"});
+      var url=URL.createObjectURL(blob); var a=document.createElement("a");
+      a.href=url; a.download=nm; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(url);},100);
+      flash("toast-save");}
+    if(_fsa){
+      _fsa.createWritable().then(function(w){return w.write(html).then(function(){return w.close();});}).then(function(){flash("toast-save");}).catch(function(){blobFallback();});
+    } else if(window.showSaveFilePicker){
+      window.showSaveFilePicker({suggestedName:nm,types:[{description:"HTML",accept:{"text/html":[".html"]}}]}).then(function(h){_fsa=h;return h.createWritable();}).then(function(w){return w.write(html).then(function(){return w.close();});}).then(function(){flash("toast-save");}).catch(function(e){if(e.name!=="AbortError") blobFallback();});
+    } else {blobFallback();}}
+  stEls().forEach(function(el){el.addEventListener("input",autosave);el.addEventListener("change",autosave);});
+  try{var _raw=localStorage.getItem(SKEY);if(_raw)restoreState(JSON.parse(_raw));}catch(e){}
+  var bj=document.getElementById("btn-json");
+  if(bj)bj.addEventListener("click",function(){var el=document.getElementById("mr");copy(JSON.stringify({prd_resumo:el?el.textContent:""},null,2));});
+  var bs=document.getElementById("btn-save"); if(bs) bs.addEventListener("click",saveHtml);
+  document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();saveHtml();}});
+})();
+</script>
+</body>
+</html>
