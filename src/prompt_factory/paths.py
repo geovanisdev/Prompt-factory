@@ -48,6 +48,14 @@ DB_BUILD: Path = DB / "prompts.build.sqlite"
 #: criado pela própria app na primeira subida — ela é a dona dele.
 ANNOTATE_DB_FILE: Path = DB / "annotate.sqlite"
 
+#: Onde os artefatos de entrega da Bancada (P5b) são gravados. Pasta PRÓPRIA
+#: dentro de ``exports/`` porque o produto é outro: ``exports/`` guarda recortes
+#: do CORPUS (prompts crus, um manifesto de licença por arquivo) e isto aqui
+#: guarda o TRABALHO DE ANOTAÇÃO (pares de SFT, pares de preferência, relatório
+#: de QC). Misturados na mesma pasta, um ``export_20260801.jsonl`` não diria qual
+#: dos dois produtos é — e eles têm licenças e destinatários diferentes.
+ANNOTATE_EXPORTS: Path = EXPORTS / "annotate"
+
 LABELING: Path = ROOT / "labeling"
 TAXONOMY_JSON: Path = LABELING / "taxonomy.json"
 LABEL_MANIFEST: Path = LABELING / "manifest.json"
@@ -83,6 +91,7 @@ def ensure_dirs(*extra: Path) -> None:
 
 __all__ = [
     "ANNOTATE_DB_FILE",
+    "ANNOTATE_EXPORTS",
     "BATCHES",
     "CONFIG",
     "DATA",

@@ -5,8 +5,8 @@ Banco de **prompts escritos por pessoas reais** — o primeiro turno de usuário
 Tudo roda **offline depois da ingestão**: a interface é um SQLite mais um arquivo HTML sem build, sem framework e sem nenhuma referência a host externo.
 
 ```
-144.754 prompts · 106.039 en · 38.715 pt · 9 fontes abertas · 6 licenças
-prompts de 1 a 981.656 caracteres · 440 MB de texto
+159.733 prompts · 116.051 en · 43.682 pt · 9 fontes abertas · 6 licenças
+prompts de 1 a 981.656 caracteres · 541 MB de texto
 ```
 
 ---
@@ -26,18 +26,18 @@ O funil, medido no run que produziu o banco atual:
 | `data/raw/*.parquet` (9 fontes) | **214.947** | — |
 | s01 normalize | 214.946 | 1 `uid` repetido dentro do run |
 | s02 idioma + variante | 201.704 | **13.242** que não eram pt nem en (a `language` das fontes erra muito) |
-| s03 PII | 201.704 | nada sai; 1.088 linhas foram *reescritas* |
+| s03 PII | 201.704 | nada sai; 2.266 linhas foram *reescritas* |
 | s04 dedup exato | 189.087 | **12.617** cópias byte-a-byte do texto normalizado |
 | s05 embeddings | 189.087 | — (só produz `emb/embeddings.f16.npy`) |
-| s06 dedup próximo | **144.754** | **44.333** quase-duplicatas (cosseno ≥ 0,985 **e** Jaccard ≥ 0,65 **e** razão de tamanho ≤ 2) |
+| s06 dedup próximo | **159.733** | **2.215** fora de pt/en no recheck de idioma + **27.139** quase-duplicatas validadas par a par contra o canônico (cosseno ≥ 0,985 **e** Jaccard ≥ 0,65 **e** razão de tamanho ≤ 2) |
 
 Distribuição do universo:
 
-* **idioma**: en 106.039 · pt 38.715
-* **variante do pt**: `pt-indef` 22.730 · `pt-BR` 14.698 · `pt-PT` 1.287 — `pt-indef` é a **maioria e não é erro**: significa que o texto não tem marca dialetal suficiente para decidir ("como fazer um bolo?" não é brasileiro nem português).
-* **fonte**: wildchat_en 58.203 · wildchat_pt 31.952 · hh_rlhf 14.873 · dolly 14.399 · no_robots 9.948 · prism 7.561 · aya 6.287 · arena140k 1.259 · oasst 272
-* **4.547 linhas ainda têm cópia exata no corpus** (`n_exact_dups > 0`): são os robôs que sobreviveram ao dedup por diferirem num detalhe. A interface mostra `×N` nelas e o filtro `max_dups=0` derruba a família inteira.
-* **1.088 linhas tiveram PII substituída** por marcadores.
+* **idioma**: en 116.051 · pt 43.682
+* **variante do pt**: `pt-indef` 26.600 · `pt-BR` 15.973 · `pt-PT` 1.109 — `pt-indef` é a **maioria e não é erro**: significa que o texto não tem marca dialetal suficiente para decidir ("como fazer um bolo?" não é brasileiro nem português).
+* **fonte**: wildchat_en 67.031 · wildchat_pt 38.070 · hh_rlhf 14.878 · dolly 14.416 · no_robots 9.949 · prism 7.564 · aya 6.293 · arena140k 1.260 · oasst 272
+* **5.102 linhas ainda têm cópia exata no corpus** (`n_exact_dups > 0`): são os robôs que sobreviveram ao dedup por diferirem num detalhe. A interface mostra `×N` nelas e o filtro `max_dups=0` derruba a família inteira.
+* **1.240 linhas tiveram PII substituída** por marcadores.
 * `task_type`, `domain`, `quality` e `nsfw` estão **NULL em 100% das linhas**: a campanha de rotulagem (M6/M7) ainda não rodou. É o estado esperado, não defeito — a interface diz "rotulagem PENDENTE" e desabilita esses filtros com a explicação, em vez de escondê-los.
 
 ---
@@ -48,22 +48,22 @@ Cada prompt carrega a licença **até a linha** no banco (`license`, `commercial
 
 | fonte | dataset | idioma | licença | comercial | redistribuível | no universo |
 | --- | --- | --- | --- | :-: | :-: | ---: |
-| `wildchat_pt` | `allenai/WildChat-4.8M` | pt | ODC-BY-1.0 | sim | sim | 31.952 |
-| `aya` | `CohereLabs/aya_dataset` | pt | Apache-2.0 | sim | sim | 6.287 |
-| `arena140k` | `lmarena-ai/arena-human-preference-140k` | pt | CC-BY-4.0 | sim | sim | 1.259 |
+| `wildchat_pt` | `allenai/WildChat-4.8M` | pt | ODC-BY-1.0 | sim | sim | 38.070 |
+| `aya` | `CohereLabs/aya_dataset` | pt | Apache-2.0 | sim | sim | 6.293 |
+| `arena140k` | `lmarena-ai/arena-human-preference-140k` | pt | CC-BY-4.0 | sim | sim | 1.260 |
 | `oasst` | `OpenAssistant/oasst1`+`oasst2` | pt | Apache-2.0 | sim | sim | 272 |
-| `wildchat_en` | `allenai/WildChat-4.8M` | en | ODC-BY-1.0 | sim | sim | 58.203 |
-| `hh_rlhf` | `Anthropic/hh-rlhf` (só *helpful*) | en | MIT | sim | sim | 14.873 |
-| `dolly` | `databricks/databricks-dolly-15k` | en | **CC-BY-SA-3.0** | sim | sim | 14.399 |
-| `no_robots` | `HuggingFaceH4/no_robots` | en | **CC-BY-NC-4.0** | **não** | sim | 9.948 |
-| `prism` | `HannahRoseKirk/prism-alignment` | en | CC-BY-4.0 | sim | sim | 7.561 |
+| `wildchat_en` | `allenai/WildChat-4.8M` | en | ODC-BY-1.0 | sim | sim | 67.031 |
+| `hh_rlhf` | `Anthropic/hh-rlhf` (só *helpful*) | en | MIT | sim | sim | 14.878 |
+| `dolly` | `databricks/databricks-dolly-15k` | en | **CC-BY-SA-3.0** | sim | sim | 14.416 |
+| `no_robots` | `HuggingFaceH4/no_robots` | en | **CC-BY-NC-4.0** | **não** | sim | 9.949 |
+| `prism` | `HannahRoseKirk/prism-alignment` | en | CC-BY-4.0 | sim | sim | 7.564 |
 | `lmsys` *(desligada)* | `lmsys/lmsys-chat-1m` | pt | LMSYS-1M | **não** | **não** | 0 |
 
 **O que isso implica no export** — e é a razão de o projeto ser construído do jeito que é:
 
 * **`redistributable = false` fica FORA do arquivo por padrão** e o manifesto conta quantas linhas foram excluídas. Dá para incluir (`include_nonredistributable`) para uso local, e aí o manifesto carimba um `WARNING: não publique`.
-* **`commercial_ok = false` NÃO é excluído** — é contabilizado à parte. A licença não comercial não impede o uso, impede *um certo* uso, e quem decide é quem exporta. Hoje são as 9.948 linhas do `no_robots`.
-* **CC-BY-SA-3.0 é viral**: as 14.399 linhas do `dolly` fazem o derivado herdar a licença. A interface pinta essa classe com cor própria (`viral`) para a decisão ser tomada antes, não depois.
+* **`commercial_ok = false` NÃO é excluído** — é contabilizado à parte. A licença não comercial não impede o uso, impede *um certo* uso, e quem decide é quem exporta. Hoje são as 9.949 linhas do `no_robots`.
+* **CC-BY-SA-3.0 é viral**: as 14.416 linhas do `dolly` fazem o derivado herdar a licença. A interface pinta essa classe com cor própria (`viral`) para a decisão ser tomada antes, não depois.
 * **Toda linha exportada leva `attribution`.** ODC-BY, CC-BY e CC-BY-SA exigem crédito a cada uso; sem esse campo o arquivo simplesmente não cumpre a licença. Ele não é coluna do banco: é resolvido de `config/sources.toml` na hora de escrever.
 
 `lmsys` é o maior pool de português que existe, mas é *gated* no Hub e a licença proíbe redistribuição. `pf ingest lmsys` já existe: com `enabled = false` ele não faz rede nenhuma, imprime o passo a passo para ligar e sai com código 2.
@@ -76,7 +76,7 @@ Cada prompt carrega a licença **até a linha** no banco (`license`, `commercial
 
 * **Python 3.12** (o `pyproject` fixa `>=3.12,<3.13`).
 * **[uv](https://docs.astral.sh/uv/)**. Nesta máquina ele está em `C:\Users\gigio\.local\bin\uv.exe` e **não entra no PATH** até você abrir um terminal novo — daí o caminho completo em todos os comandos abaixo. Se `uv` já funciona no seu shell, ignore o prefixo.
-* **~8 GB de disco livre**: `data/` fica com 3,6 GB (raw 701 MB · interim 1,8 GB · final 237 MB · emb 250 MB · db 698 MB), mais ~2,5 GB de cache do HuggingFace para as fontes pequenas (só o `arena140k` são 1,6 GB) e ~470 MB do modelo de embeddings.
+* **~8 GB de disco livre**: `data/` fica com 3,8 GB (raw 700 MB · interim 1,8 GB · final 288 MB · emb 261 MB · db 875 MB), mais ~2,5 GB de cache do HuggingFace para as fontes pequenas (só o `arena140k` são 1,6 GB) e ~470 MB do modelo de embeddings.
 * **Rede** para a ingestão — e paciência: os dois passes do WildChat baixam ~9–11,5 GB **cada**, em *streaming*, sem guardar nada em disco. Depois disso nada mais sai da máquina.
 
 ```powershell
@@ -84,7 +84,7 @@ git clone <url> Prompt-factory
 cd Prompt-factory
 & "$env:USERPROFILE\.local\bin\uv.exe" sync          # cria o .venv a partir do uv.lock
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf --help # lista os comandos
-& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 628 testes, ~48 s
+& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 1.174 testes, ~100 s
 & "$env:USERPROFILE\.local\bin\uv.exe" run ruff check .
 ```
 
@@ -136,9 +136,9 @@ Na ordem. Os tempos são os **medidos** nesta máquina (Windows 11, CPU, disco e
 | 5 | `pf report raw` | segundos | conferência: contagens dentro das faixas de `sources.toml` |
 | 6 | `pf run s01-s04` | ~10 min | `interim/dedup1.parquet` — 189.087 linhas |
 | 7 | `pf run s05` | **120 min** | `emb/embeddings.f16.npy` + `emb/uids.txt` |
-| 8 | `pf run s06` | **47 min** | `final/universe.parquet` — **144.754** linhas + `emb/universe.f16.npy` |
+| 8 | `pf run s06` | **47 min** | `final/universe.parquet` — **159.733** linhas + `emb/universe.f16.npy` |
 | 9 | `pf report universe` · `pf report dedup-sample` | segundos | distribuições + 50 pares de near-dup para revisão humana |
-| 10 | `pf load-db --allow-unlabeled-pct 100` | **36 s** | `data/db/prompts.sqlite` (698 MB) |
+| 10 | `pf load-db --allow-unlabeled-pct 100` | **36 s** | `data/db/prompts.sqlite` (872 MB) |
 | 11 | `pf serve` | sobe em ~5 s | http://127.0.0.1:8765 |
 
 Total: **~4 h 15 min**, das quais 3 h 30 são os passos 2, 3, 7 e 8.
@@ -183,7 +183,7 @@ Primeiro paint contra o banco real: **292 ms** a frio, **34 ms** com o cache que
 
 O seletor `texto | sentido` fica colado à barra de busca (atalho `m`). **Os filtros da barra lateral continuam valendo nos dois modos** — o que muda é que a busca por sentido **ordena, não recorta**: o conjunto continua sendo o do filtro, e por isso "adicionar os N do filtro" e o export levam o conjunto inteiro, não os 50 vizinhos que estão na tela. A interface avisa isso na hora de fazer.
 
-Os ~16 s da primeira busca por sentido são o carregamento do modelo (10,6 s de import do torch + 4,7 s do e5) mais 0,4 s para converter a matriz de 212 MiB. Por isso o aquecimento **começa no clique do modo**, roda numa thread e a tela mostra uma faixa explicando — em vez de travar sem dizer nada. Sem `data/emb/universe.f16.npy` o modo avisa que falta rodar o s05/s06 e a busca textual continua intacta.
+Os ~16 s da primeira busca por sentido são o carregamento do modelo (10,6 s de import do torch + 4,7 s do e5) mais 0,4 s para converter a matriz de 234 MiB. Por isso o aquecimento **começa no clique do modo**, roda numa thread e a tela mostra uma faixa explicando — em vez de travar sem dizer nada. Sem `data/emb/universe.f16.npy` o modo avisa que falta rodar o s05/s06 e a busca textual continua intacta.
 
 Exemplo do que "sentido" quer dizer: buscar **`pedir aumento pro chefe`** traz `nota para pedir aumento` em primeiro, e logo abaixo `faça uma petição trabalhista` e `faça uma proposta de emprego` — que não têm uma palavra em comum com a consulta.
 
@@ -233,7 +233,7 @@ E uma regra: CSV **tem** de ser lido com um parser de CSV. Os prompts têm vírg
 | M0–M1 | scaffold, schema canônico de 27 colunas, SQLite + FTS5 sem acento | ✅ |
 | M2 | ingesters das 7 fontes pequenas | ✅ |
 | M3 | WildChat em streaming com checkpoint/resume: pt, pool en e downsample | ✅ |
-| M4 | s01–s06: normalize → idioma/variante → PII → dedup exato → embeddings → dedup próximo | ✅ **144.754 linhas** |
+| M4 | s01–s06: normalize → idioma/variante → PII → dedup exato → embeddings → dedup próximo | ✅ **159.733 linhas** |
 | M5 | infraestrutura da campanha de rotulagem (s07 semente + lotes, s08 merge) | ✅ pronta — **a campanha não rodou** |
 | M6 | a campanha de rotulagem propriamente dita | ⏳ **pendente** |
 | M7 | s09 treino + s10 aplicação do classificador | ⏳ **stub** (`pf train`/`pf apply` saem com código 2) |
@@ -243,7 +243,7 @@ E uma regra: CSV **tem** de ser lido com um parser de CSV. Os prompts têm vírg
 
 ### Pendente de **decisão humana** (não de código)
 
-1. **Os limiares do near-dup.** O s06 colapsou 44.333 linhas com `near_cosine = 0.985`, `near_jaccard = 0.65` e `near_len_ratio = 2.0`. Aceitar esses números é uma escolha, não um resultado: apertar recupera texto legítimo, afrouxar limpa mais robô. `pf report dedup-sample` grava `data/final/dedup_sample_50.txt` com 50 pares reais **exatamente para essa leitura**. Os limiares moram em `config/settings.toml`, nunca no código — mudá-los é replayar o s06.
+1. **Os limiares do near-dup.** O s06 colapsou 27.139 linhas com `near_cosine = 0.985`, `near_jaccard = 0.65` e `near_len_ratio = 2.0`. Aceitar esses números é uma escolha, não um resultado: apertar recupera texto legítimo, afrouxar limpa mais robô. `pf report dedup-sample` grava `data/final/dedup_sample_50.txt` com 50 pares reais **exatamente para essa leitura**. Os limiares moram em `config/settings.toml`, nunca no código — mudá-los é replayar o s06.
 2. **A calibração da rotulagem.** `pf make-seed` já sorteou os 12.000 itens da semente (6k pt + 6k en, estratificados por fonte × faixa de tamanho) e fatiou em **155 lotes**. O `labeling/manifest.json` está com os 155 em `pending` e a calibração (`batch_0000`, 100 itens) em `gold_pending`. O próximo passo é humano: revisar esses 100 itens à mão e importar com `pf labels gold`. Sem esse ouro não há como medir a concordância dos agentes — e um `agreement = None` ("não medido") é deliberadamente diferente de `0.0` ("errou tudo").
 3. **A taxonomia v1.1.** `task_type` e `domain` não têm `CHECK` no DDL justamente para poderem evoluir sem migração. A v1.0 tem 16 tarefas e 16 domínios, em `labeling/taxonomy.json`.
 
@@ -277,8 +277,12 @@ src/prompt_factory/
   app/              FastAPI: queries.py (todo o SQL de leitura), semantic.py,
                     presenters.py e static/index.html (a interface inteira, um arquivo)
   cli.py            entrypoint `pf`
+analysis/           camada de data science: notebooks de QC + o HTML renderizado
+                    (01 anotação: calibração do revisor, vazamento da triagem,
+                     trilha de edição · 02 campanha de rotulagem + validação do
+                     dedup próximo). Só LEEM; ver analysis/README.md
 scripts/            smoke_test.ps1, run_pipeline.ps1
-tests/              628 testes, ~48 s
+tests/              1.174 testes, ~100 s
 data/               gitignorado; regenerável
 ```
 

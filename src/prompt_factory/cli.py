@@ -839,11 +839,100 @@ def _annotate(args: argparse.Namespace) -> int:
     if acao == "gerar":
         return _annotate_gerar(args, banco, corpus)
 
+    if acao == "export":
+        return _annotate_export(args, banco, corpus)
+
     print(
-        f"[pf] ação desconhecida: {acao!r} (use serve | seed | status | migrate | gerar)",
+        f"[pf] ação desconhecida: {acao!r} "
+        "(use serve | seed | status | migrate | gerar | export)",
         file=sys.stderr,
     )
     return 2
+
+
+def _annotate_export(args: argparse.Namespace, banco: Path, corpus: Path) -> int:
+    """``pf annotate export`` (P5b) — os artefatos de entrega da Bancada.
+
+    O corpus é **obrigatório** aqui, e não um extra: sem ele não há texto de
+    prompt, não há licença e não há atribuição — e um export de anotação sem a
+    proveniência da linha não cumpre a licença de nenhuma das fontes.
+
+    ``--perfil all`` gera os cinco perfis coletivos de uma vez. A auditoria fica
+    de fora dele de propósito: ela é de UM item e precisa de ``--anotacao``.
+    """
+    from . import db as dbmod
+    from . import paths
+    from .annotate import db as adb
+    from .annotate import entrega
+
+    if not banco.is_file():
+        print(f"[annotate] a plataforma ainda não tem banco em {banco}", file=sys.stderr)
+        print("[annotate] rode `pf annotate seed` (ou suba a app) antes de exportar")
+        return 1
+    if not corpus.is_file():
+        print(f"[annotate] banco de prompts não encontrado em {corpus}", file=sys.stderr)
+        print("[annotate] o export precisa dele para a licença e a atribuição por linha:")
+        print("[annotate]   pf load-db --allow-unlabeled-pct 100")
+        return 1
+
+    destino = Path(args.out_dir).resolve() if args.out_dir else paths.ANNOTATE_EXPORTS
+    escolhido = args.perfil or "all"
+    if escolhido == "all":
+        # A auditoria é de UM item: entra no `all` só quando alguém disse qual.
+        perfis = [k for k in entrega.PERFIS if k != "audit"]
+        if args.anotacao is not None:
+            perfis.append("audit")
+    else:
+        perfis = [escolhido]
+
+    conn = dbmod.connect(banco)
+    conn_corpus = dbmod.connect(corpus, readonly=True)
+    codigo = 0
+    try:
+        # O export LÊ colunas que só existem a partir de certas versões
+        # (`gabarito_avaliacao_json`, `payload_corrigido_json`). Num banco de
+        # schema antigo ele não daria erro: daria um artefato plausível com o
+        # QC pela metade, que é o desfecho pior.
+        versao = adb.versao_do_banco(conn)
+        if versao is not None and versao != adb.SCHEMA_VERSION_ANOTACAO:
+            print(f"[annotate] {adb.SchemaDivergente(versao)}", file=sys.stderr)
+            return 3
+        for chave in perfis:
+            pf = entrega.perfil(chave)
+            try:
+                res = entrega.executar(
+                    conn,
+                    conn_corpus,
+                    chave,
+                    destino_dir=destino,
+                    nome=args.name if escolhido != "all" else None,
+                    incluir_sinteticas=bool(args.incluir_sinteticas),
+                    incluir_pendentes=bool(args.incluir_pendentes),
+                    tipos=tuple(args.tipo or ()),
+                    projeto=args.projeto,
+                    anotacao_id=args.anotacao,
+                )
+            except ValueError as exc:
+                # Perfil que não pôde sair (auditoria sem item, item fora do
+                # recorte). Não derruba os outros: um `--perfil all` que perde a
+                # auditoria ainda entregou cinco artefatos, e dizer qual faltou é
+                # mais útil que abortar tudo.
+                print(f"[annotate] {chave}: {exc}", file=sys.stderr)
+                codigo = 1
+                continue
+            unidade = "linha(s)" if pf.container == "jsonl" else "documento"
+            print(f"[annotate] {chave:14} {res.row_count:>6} {unidade:11} {res.arquivo}")
+            if aviso := res.manifest.get("WARNING"):
+                print(f"[annotate] AVISO: {aviso}")
+            for chave_nota in ("NOTE_PENDING", "NOTE_MISSING_PROMPTS"):
+                if nota := res.manifest.get(chave_nota):
+                    print(f"[annotate] nota: {nota}")
+        print(f"[annotate] manifesto de cada artefato ao lado dele, em {destino}")
+    finally:
+        conn.close()
+        conn_corpus.close()
+        _limpar_shm(corpus)
+    return codigo
 
 
 def _limpar_shm(corpus: Path) -> None:
@@ -1451,11 +1540,12 @@ COMMANDS: tuple[_Cmd, ...] = (
                 ("action",),
                 {
                     "nargs": "?",
-                    "choices": ["serve", "seed", "status", "migrate", "gerar"],
+                    "choices": ["serve", "seed", "status", "migrate", "gerar", "export"],
                     "help": (
                         "serve (padrão) | seed (personas + fixtures + tarefas) | "
                         "status | migrate (sobe o schema preservando as anotações) | "
-                        "gerar (campanha de material e de anotações sintéticas)"
+                        "gerar (campanha de material e de anotações sintéticas) | "
+                        "export (os artefatos de entrega)"
                     ),
                 },
             ),
@@ -1511,7 +1601,10 @@ COMMANDS: tuple[_Cmd, ...] = (
                 ("--out-dir",),
                 {
                     "metavar": "DIR",
-                    "help": "gerar preparar: copia o lote para cá (a saída do agente trunca ~30k)",
+                    "help": (
+                        "gerar preparar: copia o lote para cá (a saída do agente trunca ~30k); "
+                        "export: onde gravar os artefatos (padrão: data/exports/annotate)"
+                    ),
                 },
             ),
             (
@@ -1527,6 +1620,52 @@ COMMANDS: tuple[_Cmd, ...] = (
                 {"metavar": "DIR", "help": "raiz da campanha (padrão: geracao/)"},
             ),
             (("--json",), {"action": "store_true", "help": "gerar status em JSON, para script"}),
+            (
+                ("--perfil",),
+                {
+                    "choices": [
+                        "all",
+                        "annotations",
+                        "sft",
+                        "preference",
+                        "quality-report",
+                        "dataset-card",
+                        "audit",
+                    ],
+                    "help": "export: qual artefato (padrão: all, menos a auditoria)",
+                },
+            ),
+            (
+                ("--name",),
+                {"metavar": "NOME", "help": "export: nome-base do arquivo (só com um perfil)"},
+            ),
+            (
+                ("--tipo",),
+                {
+                    "action": "append",
+                    "metavar": "TIPO",
+                    "help": "export: recorta por tipo de tarefa (repetível)",
+                },
+            ),
+            (("--projeto",), {"metavar": "NOME", "help": "export: recorta por projeto"}),
+            (
+                ("--anotacao",),
+                {"type": int, "metavar": "ID", "help": "export: a anotação do perfil `audit`"},
+            ),
+            (
+                ("--incluir-sinteticas",),
+                {
+                    "action": "store_true",
+                    "help": "export: inclui anotações sintéticas nos perfis de DADO (fora por padrão)",
+                },
+            ),
+            (
+                ("--incluir-pendentes",),
+                {
+                    "action": "store_true",
+                    "help": "export: inclui o que passou na triagem mas não no Rate and Review",
+                },
+            ),
         ],
         implemented=True,
         handler=_annotate,

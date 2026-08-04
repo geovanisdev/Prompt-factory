@@ -318,7 +318,14 @@ class Resultado(NamedTuple):
     manifest: dict[str, Any]
 
 
-def _sha256(caminho: Path, bloco: int = 1 << 20) -> str:
+def sha256_arquivo(caminho: Path, bloco: int = 1 << 20) -> str:
+    """Digest do arquivo gravado, em blocos (o export do universo tem ~300 MB).
+
+    Público porque o P5b (``annotate/entrega.py``) carimba o mesmo digest nos
+    artefatos de entrega da Bancada. Dois `sha256` calculados em módulos
+    diferentes divergiriam no dia em que um deles passasse a ler o arquivo
+    inteiro na memória — e o manifesto existe justamente para ser conferível.
+    """
     h = hashlib.sha256()
     with caminho.open("rb") as fh:
         for pedaco in iter(lambda: fh.read(bloco), b""):
@@ -409,7 +416,7 @@ def executar(
     manifest: dict[str, Any] = {
         "created_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "file": arquivo.name,
-        "sha256": _sha256(arquivo),
+        "sha256": sha256_arquivo(arquivo),
         "bytes": arquivo.stat().st_size,
         "format": fmt.container,
         "profile": fmt.profile,
@@ -539,4 +546,5 @@ __all__ = [
     "nome_de_arquivo",
     "previa_csv",
     "registrar",
+    "sha256_arquivo",
 ]

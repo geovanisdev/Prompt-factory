@@ -76,6 +76,146 @@
         }
       ],
       "status_inicial": "pendente_triagem"
+    },
+    "mat_0002": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 10,
+      "claimed_at": "2026-07-31T20:57:31Z",
+      "done_at": "2026-07-31T22:28:17Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 10,
+        "respostas_modelo": 20,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "5fb7251ec1d9b973",
+        "fc58ff0a27eed14b",
+        "356265d5911b77b1",
+        "ea308ba5bcc13368",
+        "e4a77f065791adf5",
+        "40e7f83d06834fff",
+        "ba70e8882d97f4f6",
+        "b51560f3fc48d566",
+        "9eadf505f9ed71e9",
+        "819a392b2c66b583"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0003": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 10,
+      "claimed_at": "2026-07-31T20:57:31Z",
+      "done_at": "2026-07-31T22:28:18Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 10,
+        "respostas_modelo": 20,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "51638590e2679207",
+        "5ad63ecfc5753f95",
+        "1b11d0e7b90b43db",
+        "36112ca25fe25b8c",
+        "82e253f02ecbe585",
+        "05d3f67285fb86e4",
+        "54c0c96d9a3fc4c8",
+        "2b0753d615f03794",
+        "c139aae0c7db7c78",
+        "86e8bee859d5de53"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0004": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 10,
+      "claimed_at": "2026-07-31T20:57:32Z",
+      "done_at": "2026-07-31T22:29:46Z",
+      "tentativas": 2,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 10,
+        "respostas_modelo": 20,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "06606bbb9d6f284e",
+        "3562936fa1708bd4",
+        "89917b1e2fab02b0",
+        "2efd2d4fdaef3eb8",
+        "27b6a3aaf94820a3",
+        "85b1a8ee20456a36",
+        "5b266d2040784e2c",
+        "8c48a9a5f3fb2c30",
+        "20a777a24754dec1",
+        "67a685935b4c10f1"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0005": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 10,
+      "claimed_at": "2026-07-31T20:57:33Z",
+      "done_at": "2026-07-31T22:28:21Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 10,
+        "respostas_modelo": 20,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "26338203d38f00a1",
+        "828a00e659d38ec9",
+        "3a890487fb5ff1a5",
+        "38fe1a54524b3c3b",
+        "26f6a770ef7c30ba",
+        "7453ec792627289f",
+        "a4fc5cddcf71b571",
+        "28e48b075ccb16f6",
+        "c2ef33c420164f3b",
+        "bcb35bfe582c843a"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0006": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 10,
+      "claimed_at": "2026-07-31T20:57:33Z",
+      "done_at": "2026-07-31T22:28:22Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 10,
+        "respostas_modelo": 20,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "4fc804f5580c0c3e",
+        "3e50490a8e1f06d7",
+        "5cecb5480845391e",
+        "abfb19d0350dbc8d",
+        "5977ac22c9bde25e",
+        "7ee3a3a8e82bc451",
+        "cb365faa67dafa6e",
+        "f6892d83cc104e4a",
+        "c80d50d7a2f8fd8b",
+        "cfe76aa434a2aa54"
+      ],
+      "lang": "ambos"
     }
   }
 }
