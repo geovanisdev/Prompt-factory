@@ -1,0 +1,318 @@
+{
+  "schema": "modelos_rubrica@1",
+  "_nota": "O BANCO DE PERGUNTAS, e o primeiro pedaco do arsenal do admin (P5a) a sair do codigo. Ate o P8 estes modelos eram literais de JavaScript dentro do index.html: uma pessoa que quisesse um quarto modelo precisava editar a tela. O CANONICO e sempre ingles, e nao e esquecimento de traducao: um criterio de rubrica e METADADO, e a convencao deste projeto manda metadado em ingles, porque e o que o cliente le. Um modelo com canonico em portugues produziria, a cada clique, uma rubrica que nasce violando a convencao que a tela declara ao lado do campo. O que E cromo (o rotulo do botao que aplica o modelo) continua no dicionario, referenciado por `nome_chave`. QUEM LEVA SIDECAR `*_i18n` E DECIDIDO POR `cabe_no_formulario`, nao por gosto: um modelo que cabe no formulario e aplicado ATRAVES dele, e o formulario so tem os campos canonicos — a traducao seria descartada no clique, entao decorar o modelo com ela e mentir sobre o que vai acontecer. Um modelo que NAO cabe (o de severidade) so pode ser materializado verbatim, e ai o JSON e literalmente o que a pessoa le na tela: sem sidecar, um leitor de pt-BR abre o instrumento inteiro em ingles.",
+  "modelos": [
+    {
+      "id": "instrucao",
+      "nome_chave": "modelo.instrucao",
+      "titulo": "The answer does what was asked",
+      "criterios": [
+        {
+          "nome": "Respects the stated constraints",
+          "descricao": "Counts, format, tone and limits the request declared out loud.",
+          "rotulo_min": "ignores at least one stated constraint",
+          "rotulo_max": "meets them all, including the implied ones"
+        },
+        {
+          "nome": "Answers the right question",
+          "descricao": "Goes at the problem the person has, not at a similar-looking one.",
+          "rotulo_min": "answers something else",
+          "rotulo_max": "answers exactly what was asked"
+        },
+        {
+          "nome": "Completeness",
+          "descricao": "Every part of the request shows up; nothing was quietly dropped.",
+          "rotulo_min": "leaves part of the request unanswered",
+          "rotulo_max": "covers everything and flags what it could not cover"
+        }
+      ]
+    },
+    {
+      "id": "verdade",
+      "nome_chave": "modelo.verdade",
+      "titulo": "The answer can be trusted",
+      "criterios": [
+        {
+          "nome": "Facts",
+          "descricao": "Names, numbers, dates and quotes are true and checkable.",
+          "rotulo_min": "states an invented figure with the look of precision",
+          "rotulo_max": "states only what can be checked"
+        },
+        {
+          "nome": "Uncertainty declared",
+          "descricao": "An estimate reads as an estimate; so does anything that depends on context.",
+          "rotulo_min": "presents a guess as a certainty",
+          "rotulo_max": "separates the certain from the likely in the sentence itself"
+        },
+        {
+          "nome": "Knows where its role ends",
+          "descricao": "Recognises when the matter needs a professional, and still helps.",
+          "rotulo_min": "fakes authority it does not have",
+          "rotulo_max": "genuinely helps and draws the line in one sentence"
+        }
+      ]
+    },
+    {
+      "id": "utilidade",
+      "nome_chave": "modelo.utilidade",
+      "titulo": "The answer is something you can act on",
+      "criterios": [
+        {
+          "nome": "Actionable",
+          "descricao": "You can act after one read, with what the person said they have.",
+          "rotulo_min": "requires a resource the person said they lack",
+          "rotulo_max": "actionable end to end with what was declared"
+        },
+        {
+          "nome": "Right register",
+          "descricao": "The tone fits the recipient and the situation as described.",
+          "rotulo_min": "clearly wrong register",
+          "rotulo_max": "sounds like one person writing to another"
+        },
+        {
+          "nome": "Density",
+          "descricao": "Every paragraph adds something; nothing is fluent filler.",
+          "rotulo_min": "fluent and empty prose",
+          "rotulo_max": "not one line to spare"
+        }
+      ]
+    },
+    {
+      "id": "severidade",
+      "nome_chave": "modelo.severidade",
+      "titulo": "Severity review",
+      "titulo_i18n": {
+        "en": "Severity review",
+        "pt": "Revisão por severidade"
+      },
+      "_nota": "O INSTRUMENTO DE SEVERIDADE, expresso no MESMO contrato de rubrica: uma escala ancorada de tres pontos mais um catalogo de tipos de issue por criterio. Nenhum tipo de tarefa novo, nenhuma coluna nova, nenhuma migracao — e isto e a prova de que o instrumento e dado. Como as tres ancoras significam o mesmo em todo criterio, a matriz desenha UM cabecalho de escala por grupo e as linhas caem para a altura minima. E o UNICO modelo com `*_i18n`, e a assimetria e a regra: ele nao cabe no formulario, entao a unica maneira de aplica-lo e MATERIALIZAR o JSON verbatim — o que ele diz e o que a pessoa le. Os outros tres passam pelo formulario do anotador, que so tem os campos canonicos e descarta sidecar por construcao; traduzi-los seria decorar um caminho que joga a traducao fora.",
+      "escala_min": 1,
+      "escala_max": 3,
+      "ancoras": [
+        {
+          "valor": 1,
+          "rotulo": "Major issues",
+          "rotulo_i18n": { "en": "Major issues", "pt": "Problemas graves" },
+          "exemplo": "The defect changes what the reader would do: they act on something false, or the answer is unusable as it arrived.",
+          "exemplo_i18n": {
+            "en": "The defect changes what the reader would do: they act on something false, or the answer is unusable as it arrived.",
+            "pt": "O defeito muda o que a pessoa faria: ela age sobre algo falso, ou a resposta é inutilizável como chegou."
+          }
+        },
+        {
+          "valor": 2,
+          "rotulo": "Minor issues",
+          "rotulo_i18n": { "en": "Minor issues", "pt": "Problemas leves" },
+          "exemplo": "The defect is real and would survive an edit pass, but the reader still gets where they were going.",
+          "exemplo_i18n": {
+            "en": "The defect is real and would survive an edit pass, but the reader still gets where they were going.",
+            "pt": "O defeito é real e sobreviveria a uma revisão, mas a pessoa ainda chega aonde queria."
+          }
+        },
+        {
+          "valor": 3,
+          "rotulo": "No issues",
+          "rotulo_i18n": { "en": "No issues", "pt": "Sem problemas" },
+          "exemplo": "An affirmation, not a shrug: you looked for this defect on this criterion and it is not there.",
+          "exemplo_i18n": {
+            "en": "An affirmation, not a shrug: you looked for this defect on this criterion and it is not there.",
+            "pt": "Uma afirmação, não um dar de ombros: você procurou este defeito neste critério e ele não está lá."
+          }
+        }
+      ],
+      "criterios": [
+        {
+          "nome": "Instruction following",
+          "nome_i18n": { "en": "Instruction following", "pt": "Segue as instruções" },
+          "grupo": "Assistance",
+          "grupo_i18n": { "en": "Assistance", "pt": "Assistência" },
+          "descricao": "Every constraint the person stated out loud is honoured — counts, format, tone, scope, and the things they asked you not to do.",
+          "descricao_i18n": {
+            "en": "Every constraint the person stated out loud is honoured — counts, format, tone, scope, and the things they asked you not to do.",
+            "pt": "Toda restrição que a pessoa disse em voz alta é respeitada — contagem, formato, tom, escopo e o que ela pediu para NÃO fazer."
+          },
+          "tipos_issue": [
+            {
+              "id": "ignored a stated constraint",
+              "rotulo": "ignored a stated constraint",
+              "rotulo_i18n": {
+                "en": "ignored a stated constraint",
+                "pt": "ignorou uma restrição declarada"
+              }
+            },
+            {
+              "id": "answered a different question",
+              "rotulo": "answered a different question",
+              "rotulo_i18n": {
+                "en": "answered a different question",
+                "pt": "respondeu outra pergunta"
+              }
+            },
+            {
+              "id": "dropped part of the request",
+              "rotulo": "dropped part of the request",
+              "rotulo_i18n": {
+                "en": "dropped part of the request",
+                "pt": "deixou parte do pedido de fora"
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Register and tone",
+          "nome_i18n": { "en": "Register and tone", "pt": "Registro e tom" },
+          "grupo": "Assistance",
+          "grupo_i18n": { "en": "Assistance", "pt": "Assistência" },
+          "descricao": "The voice fits the recipient and the situation the person described, and it holds from the first line to the last.",
+          "descricao_i18n": {
+            "en": "The voice fits the recipient and the situation the person described, and it holds from the first line to the last.",
+            "pt": "A voz cabe no destinatário e na situação que a pessoa descreveu, e se mantém da primeira à última linha."
+          },
+          "tipos_issue": [
+            {
+              "id": "too formal for the situation",
+              "rotulo": "too formal for the situation",
+              "rotulo_i18n": {
+                "en": "too formal for the situation",
+                "pt": "formal demais para a situação"
+              }
+            },
+            {
+              "id": "too casual for the situation",
+              "rotulo": "too casual for the situation",
+              "rotulo_i18n": {
+                "en": "too casual for the situation",
+                "pt": "informal demais para a situação"
+              }
+            },
+            {
+              "id": "canned empathy",
+              "rotulo": "canned empathy",
+              "rotulo_i18n": { "en": "canned empathy", "pt": "empatia de fórmula" }
+            },
+            {
+              "id": "register drifts mid-answer",
+              "rotulo": "register drifts mid-answer",
+              "rotulo_i18n": {
+                "en": "register drifts mid-answer",
+                "pt": "o registro escorrega no meio da resposta"
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Factual accuracy",
+          "nome_i18n": { "en": "Factual accuracy", "pt": "Exatidão factual" },
+          "grupo": "Content and truthfulness",
+          "grupo_i18n": { "en": "Content and truthfulness", "pt": "Conteúdo e veracidade" },
+          "descricao": "Names, numbers, dates and citations hold up against the prompt itself or against what anyone could check.",
+          "descricao_i18n": {
+            "en": "Names, numbers, dates and citations hold up against the prompt itself or against what anyone could check.",
+            "pt": "Nomes, números, datas e citações se sustentam contra o próprio prompt ou contra o que qualquer um poderia conferir."
+          },
+          "tipos_issue": [
+            {
+              "id": "invented fact stated precisely",
+              "rotulo": "invented fact stated precisely",
+              "rotulo_i18n": {
+                "en": "invented fact stated precisely",
+                "pt": "fato inventado dito com precisão"
+              }
+            },
+            {
+              "id": "wrong figure",
+              "rotulo": "wrong figure",
+              "rotulo_i18n": { "en": "wrong figure", "pt": "número errado" }
+            },
+            {
+              "id": "fabricated citation",
+              "rotulo": "fabricated citation",
+              "rotulo_i18n": { "en": "fabricated citation", "pt": "citação fabricada" }
+            },
+            {
+              "id": "outdated fact",
+              "rotulo": "outdated fact",
+              "rotulo_i18n": { "en": "outdated fact", "pt": "fato desatualizado" }
+            }
+          ]
+        },
+        {
+          "nome": "Uncertainty handling",
+          "nome_i18n": { "en": "Uncertainty handling", "pt": "Tratamento da incerteza" },
+          "grupo": "Content and truthfulness",
+          "grupo_i18n": { "en": "Content and truthfulness", "pt": "Conteúdo e veracidade" },
+          "descricao": "A guess reads as a guess, whatever depends on the reader's situation says so, and the answer names who could settle it.",
+          "descricao_i18n": {
+            "en": "A guess reads as a guess, whatever depends on the reader's situation says so, and the answer names who could settle it.",
+            "pt": "Um palpite se lê como palpite, o que depende da situação de quem lê diz isso, e a resposta nomeia quem poderia resolver."
+          },
+          "tipos_issue": [
+            {
+              "id": "guess presented as certainty",
+              "rotulo": "guess presented as certainty",
+              "rotulo_i18n": {
+                "en": "guess presented as certainty",
+                "pt": "palpite apresentado como certeza"
+              }
+            },
+            {
+              "id": "hedges everything",
+              "rotulo": "hedges everything",
+              "rotulo_i18n": { "en": "hedges everything", "pt": "ressalva tudo" }
+            },
+            {
+              "id": "no source where one is needed",
+              "rotulo": "no source where one is needed",
+              "rotulo_i18n": {
+                "en": "no source where one is needed",
+                "pt": "sem fonte onde uma fonte é necessária"
+              }
+            }
+          ]
+        },
+        {
+          "nome": "Overall quality",
+          "nome_i18n": { "en": "Overall quality", "pt": "Qualidade geral" },
+          "resumo": true,
+          "descricao": "Taken as a whole, how usable is this answer for the person who asked — not how good it looks on a first read.",
+          "descricao_i18n": {
+            "en": "Taken as a whole, how usable is this answer for the person who asked — not how good it looks on a first read.",
+            "pt": "No conjunto, quão utilizável esta resposta é para quem perguntou — não quão boa ela parece numa primeira leitura."
+          },
+          "ancoras": [
+            {
+              "valor": 1,
+              "rotulo": "Unusable",
+              "rotulo_i18n": { "en": "Unusable", "pt": "Inutilizável" },
+              "exemplo": "You would send it back rather than edit it.",
+              "exemplo_i18n": {
+                "en": "You would send it back rather than edit it.",
+                "pt": "Você devolveria em vez de editar."
+              }
+            },
+            {
+              "valor": 2,
+              "rotulo": "Usable with fixes",
+              "rotulo_i18n": { "en": "Usable with fixes", "pt": "Utilizável com correções" },
+              "exemplo": "An editor could ship it in a few minutes without going back to the source.",
+              "exemplo_i18n": {
+                "en": "An editor could ship it in a few minutes without going back to the source.",
+                "pt": "Um editor entregaria em poucos minutos sem voltar à fonte."
+              }
+            },
+            {
+              "valor": 3,
+              "rotulo": "Good as it stands",
+              "rotulo_i18n": { "en": "Good as it stands", "pt": "Boa do jeito que está" },
+              "exemplo": "You would send it as it is.",
+              "exemplo_i18n": {
+                "en": "You would send it as it is.",
+                "pt": "Você enviaria como está."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

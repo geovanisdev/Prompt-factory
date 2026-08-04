@@ -3,6 +3,7 @@
   "task_type": {
     "geracao-criativa": {
       "nome": "Geração criativa",
+      "nome_en": "Creative writing",
       "definicao": "Pedido de criação de conteúdo ficcional ou artístico original: histórias, poemas, letras de música, piadas, diálogos, cenários. Desempate: texto com finalidade prática ou profissional é redacao-pratica; se o usuário pede que o assistente encarne um personagem e interaja, é roleplay-persona.",
       "exemplos": [
         "Escreve um conto de terror ambientado numa cidadezinha do interior de Minas",
@@ -12,6 +13,7 @@
     },
     "redacao-pratica": {
       "nome": "Redação prática",
+      "nome_en": "Practical writing",
       "definicao": "Criação de texto utilitário do zero: e-mails, mensagens, posts, currículos, descrições de produto, discursos, cartas. Desempate: se o objetivo é arte ou entretenimento, é geracao-criativa; se o usuário fornece um texto próprio para melhorar, é reescrita-edicao.",
       "exemplos": [
         "Escreve um e-mail educado pro meu chefe pedindo aumento depois de 2 anos sem reajuste",
@@ -21,6 +23,7 @@
     },
     "reescrita-edicao": {
       "nome": "Reescrita e edição",
+      "nome_en": "Rewriting and editing",
       "definicao": "O usuário fornece um texto e pede para corrigir, melhorar, encurtar, expandir, mudar o tom ou reformatar, preservando o conteúdo. Desempate: sem texto-fonte do usuário é redacao-pratica ou geracao-criativa; mudar de idioma é traducao; condensar fielmente é resumo.",
       "exemplos": [
         "Corrige a gramática mantendo o jeito informal: 'nois vai amanha no mercado compra as coisa'",
@@ -30,6 +33,7 @@
     },
     "resumo": {
       "nome": "Resumo",
+      "nome_en": "Summarisation",
       "definicao": "Condensar um texto fornecido ou material identificado (artigo, livro, vídeo) preservando as ideias principais. Desempate: mudar tom ou estilo mantendo o conteúdo integral é reescrita-edicao; pergunta pontual sobre o material é qa-contexto; explicar um conceito sem material de apoio é qa-aberta.",
       "exemplos": [
         "Resume esse artigo em 3 bullet points: [texto]",
@@ -39,6 +43,7 @@
     },
     "traducao": {
       "nome": "Tradução",
+      "nome_en": "Translation",
       "definicao": "Converter texto de um idioma para outro, incluindo pedidos pontuais de 'como se diz X em Y'. Desempate: dúvida sobre gramática ou uso da língua sem texto para converter é qa-aberta (domínio linguagem-idiomas); adaptar tom no mesmo idioma é reescrita-edicao.",
       "exemplos": [
         "Traduz pro inglês: 'que saudade de você, volta logo'",
@@ -48,6 +53,7 @@
     },
     "qa-aberta": {
       "nome": "Pergunta aberta",
+      "nome_en": "Open question",
       "definicao": "Pergunta factual ou explicativa respondível com o conhecimento do modelo, sem material de apoio fornecido pelo usuário. Desempate: se há texto ou dados anexados sobre os quais se pergunta, é qa-contexto; recomendação ou julgamento aplicado à situação do usuário é conselho-opiniao; exigindo cálculo ou dedução formal, é matematica-raciocinio.",
       "exemplos": [
         "Por que o céu é azul?",
@@ -57,6 +63,7 @@
     },
     "qa-contexto": {
       "nome": "Pergunta sobre contexto fornecido",
+      "nome_en": "Question about provided context",
       "definicao": "O usuário fornece um documento, trecho ou dados e pergunta algo que se responde a partir desse material. Desempate: sem material anexado é qa-aberta; pedir condensação do material é resumo; pedir saída estruturada (campos, rótulos, JSON) é classificacao-extracao.",
       "exemplos": [
         "Com base no contrato abaixo, qual a multa se eu cancelar antes do prazo? [texto]",
@@ -66,6 +73,7 @@
     },
     "brainstorm": {
       "nome": "Brainstorm e ideação",
+      "nome_en": "Brainstorming and ideation",
       "definicao": "Gerar ideias, nomes, alternativas ou possibilidades em aberto, tipicamente em lista, sem compromisso com um texto final único. Desempate: pedir um texto pronto é redacao-pratica ou geracao-criativa; pedir etapas ordenadas para atingir um objetivo é planejamento.",
       "exemplos": [
         "Me dá 10 ideias de nome pra uma cafeteria com tema de livros",
@@ -75,6 +83,7 @@
     },
     "classificacao-extracao": {
       "nome": "Classificação e extração",
+      "nome_en": "Classification and extraction",
       "definicao": "Rotular, categorizar, ranquear ou extrair informação estruturada (entidades, campos, tabelas, JSON) de material fornecido, com formato de saída definido. Desempate: resposta em prosa livre sobre o material é qa-contexto; pedir um programa que faça a extração é codigo.",
       "exemplos": [
         "Extrai nome, e-mail e telefone deste texto e devolve em JSON: [texto]",
@@ -84,6 +93,7 @@
     },
     "codigo": {
       "nome": "Código e programação",
+      "nome_en": "Code and programming",
       "definicao": "Escrever, corrigir, explicar, revisar, converter ou otimizar código; dúvidas de programação, SQL, regex, scripts, erros e ferramentas de desenvolvimento. Desempate: pergunta conceitual sobre tecnologia sem código envolvido é qa-aberta (domínio tecnologia); problema puramente matemático sem programação é matematica-raciocinio.",
       "exemplos": [
         "Escreve uma função em Python que valida CPF",
@@ -93,6 +103,7 @@
     },
     "matematica-raciocinio": {
       "nome": "Matemática e raciocínio",
+      "nome_en": "Maths and reasoning",
       "definicao": "Cálculos, problemas matemáticos, lógica, enigmas, probabilidade, conversões de unidade e deduções passo a passo. Desempate: se pede código para calcular, é codigo; pergunta factual sem cálculo é qa-aberta.",
       "exemplos": [
         "Quanto é 15% de 340?",
@@ -102,6 +113,7 @@
     },
     "conselho-opiniao": {
       "nome": "Conselho e opinião",
+      "nome_en": "Advice and opinion",
       "definicao": "Pedido de orientação, recomendação ou julgamento subjetivo aplicado à situação pessoal do usuário. Desempate: pergunta factual neutra é qa-aberta; pedir um plano estruturado em etapas é planejamento; desabafo sem pedido concreto é conversa-social.",
       "exemplos": [
         "Vale a pena aceitar uma proposta ganhando 20% menos mas 100% home office?",
@@ -111,6 +123,7 @@
     },
     "planejamento": {
       "nome": "Planejamento",
+      "nome_en": "Planning",
       "definicao": "Montar planos, cronogramas, roteiros, rotinas, treinos, dietas, currículos de estudo ou itinerários com etapas e sequência organizadas. Desempate: ideias soltas sem sequência são brainstorm; orientação pontual sem estrutura de etapas é conselho-opiniao.",
       "exemplos": [
         "Monta um cronograma de 3 meses pro ENEM estudando 2h por dia útil",
@@ -120,6 +133,7 @@
     },
     "roleplay-persona": {
       "nome": "Roleplay e persona",
+      "nome_en": "Roleplay and persona",
       "definicao": "O usuário pede que o assistente assuma um personagem, papel ou persona e interaja a partir dele (personagens de ficção, simulações de entrevista, 'aja como', personas de jailbreak). Desempate: pedir uma história sobre personagens, sem interação em papéis, é geracao-criativa.",
       "exemplos": [
         "Você é o Monkey D. Luffy e responde como ele até eu mandar parar",
@@ -129,6 +143,7 @@
     },
     "conversa-social": {
       "nome": "Conversa social",
+      "nome_en": "Social chat",
       "definicao": "Cumprimentos, small talk, testes do tipo 'oi, você funciona?', agradecimentos, desabafos sem pedido concreto e curiosidade sobre o próprio assistente. Desempate: havendo tarefa ou pergunta concreta, classifica-se pela tarefa; desabafo pedindo orientação é conselho-opiniao.",
       "exemplos": [
         "oi, tudo bem?",
@@ -138,6 +153,7 @@
     },
     "outro": {
       "nome": "Outro",
+      "nome_en": "Other",
       "definicao": "Prompts que não se encaixam em nenhuma classe: intenção indiscernível, instrução vazia, ou várias tarefas combinadas sem uma dominante. Desempate: usar somente quando nenhuma outra classe cobre a maior parte da intenção; se existe tarefa dominante identificável, usar a classe dela.",
       "exemplos": [
         "asdkjhs teste 123",
@@ -149,6 +165,7 @@
   "domain": {
     "tecnologia": {
       "nome": "Tecnologia",
+      "nome_en": "Technology",
       "definicao": "Computação, software, hardware, internet, IA, eletrônicos, celulares, redes e ferramentas digitais. Desempate: desenvolvimento e programação de jogos ficam em tecnologia; jogar, builds e o universo dos jogos ficam em jogos.",
       "exemplos": [
         "Como formato um pendrive no Windows 11?",
@@ -158,6 +175,7 @@
     },
     "educacao": {
       "nome": "Educação",
+      "nome_en": "Education",
       "definicao": "O processo de estudar e ensinar: escola, faculdade, provas, vestibular e ENEM, lição de casa, TCC, planos de aula, métodos de estudo. Desempate: pergunta de conteúdo sem enquadramento escolar vai para o domínio do assunto (ex.: fotossíntese em ciencia); com enquadramento escolar explícito, fica em educacao.",
       "exemplos": [
         "Me ajuda a montar um plano de aula sobre frações pro 5º ano",
@@ -167,6 +185,7 @@
     },
     "trabalho-negocios": {
       "nome": "Trabalho e negócios",
+      "nome_en": "Work and business",
       "definicao": "Carreira, RH, empreendedorismo, marketing, vendas, gestão, comunicação corporativa e currículos. Desempate: finanças pessoais e investimentos ficam em financas; tarefa técnica de programação no trabalho fica em tecnologia.",
       "exemplos": [
         "Melhora esse resumo do meu currículo de vendedor: [texto]",
@@ -176,6 +195,7 @@
     },
     "saude": {
       "nome": "Saúde",
+      "nome_en": "Health",
       "definicao": "Medicina, sintomas, medicamentos, nutrição, exercício físico pela saúde ou estética, sono, saúde mental e bem-estar. Desempate: receita de comida sem foco nutricional fica em culinaria; regras, técnica e universo de modalidades esportivas ficam em esportes.",
       "exemplos": [
         "Tô com dor de garganta há 3 dias e sem febre, devo me preocupar?",
@@ -185,6 +205,7 @@
     },
     "direito": {
       "nome": "Direito",
+      "nome_en": "Law",
       "definicao": "Leis, contratos, processos, direitos (consumidor, trabalhista, família), documentos e procedimentos jurídicos. Desempate: debate sobre leis como tema social ou político fica em politica-sociedade; procedimento prático de imposto de renda fica em financas.",
       "exemplos": [
         "Fui demitido sem justa causa, o que tenho direito de receber?",
@@ -194,6 +215,7 @@
     },
     "ciencia": {
       "nome": "Ciência",
+      "nome_en": "Science",
       "definicao": "Física, química, biologia, astronomia, geociências, matemática como disciplina e pesquisa científica. Desempate: tecnologia aplicada e computação ficam em tecnologia; conteúdo com enquadramento escolar explícito (prova, lição) fica em educacao.",
       "exemplos": [
         "Por que o céu é azul?",
@@ -203,6 +225,7 @@
     },
     "artes-entretenimento": {
       "nome": "Artes e entretenimento",
+      "nome_en": "Arts and entertainment",
       "definicao": "Filmes, séries, música, livros, celebridades, TV, cultura pop e artes em geral, incluindo pedidos criativos ancorados nesse universo (fanfic, 'no estilo de'). Desempate: pedido criativo de tema genérico e cotidiano fica em geral; videogames ficam em jogos.",
       "exemplos": [
         "Me indica séries parecidas com Dark",
@@ -212,6 +235,7 @@
     },
     "financas": {
       "nome": "Finanças",
+      "nome_en": "Personal finance",
       "definicao": "Dinheiro pessoal: investimentos, orçamento, dívidas, bancos, impostos na prática, criptomoedas e aposentadoria. Desempate: gestão e estratégia de empresas ficam em trabalho-negocios; disputa legal sobre dinheiro fica em direito.",
       "exemplos": [
         "Vale mais a pena Tesouro Direto ou CDB pra guardar 10 mil por 2 anos?",
@@ -221,6 +245,7 @@
     },
     "viagens": {
       "nome": "Viagens",
+      "nome_en": "Travel",
       "definicao": "Destinos, roteiros, passagens, hospedagem, vistos de turismo, câmbio de viagem e dicas de turismo. Desempate: mudança definitiva de país e questões migratórias legais ficam em direito.",
       "exemplos": [
         "Roteiro de 4 dias em Buenos Aires gastando pouco",
@@ -230,6 +255,7 @@
     },
     "culinaria": {
       "nome": "Culinária",
+      "nome_en": "Cooking",
       "definicao": "Receitas, técnicas de cozinha, ingredientes, substituições, bebidas e harmonização. Desempate: dieta e valor nutricional com foco em saúde ficam em saude; montar um negócio de comida fica em trabalho-negocios.",
       "exemplos": [
         "Receita de pão de queijo que não fica borrachudo",
@@ -239,6 +265,7 @@
     },
     "esportes": {
       "nome": "Esportes",
+      "nome_en": "Sports",
       "definicao": "Modalidades esportivas, campeonatos, clubes, atletas, regras, técnica e história do esporte. Desempate: exercício físico pela saúde ou estética fica em saude; e-sports e jogos eletrônicos ficam em jogos.",
       "exemplos": [
         "Quantas Libertadores o Flamengo tem?",
@@ -248,6 +275,7 @@
     },
     "politica-sociedade": {
       "nome": "Política e sociedade",
+      "nome_en": "Politics and society",
       "definicao": "Política, eleições, governo, história, religião, filosofia, notícias e questões sociais. Desempate: aplicação da lei a um caso concreto do usuário fica em direito; história da ciência fica em ciencia.",
       "exemplos": [
         "Explica a diferença entre presidencialismo e parlamentarismo",
@@ -257,6 +285,7 @@
     },
     "relacionamentos-pessoal": {
       "nome": "Relacionamentos e vida pessoal",
+      "nome_en": "Relationships and personal life",
       "definicao": "Amor, amizade, família, convivência, conflitos interpessoais, autoconhecimento e etiqueta social, incluindo mensagens pessoais a escrever. Desempate: sofrimento psíquico como condição clínica (depressão, ansiedade, luto patológico) fica em saude.",
       "exemplos": [
         "Como pedir desculpas pra minha melhor amiga depois de uma briga feia?",
@@ -266,6 +295,7 @@
     },
     "jogos": {
       "nome": "Jogos",
+      "nome_en": "Games",
       "definicao": "Videogames, jogos de tabuleiro, RPG de mesa, xadrez, e-sports, gacha, builds, lore e dicas de gameplay. Desempate: desenvolvimento e programação de jogos ficam em tecnologia; esportes físicos ficam em esportes.",
       "exemplos": [
         "Qual a melhor build pra Yasuo no patch atual?",
@@ -275,6 +305,7 @@
     },
     "linguagem-idiomas": {
       "nome": "Linguagem e idiomas",
+      "nome_en": "Language and linguistics",
       "definicao": "A língua em si: gramática, vocabulário, significado de palavras, aprendizado de idiomas, etimologia e linguística. Desempate: tradução de um texto sobre assunto claro leva o domínio do assunto; quando o interesse é a língua (regra, uso, significado), fica aqui.",
       "exemplos": [
         "Qual a diferença entre 'mas' e 'mais'?",
@@ -284,6 +315,7 @@
     },
     "geral": {
       "nome": "Geral",
+      "nome_en": "General",
       "definicao": "Assuntos cotidianos, mistos ou indeterminados que não pertencem claramente a nenhum outro domínio; inclui small talk, testes do assistente e pedidos criativos de tema genérico. Desempate: usar somente quando nenhum domínio específico cobre o assunto principal.",
       "exemplos": [
         "oi, tudo bem?",

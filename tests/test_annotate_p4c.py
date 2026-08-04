@@ -39,6 +39,7 @@ from prompt_factory.annotate import migracao
 from prompt_factory.annotate import seed as seedmod
 from prompt_factory.annotate.main import criar_app
 
+from .fixtures_annotate_v1 import rebaixar
 from .test_api import montar_banco
 
 # ---------------------------------------------------------------------------
@@ -122,7 +123,7 @@ EN_RUIM = (
 
 
 def rubrica_gerada(titulo: str = "Actionable answer for the stated situation") -> dict[str, Any]:
-    """No contrato de fixture (``rubrica@2``): escala com as PONTAS ancoradas."""
+    """No contrato de fixture (``rubrica@3``): escala com as PONTAS ancoradas."""
     return {
         "titulo": titulo,
         "criterios": [
@@ -975,7 +976,10 @@ def test_migrar_da_v3_preserva_o_alvo_escondido(
     conn = abrir(semeado)
     try:
         antes = gmod.composicao(conn)
-        # Volta o carimbo para a v3: a migração vai ler daqui.
+        # Volta o banco para a v3 — carimbo E forma. Só o carimbo deixaria a
+        # tabela e a coluna do marco seguinte para trás, e a conferência de
+        # contagens da migração acusaria linhas que a v3 nunca teve.
+        rebaixar(conn, 3)
         adb.set_meta(conn, adb.CHAVE_VERSAO, "3")
     finally:
         conn.close()
@@ -1000,6 +1004,7 @@ def test_o_schema_migrado_da_v3_e_identico_ao_de_um_banco_novo(
 ) -> None:
     conn = abrir(semeado)
     try:
+        rebaixar(conn, 3)
         adb.set_meta(conn, adb.CHAVE_VERSAO, "3")
     finally:
         conn.close()

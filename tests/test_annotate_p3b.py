@@ -42,7 +42,7 @@ from prompt_factory.annotate import migracao
 from prompt_factory.annotate import seed as seedmod
 from prompt_factory.annotate.main import criar_app
 
-from .fixtures_annotate_v1 import init_v1
+from .fixtures_annotate_v1 import contagens_do_disco, init_v1, rebaixar
 from .test_annotate_p2 import notas_da_rubrica, rubrica_ok
 from .test_api import montar_banco
 
@@ -1073,11 +1073,9 @@ def _banco_v2_com_trabalho(caminho: Path, corpus: Path) -> dict[str, int]:
     # Rebaixa para a v2: tira a coluna da v3 e carimba a versão antiga.
     conn = com_banco(caminho)
     try:
-        conn.execute(
-            f"ALTER TABLE anotacoes DROP COLUMN {adb.COLUNA_GABARITO_AVALIACAO}"
-        )
+        rebaixar(conn, 2)
         adb.set_meta(conn, adb.CHAVE_VERSAO, 2)
-        antes = adb.contagens(conn)
+        antes = contagens_do_disco(conn)
     finally:
         conn.close()
     return antes

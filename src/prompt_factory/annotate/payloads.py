@@ -41,8 +41,33 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from ..config import get as _cfg
 from .db import ESCALA_TURNO, PAPEIS_TURNO, ROTULOS_DUELO, ROTULOS_MODELO, TIPOS_TAREFA
 
-#: Sufixo de versão dos quatro contratos. ``"avaliar_rubrica" -> "avaliar_rubrica@1"``.
+#: Versão PADRÃO, para um tipo que não esteja em ``VERSOES``. Continua existindo
+#: porque cinco dos seis contratos estão nela e escrevê-la seis vezes na tabela
+#: abaixo só criaria seis lugares para divergir.
 VERSAO_PAYLOAD = 1
+
+#: Versão POR TIPO. Era uma constante global (`VERSAO_PAYLOAD`) lida por
+#: ``nome_schema`` para os seis contratos — e essa era a armadilha: subir o
+#: ``avaliar_rubrica`` para 2 renomearia os outros cinco, que não mudaram. O
+#: ``entrega.py`` grava ``payload_schema`` dentro do JSONL entregue, então cinco
+#: contratos passariam a **declarar publicamente uma versão que nunca existiu**.
+VERSOES: dict[str, int] = {"avaliar_rubrica": 2}
+
+#: Separador entre o contrato e a identidade do INSTRUMENTO em ``payload_schema``.
+#:
+#: POR QUE ISTO EXISTE ANTES DE O CONSTRUTOR EXISTIR
+#: =================================================
+#: O P5a dá ao admin um arsenal para montar a tarefa: escolher blocos, reusar
+#: perguntas de um banco, escrever novas. A partir daí **duas tarefas do mesmo
+#: tipo têm instrumentos diferentes**, e o ``assert set(MODELOS) == set(TIPOS_TAREFA)``
+#: lá embaixo deixa de descrever o mundo.
+#:
+#: ``payload_schema`` é gravado em TODA linha de ``anotacoes``, copiado coluna a
+#: coluna pela migração e usado pelo ``entrega.py`` para chavear o glossário —
+#: ou seja, **é imutável no que já está escrito**. O formato se decide agora ou
+#: nunca: ``avaliar_rubrica@2+severidade@1``. Sem instrumento declarado, o sufixo
+#: simplesmente não aparece e tudo o que existe hoje continua legível.
+SEPARADOR_INSTRUMENTO = "+"
 
 #: Teto de caracteres de um campo de texto livre do anotador. Não é estética:
 #: sem teto, um paste acidental de 1 MB entra no ``payload_json`` e a fila do
@@ -91,42 +116,103 @@ class _Base(BaseModel):
 
 
 class NotaCriterio(_Base):
-    """Uma nota por critério, mais a justificativa que só existe quando pedida."""
+    """Uma nota por critério — mais o que a torna auditável (``@2``).
+
+    OS QUATRO ESTADOS DE UM CRITÉRIO, E POR QUE ELES PRECISAM DE NOMES DIFERENTES
+    ============================================================================
+    ``não avaliado`` · ``limpo`` · ``com issue`` · ``não se aplica``. Numa matriz,
+    o valor bom da escala e a não-decisão são a MESMA célula preenchida se a
+    distinção não for gravada — e depois, no export, ninguém consegue separar
+    "olhei e está tudo certo" de "não olhei".
+
+    Aqui a separação é dura: ``nao_aplicavel`` é campo próprio (não um valor de
+    escala, não ``0``, não uma sentinela numérica — sentinela entra em toda média
+    e é o defeito que ninguém encontra), e **``não avaliado`` simplesmente não
+    atravessa o fio**: sem ``nao_aplicavel``, a nota é obrigatória. É estado de
+    formulário, e quem o barra é o botão de enviar antes do clique.
+
+    ``tipos_issue`` É UM OBJETO, NUNCA UMA LISTA
+    ============================================
+    ``{id: bool}`` com **todos** os ids do catálogo presentes, inclusive os
+    ``false``. Não é gosto: ``avaliacoes.achatar`` trata lista vazia como FOLHA,
+    então ``[] -> ["x"]`` produziria dois caminhos de diff (``…tipos_issue``
+    sumindo e ``…tipos_issue.0`` nascendo) e o Rate and Review cobraria **dois
+    motivos por uma marcação**. Com o objeto completo, todo toggle é exatamente
+    um caminho, ``true``↔``false``.
+    """
 
     criterio: Annotated[str, Field(min_length=1, max_length=200)]
-    nota: int
+    nota: int | None = None
     justificativa: Annotated[str | None, Field(max_length=MAX_TEXTO_LIVRE)] = None
+    #: O critério não se aplica a esta resposta. Exige ``motivo_na`` e proíbe nota.
+    nao_aplicavel: bool = False
+    motivo_na: Annotated[str | None, Field(max_length=MAX_TEXTO_LIVRE)] = None
+    #: ``{id_do_catalogo: marcado}``. Ver o docstring da classe.
+    tipos_issue: Annotated[dict[str, bool], Field(max_length=64)] = {}
+    #: Trecho verbatim da resposta que sustenta o achado. **Opcional de propósito**:
+    #: exigir um span em toda severidade alta faria quem enfrenta um defeito difuso
+    #: ("a resposta inteira erra o registro") colar um trecho arbitrário só para
+    #: destravar o botão — evidência fabricada dentro do artefato entregue.
+    trecho: Annotated[str | None, Field(max_length=MAX_TEXTO_LIVRE)] = None
+    #: Ato explícito de dizer "não há um trecho: o defeito é difuso".
+    trecho_difuso: bool = False
 
     @field_validator("nota", mode="before")
     @classmethod
     def _nota_nao_e_bool(cls, v: Any) -> Any:
         # A pegadinha central deste módulo: `"nota": true` chegaria a um
         # validador comum já convertido em 1 — uma nota válida, e errada.
-        return _sem_bool(v, "nota")
+        return None if v is None else _sem_bool(v, "nota")
 
     @field_validator("nota")
     @classmethod
-    def _nota_no_intervalo(cls, v: int) -> int:
+    def _nota_no_intervalo(cls, v: int | None) -> int | None:
         # 1..9 é o teto ABSOLUTO da plataforma (é o que o teclado gradua). A
         # escala REAL de cada critério é a da rubrica, e quem a confere é a rota
         # de submissão, que tem a rubrica em mãos — o modelo não a tem.
-        if not 1 <= v <= 9:
+        if v is not None and not 1 <= v <= 9:
             raise ValueError(f"nota fora de 1..9: {v}")
         return v
 
-    @field_validator("justificativa")
+    @field_validator("justificativa", "motivo_na", "trecho")
     @classmethod
-    def _justificativa_limpa(cls, v: str | None) -> str | None:
+    def _texto_limpo(cls, v: str | None) -> str | None:
         if v is None:
             return None
-        limpa = _limpo(v)
+        limpo = _limpo(v)
         # Campo aberto e não preenchido chega como "" — guardar string vazia
         # faria a fila do revisor mostrar uma justificativa que ninguém escreveu.
-        return limpa or None
+        return limpo or None
+
+    @model_validator(mode="after")
+    def _na_e_nota_se_excluem(self) -> NotaCriterio:
+        if self.nao_aplicavel:
+            # XOR duro. `nota` AUSENTE, e não `null`: um leitor que encontre a
+            # chave com valor nulo não sabe dizer se ela foi apagada ou nunca
+            # existiu, e é justamente essa a distinção que este campo carrega.
+            if self.nota is not None:
+                raise ValueError("critério marcado N/A não pode ter nota")
+            if not self.motivo_na:
+                raise ValueError("N/A exige o motivo — sem ele o critério some sem explicação")
+            if any(self.tipos_issue.values()):
+                raise ValueError("critério marcado N/A não pode ter tipo de issue")
+            if self.trecho:
+                raise ValueError("critério marcado N/A não pode ter trecho")
+        elif self.nota is None:
+            raise ValueError("critério sem nota e sem N/A — decida um dos dois")
+        if self.trecho and self.trecho_difuso:
+            raise ValueError("ou o trecho existe, ou o defeito é difuso — não os dois")
+        return self
 
 
 class AvaliarRubrica(_Base):
-    """``avaliar_rubrica@1`` — uma nota por critério da rubrica, mais o geral."""
+    """``avaliar_rubrica@2`` — uma nota por critério da rubrica, mais o geral.
+
+    ``@1`` continua legível e nada o reescreve: a versão viaja na coluna
+    ``payload_schema``, que é o motivo de a coluna existir. Uma linha gravada em
+    ``@1`` não tem `tipos_issue` nem `nao_aplicavel`, e é isso mesmo — inventar
+    as chaves na leitura afirmaria que alguém decidiu algo que ninguém decidiu.
+    """
 
     notas: Annotated[list[NotaCriterio], Field(min_length=1, max_length=32)]
     comentario_geral: Annotated[str | None, Field(max_length=MAX_TEXTO_LIVRE)] = None
@@ -562,9 +648,34 @@ MODELOS: dict[str, type[_Base]] = {
 assert set(MODELOS) == set(TIPOS_TAREFA), "MODELOS e TIPOS_TAREFA divergiram"
 
 
-def nome_schema(tipo: str) -> str:
-    """``"comparar_ab"`` → ``"comparar_ab@1"`` — o que vai para ``payload_schema``."""
-    return f"{tipo}@{VERSAO_PAYLOAD}"
+def nome_schema(tipo: str, instrumento: str | None = None) -> str:
+    """O que vai para ``payload_schema``.
+
+    ``"comparar_ab"`` → ``"comparar_ab@1"`` ·
+    ``"avaliar_rubrica"`` → ``"avaliar_rubrica@2"`` ·
+    ``("avaliar_rubrica", "severidade@1")`` → ``"avaliar_rubrica@2+severidade@1"``.
+
+    O terceiro caso é o que o construtor do admin (P5a) vai usar: com um arsenal
+    de blocos, duas tarefas do MESMO tipo têm instrumentos diferentes, e o tipo
+    deixa de descrever o que foi preenchido. Reservar o formato agora é barato;
+    depois não é — esta string é gravada em toda linha de ``anotacoes`` e nada a
+    reescreve.
+    """
+    base = f"{tipo}@{VERSOES.get(tipo, VERSAO_PAYLOAD)}"
+    return base if not instrumento else f"{base}{SEPARADOR_INSTRUMENTO}{instrumento}"
+
+
+def partes_do_schema(schema: str) -> tuple[str, str, str | None]:
+    """``"avaliar_rubrica@2+severidade@1"`` → ``("avaliar_rubrica", "2", "severidade@1")``.
+
+    O leitor do formato acima, em UM lugar. Quem precisar decidir por tipo (o
+    ``entrega.py`` chaveia o glossário assim) usa o primeiro elemento e ignora o
+    resto — que é o que faz uma linha com instrumento continuar legível por
+    código escrito antes de o instrumento existir.
+    """
+    corpo, _, instrumento = str(schema).partition(SEPARADOR_INSTRUMENTO)
+    tipo, _, versao = corpo.partition("@")
+    return tipo, versao, instrumento or None
 
 
 def escolher(tipo: str) -> type[_Base]:
@@ -580,7 +691,9 @@ __all__ = [
     "MAX_RESPOSTA_SFT",
     "MAX_TEXTO_LIVRE",
     "MODELOS",
+    "SEPARADOR_INSTRUMENTO",
     "VERSAO_PAYLOAD",
+    "VERSOES",
     "AvaliarRubrica",
     "ComparacaoCriterio",
     "CompararAB",

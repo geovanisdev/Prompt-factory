@@ -156,4 +156,72 @@ def init_v1(conn: sqlite3.Connection) -> sqlite3.Connection:
     return conn
 
 
-__all__ = ["DDL_V1", "VERSAO_V1", "init_v1"]
+__all__ = [
+    "DDL_V1",
+    "FALTAVA_NA_VERSAO",
+    "VERSAO_V1",
+    "contagens_do_disco",
+    "init_v1",
+    "rebaixar",
+]
+
+
+#: O que cada versão do schema **ainda não tinha**, para rebaixar um banco de
+#: hoje ao estado real de uma versão antiga.
+#:
+#: POR QUE ISTO PRECISOU EXISTIR
+#: =============================
+#: Os testes de migração constroem o banco antigo do jeito mais fiel possível:
+#: criam um banco de HOJE, fazem trabalho de verdade nele pelas rotas, e só então
+#: carimbam a versão antiga. O carimbo sozinho, porém, não rebaixa nada — a
+#: tabela e a coluna do marco novo continuam lá. Enquanto o marco novo só
+#: acrescentava tabela VAZIA isso passava despercebido; no dia em que o seed
+#: passou a POPULAR a tabela nova (os dois briefs do P9), a conferência de
+#: contagens da migração acusou "2 linhas antes, 0 depois" — e estava certa: o
+#: banco de origem não devia tê-las.
+#:
+#: Chaveado pela versão de ORIGEM que se quer simular. Uma entrada nova a cada
+#: marco que acrescente tabela ou coluna.
+FALTAVA_NA_VERSAO: dict[int, dict[str, tuple[str, ...]]] = {
+    2: {"tabelas": ("briefs",), "colunas_anotacoes": ("gabarito_avaliacao_json", "versao_brief")},
+    3: {"tabelas": ("briefs",), "colunas_anotacoes": ("versao_brief",)},
+    4: {"tabelas": ("briefs", "turnos_conversa"), "colunas_anotacoes": ("versao_brief",)},
+    5: {"tabelas": ("briefs",), "colunas_anotacoes": ("versao_brief",)},
+}
+
+
+def rebaixar(conn: sqlite3.Connection, para: int) -> None:
+    """Tira do banco o que a versão ``para`` ainda não tinha. NÃO carimba a versão.
+
+    Não carimba de propósito: quem chama costuma querer contar linhas depois do
+    rebaixamento e antes do carimbo, e um carimbo escondido aqui faria a ordem
+    dessas três coisas virar detalhe implícito.
+    """
+    if para not in FALTAVA_NA_VERSAO:
+        raise ValueError(f"não sei rebaixar para a v{para}")
+    plano = FALTAVA_NA_VERSAO[para]
+    for coluna in plano["colunas_anotacoes"]:
+        conn.execute(f"ALTER TABLE anotacoes DROP COLUMN {coluna}")
+    for tabela in plano["tabelas"]:
+        conn.execute(f"DROP TABLE IF EXISTS {tabela}")
+
+
+def contagens_do_disco(conn: sqlite3.Connection) -> dict[str, int]:
+    """``{tabela: linhas}`` lido do ``sqlite_master``, não de uma lista fixa.
+
+    ``db.contagens`` percorre ``db.TABELAS``, que descreve o schema de HOJE:
+    sobre um banco rebaixado ela pediria uma tabela que aquela versão nunca teve
+    e morreria com ``no such table``. A própria migração conta assim
+    (``_contagens_brutas``), e é assim que o teste precisa contar para comparar
+    as duas pontas da mesma operação.
+    """
+    tabelas = [
+        str(r[0])
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        )
+    ]
+    return {
+        t: int(conn.execute(f"SELECT count(*) AS n FROM {t}").fetchone()["n"]) for t in tabelas
+    }

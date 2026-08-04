@@ -240,7 +240,19 @@ def _materializar_rubrica(conn: sqlite3.Connection, env: dict[str, Any]) -> int 
             uid,
             str(payload.get("titulo") or "Rubrica aprovada"),
             json.dumps(
-                {"schema": seedmod.SCHEMA_RUBRICA, "criterios": payload["criterios"]},
+                {
+                    "schema": seedmod.SCHEMA_RUBRICA,
+                    # CONVERTIDO, não copiado. O payload vem de
+                    # `escrever_rubrica@1` (`escala_min`/`rotulo_min`) e o rótulo
+                    # acima promete `rubrica@3` (`escala:{min,max,ancoras}`).
+                    # Gravar um sob o nome do outro fazia a escala declarada
+                    # sumir em silêncio — na tela E na validação do servidor.
+                    # Mesma função da leitura, de propósito: duas conversões
+                    # divergiriam e a divergência só apareceria numa rubrica.
+                    "criterios": [
+                        tmod.normalizar_criterio(c) for c in payload["criterios"]
+                    ],
+                },
                 ensure_ascii=False,
             ),
             int(anotacao["id"]),

@@ -70,6 +70,7 @@ from typing import Any
 from .. import paths
 from ..config import get as _cfg
 from ..labeling_io import escrever_json_atomico, escrever_texto_atomico
+from . import briefs as briefmod
 from . import catalogo as catmod
 from . import db as adb
 from . import diretrizes as dirmod
@@ -945,7 +946,7 @@ def _validar_item_material(
 
 
 def _validar_rubrica(uid: str, bruto: Any) -> tuple[dict[str, Any] | None, list[str]]:
-    """A rubrica no contrato de fixture (``rubrica@2``): escala com ÂNCORAS.
+    """A rubrica no contrato de fixture (``rubrica@3``): escala com ÂNCORAS.
 
     É o formato que ``wsAvaliar`` desenha (``escala.min/max/ancoras``), e não o
     ``escrever_rubrica@1`` que um anotador submete (``escala_min``/``rotulo_min``).
@@ -1260,9 +1261,7 @@ def _validar_item_anotacao(
     # ela, uma sintética entraria com nota 7 num critério de 1..5, e a tela
     # desenharia cinco botões e um valor que não é nenhum deles.
     if isinstance(dados, payloads.AvaliarRubrica):
-        problema = tmod.erro_contra_a_rubrica(
-            rubrica, [(nota.criterio, nota.nota) for nota in dados.notas]
-        )
+        problema = tmod.erro_contra_a_rubrica(rubrica, dados.notas)
         if problema:
             erros.append(f"tarefa {tid}: {problema}")
 
@@ -1414,14 +1413,28 @@ def gravar_anotacoes(
         conta["atribuicoes"] += 1
 
         tipo = str(item["tipo"])
+        # O projeto sai da TAREFA, e a versão do brief sai da mesma função que a
+        # rota de submissão usa. Um `max(versao)` escrito em SQL aqui seria uma
+        # segunda implementação da mesma regra, e as duas divergiriam no dia em
+        # que "vigente" deixasse de ser simplesmente o maior número.
+        projeto = conn.execute(
+            "SELECT projeto_id FROM tarefas WHERE id = ?", (int(item["tarefa_id"]),)
+        ).fetchone()
         cur = conn.execute(
             "INSERT INTO anotacoes (atribuicao_id, versao, payload_schema, versao_diretriz, "
+            "                       versao_brief, "
             f"                      payload_json, {adb.COLUNA_GABARITO_AVALIACAO}, status) "
-            "VALUES (?, 1, ?, ?, ?, ?, ?)",
+            "VALUES (?, 1, ?, ?, ?, ?, ?, ?)",
             (
                 atribuicao_id,
                 payloads.nome_schema(tipo),
                 dirmod.versao_vigente(conn, tipo),
+                briefmod.versao_vigente(
+                    conn,
+                    None
+                    if projeto is None or projeto["projeto_id"] is None
+                    else int(projeto["projeto_id"]),
+                ),
                 json.dumps(item["payload"], ensure_ascii=False),
                 json.dumps(item["gabarito"], ensure_ascii=False),
                 status,

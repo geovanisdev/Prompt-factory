@@ -80,7 +80,17 @@ from typing import Any
 #: linha em ``anotacoes``. Guardá-la no servidor (em vez de só no
 #: ``localStorage``) é o que faz o duelo ser cego de verdade — o mapa de qual
 #: modelo é "A" nunca sai daqui antes de a avaliação ser enviada.
-SCHEMA_VERSION_ANOTACAO = 5
+#:
+#: **v6 (P9)**: o BRIEF DO PROJETO. A tabela ``briefs`` nasce de graça
+#: (``CREATE TABLE IF NOT EXISTS`` a cria num banco existente), mas
+#: ``anotacoes.versao_brief`` é **coluna nova em tabela que já existe** — e é ela
+#: que custa a migração, exatamente como o CHECK da v4 custou a dele. Sem a
+#: coluna, o enquadramento sob o qual cada anotação foi feita não fica gravado
+#: em lugar nenhum, e a pergunta "isto foi feito antes ou depois de a regra da
+#: justificativa apertar?" volta a não ter resposta. Nenhuma linha existente é
+#: transformada: ``versao_brief`` fica NULL no trabalho anterior ao brief, que é
+#: a verdade — não havia brief publicado.
+SCHEMA_VERSION_ANOTACAO = 6
 
 #: Chave de ``app_meta`` onde a versão acima mora.
 CHAVE_VERSAO = "schema_version_anotacao"
@@ -361,6 +371,29 @@ CREATE TABLE IF NOT EXISTS diretrizes (
   UNIQUE (tipo, versao)
 );
 
+-- O BRIEF do projeto: o outro eixo da instrução, e o que faltava (P9).
+-- `diretrizes` responde COMO se faz um tipo de tarefa e vale em qualquer
+-- projeto; o brief responde o que é ESTE projeto — para que serve o dado, que
+-- prompts aparecem, como se escolhe um, e o que este cliente aceita como rating
+-- e como justificativa.
+--
+-- Duas tabelas e não uma porque os dois eixos mudam sozinhos: dá para apertar a
+-- regra da justificativa de um cliente sem tocar na mecânica do A/B. Juntos,
+-- subir um obrigaria a subir o outro, e `versao_diretriz` deixaria de significar
+-- o que significa.
+--
+-- `texto_json` guarda `{{escopo, textos:{{en,pt}}}}`. O ESCOPO fica fora de `textos`
+-- porque é feito de ids da taxonomia do corpus, e id não se traduz — é a mesma
+-- fronteira entre o campo canônico de um critério e o sidecar `*_i18n` dele.
+CREATE TABLE IF NOT EXISTS briefs (
+  id         INTEGER PRIMARY KEY,
+  projeto_id INTEGER NOT NULL REFERENCES projetos(id) ON DELETE CASCADE,
+  versao     INTEGER NOT NULL CHECK (versao >= 1),
+  texto_json TEXT NOT NULL,
+  criado_em  TEXT NOT NULL DEFAULT ({_agora()}),
+  UNIQUE (projeto_id, versao)
+);
+
 -- ---------------------------------------------------------------------------
 -- O QUE SE ANOTA
 -- ---------------------------------------------------------------------------
@@ -477,6 +510,12 @@ CREATE TABLE IF NOT EXISTS anotacoes (
   -- o FORMATO; esta coluna versiona a INSTRUÇÃO. São coisas diferentes e as duas
   -- mudam sozinhas: dá para ajustar o texto do A/B sem mexer no formato.
   versao_diretriz INTEGER,
+  -- QUAL BRIEF DE PROJETO valia (P9). Terceiro ponteiro, terceiro eixo: formato,
+  -- mecânica do tipo, enquadramento do projeto. O cenário é o mesmo do
+  -- `versao_diretriz` e a resposta também — apertar a regra da justificativa
+  -- deste cliente numa terça e conseguir, na quinta, separar por `WHERE` o que
+  -- foi feito antes do que foi feito depois.
+  versao_brief INTEGER,
   payload_json   TEXT NOT NULL,
   -- A NOTA-ALVO ESCONDIDA de uma anotação SINTÉTICA (P3b; quem preenche é a
   -- campanha do P4c). NULL em 100% do trabalho humano, e é essa nulidade que
@@ -787,6 +826,7 @@ TABELAS: tuple[str, ...] = (
     "anotadores",
     "projetos",
     "diretrizes",
+    "briefs",
     "prompts_demo",
     "tarefas",
     "atribuicoes",

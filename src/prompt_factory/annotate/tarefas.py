@@ -417,6 +417,69 @@ def _carregar_json(bruto: Any, padrao: Any) -> Any:
     return valor
 
 
+def normalizar_criterio(bruto: Any) -> dict[str, Any]:
+    """Um critério, venha ele do formato de FIXTURE ou do formulário do anotador.
+
+    O DEFEITO QUE ESTA FUNÇÃO FECHA
+    ===============================
+    ``routes_revisao._materializar_rubrica`` gravava a rubrica aprovada com o
+    rótulo ``rubrica@2`` mas com os critérios **na forma do formulário**
+    (``escala_min``/``escala_max``/``rotulo_min``/``rotulo_max``), que é outro
+    contrato. Ninguém convertia. Consequências medidas, as duas silenciosas:
+
+    * a tela caía no default ``{min:1, max:5, ancoras:[]}`` e desenhava cinco
+      botões sem âncora nenhuma — para uma rubrica que declarou 1 a 3;
+    * ``erro_contra_a_rubrica`` fazia ``criterio.get("escala") or {}`` → ``{}``
+      → **piso 1, teto 9**. Uma rubrica escrita com escala 1 a 5, uma vez
+      aprovada, passava a **aceitar nota 9 no servidor**.
+
+    Ela é chamada nos DOIS lados — na gravação (conserta o futuro) e aqui na
+    leitura (conserta o que já está no banco) — e é a MESMA função, porque duas
+    conversões divergiriam e a divergência só apareceria numa rubrica específica,
+    meses depois. Nada de migração: registro histórico não se reescreve para
+    consertar um renderizador.
+
+    ``escala_declarada`` sai ``False`` quando não havia NADA de onde derivar. A
+    escala não é inventada nesse caso — quem desenha carimba um selo dizendo que
+    esta rubrica não declarou escala, e ``erro_contra_a_rubrica`` segue no teto
+    permissivo da plataforma. Inventar em silêncio é o que produziu o defeito
+    acima.
+    """
+    if not isinstance(bruto, dict):  # pragma: no cover - JSON nosso, sempre dict
+        return {}
+    c = dict(bruto)
+
+    escala = c.get("escala")
+    if isinstance(escala, dict) and escala.get("max") is not None:
+        c["escala"] = {**escala, "ancoras": list(escala.get("ancoras") or [])}
+        c["escala_declarada"] = True
+    elif c.get("escala_max") is not None:
+        piso, teto = int(c.get("escala_min") or 1), int(c["escala_max"])
+        ancoras = [
+            {"valor": valor, "rotulo": str(rotulo)}
+            for valor, rotulo in ((piso, c.get("rotulo_min")), (teto, c.get("rotulo_max")))
+            if rotulo
+        ]
+        c["escala"] = {"min": piso, "max": teto, "ancoras": ancoras}
+        c["escala_declarada"] = True
+    else:
+        c["escala_declarada"] = False
+
+    # Catálogo de tipos de issue: aceita a forma completa e a curta. A curta
+    # existe para fixture escrita à mão; o `id` é a identidade que vai para o
+    # payload e nunca é traduzida, então ele nasce igual ao rótulo e só diverge
+    # quando alguém quiser traduzir.
+    tipos = c.get("tipos_issue")
+    if isinstance(tipos, list):
+        c["tipos_issue"] = [
+            {"id": str(t), "rotulo": str(t)}
+            if not isinstance(t, dict)
+            else {**t, "id": str(t.get("id") or t.get("rotulo") or "")}
+            for t in tipos
+        ]
+    return c
+
+
 def rubrica_ativa(conn: sqlite3.Connection, uid: str) -> dict[str, Any] | None:
     linha = conn.execute(
         "SELECT id, titulo, criterios_json, origem FROM rubricas "
@@ -435,16 +498,52 @@ def rubrica_ativa(conn: sqlite3.Connection, uid: str) -> dict[str, Any] | None:
         # sem ela a tela mostraria o título numa língua e os critérios na outra.
         "titulo": str(linha["titulo"]),
         "titulo_i18n": conteudo.get("titulo_i18n"),
-        "criterios": conteudo.get("criterios", []),
+        # Normalizado na LEITURA, e é o que conserta as rubricas já gravadas na
+        # forma errada — ver `normalizar_criterio`.
+        "criterios": [normalizar_criterio(c) for c in conteudo.get("criterios", [])],
         "origem": str(linha["origem"]),
         "nota_chave": None,
     }
 
 
+def _como_dict(nota: Any) -> dict[str, Any]:
+    """Uma nota, venha ela como ``(nome, valor)``, modelo Pydantic ou mapa.
+
+    A tupla continua aceita porque ela é o contrato de ``@1`` e há chamador que
+    ainda a produz; o resto do dicionário nasce com os defaults de ``@2``, que
+    são exatamente "não é N/A, nenhum tipo marcado, sem trecho" — ou seja, uma
+    linha ``@1`` continua sendo avaliada pela regra que valia quando ela nasceu.
+    """
+    if isinstance(nota, tuple):
+        nome, valor = nota
+        nota = {"criterio": nome, "nota": valor}
+    elif not isinstance(nota, Mapping):
+        nota = {
+            campo: getattr(nota, campo, None)
+            for campo in (
+                "criterio",
+                "nota",
+                "justificativa",
+                "nao_aplicavel",
+                "tipos_issue",
+                "trecho",
+                "trecho_difuso",
+            )
+        }
+    return {
+        "criterio": str(nota.get("criterio")),
+        "nota": nota.get("nota"),
+        "justificativa": nota.get("justificativa"),
+        "nao_aplicavel": bool(nota.get("nao_aplicavel")),
+        "tipos_issue": dict(nota.get("tipos_issue") or {}),
+    }
+
+
 def erro_contra_a_rubrica(
-    rubrica: Mapping[str, Any] | None, notas: Sequence[tuple[str, int]]
+    rubrica: Mapping[str, Any] | None, notas: Sequence[Any]
 ) -> str | None:
-    """A nota cabe na escala DAQUELE critério, e todo critério tem nota?
+    """A nota cabe na escala DAQUELE critério, todo critério foi decidido, e o
+    que foi sinalizado está explicado?
 
     Devolve a frase do problema, ou ``None``. **Função pura, e é ela que os DOIS
     escritores chamam**: a rota de submissão (que a transforma num 422) e a
@@ -453,9 +552,23 @@ def erro_contra_a_rubrica(
     sintética gravada com uma nota que a tela não sabe desenhar — inconsistente,
     e sem nada apontando para o momento em que ela entrou.
 
-    O Pydantic não pode fazer esta checagem: ele não conhece a rubrica. 1..9 é o
-    teto ABSOLUTO da plataforma; a escala REAL é a de cada critério, e ela só
-    está em mãos aqui.
+    O Pydantic não pode fazer nada disto: ele não conhece a rubrica. 1..9 é o
+    teto ABSOLUTO da plataforma; a escala REAL é a de cada critério, o catálogo
+    de tipos de issue é de cada critério, e os dois só estão em mãos aqui.
+
+    A REGRA DE OBRIGAÇÃO, E O QUE A DISPARA  (P8)
+    =============================================
+    *Severidade abaixo do topo da escala exige **um tipo de issue E uma frase**.*
+    O ``E`` é o ponto: um checkbox sozinho não explica nada, e a dor que este
+    marco existe para matar é exatamente "rationale que não explica os ratings
+    dados". Um tipo marcado diz **o quê**; a frase diz **por quê**.
+
+    **Ela só vale para o critério que declara um catálogo `tipos_issue`.** É o
+    gatilho honesto: um critério com catálogo é um critério onde "abaixo do topo"
+    significa "há um defeito", e defeito se nomeia. Uma rubrica de qualidade
+    1..5 sem catálogo — que é o que o pacote de demonstração tem — continua se
+    comportando como sempre se comportou. Sem esse gatilho, dar 3 de 5 num
+    critério de "clareza" passaria a exigir um tipo de issue que não existe.
     """
     if rubrica is None:
         return None
@@ -464,7 +577,7 @@ def erro_contra_a_rubrica(
     }
     if not esperados:
         return None
-    dadas = dict(notas)
+    dadas = {d["criterio"]: d for d in (_como_dict(n) for n in notas)}
 
     faltam = sorted(set(esperados) - set(dadas))
     if faltam:
@@ -472,12 +585,43 @@ def erro_contra_a_rubrica(
     sobram = sorted(set(dadas) - set(esperados))
     if sobram:
         return f"critério que não está na rubrica: {', '.join(sobram)}"
+
     for nome, criterio in esperados.items():
+        dada = dadas[nome]
+        # N/A é uma DECISÃO, não uma ausência: ele satisfaz "todo critério foi
+        # decidido" e sai de toda checagem que fala de nota. O motivo já foi
+        # cobrado pelo Pydantic, que é onde ele é barato de cobrar.
+        if dada["nao_aplicavel"]:
+            continue
+
         escala = criterio.get("escala") or {}
         piso, teto = int(escala.get("min", 1)), int(escala.get("max", 9))
-        valor = dadas[nome]
+        valor = dada["nota"]
+        if valor is None:  # pragma: no cover - o XOR do Pydantic já barra
+            return f"'{nome}' está sem nota e sem N/A"
         if not piso <= valor <= teto:
             return f"'{nome}' aceita de {piso} a {teto}; veio {valor}"
+
+        catalogo = {
+            str(t.get("id"))
+            for t in (criterio.get("tipos_issue") or [])
+            if isinstance(t, dict) and t.get("id")
+        }
+        marcados = {k for k, v in dada["tipos_issue"].items() if v}
+        # Vocabulário FECHADO aqui, ao contrário dos catálogos de defeito do P4c.
+        # Lá, fechar obrigaria a editar CÓDIGO para nomear um defeito novo; aqui o
+        # vocabulário mora na linha da rubrica no banco, então estendê-lo é editar
+        # DADO — e é exatamente o que o construtor do admin vai fazer.
+        intrusos = sorted(set(dada["tipos_issue"]) - catalogo)
+        if catalogo and intrusos:
+            return f"'{nome}': tipo de issue fora do catálogo: {', '.join(intrusos)}"
+        if not catalogo:
+            continue
+        if valor < teto:
+            if not marcados:
+                return f"'{nome}' está sinalizado e sem nenhum tipo de issue marcado"
+            if not (dada["justificativa"] or "").strip():
+                return f"'{nome}' está sinalizado e sem a frase que explica a nota"
     return None
 
 
@@ -710,7 +854,8 @@ def hidratar_anotacao(
     """
     linha = conn.execute(
         "SELECT an.id, an.atribuicao_id, an.versao, an.payload_schema, an.payload_json, "
-        "       an.versao_diretriz, an.status, an.submetida_em, an.tempo_ativo_ms, "
+        "       an.versao_diretriz, an.versao_brief, an.status, an.submetida_em, "
+        "       an.tempo_ativo_ms, "
         "       a.anotador_id, au.nome AS anotador, t.tipo, t.prompt_uid "
         "FROM anotacoes an "
         "JOIN atribuicoes a ON a.id = an.atribuicao_id "
@@ -731,6 +876,9 @@ def hidratar_anotacao(
             "versao": int(linha["versao"]),
             "payload": _carregar_json(linha["payload_json"], {}),
             "payload_schema": str(linha["payload_schema"]),
+            "versao_brief": (
+                None if linha["versao_brief"] is None else int(linha["versao_brief"])
+            ),
             "versao_diretriz": (
                 None if linha["versao_diretriz"] is None else int(linha["versao_diretriz"])
             ),
@@ -759,6 +907,7 @@ __all__ = [
     "hidratar",
     "hidratar_anotacao",
     "no_pool",
+    "normalizar_criterio",
     "reabrir",
     "reivindicar",
     "resolver_prompt",

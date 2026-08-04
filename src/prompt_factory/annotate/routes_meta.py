@@ -17,12 +17,14 @@ mentira com data de validade.
 from __future__ import annotations
 
 import sqlite3
+from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from .. import __version__
+from .. import __version__, schema
 from ..config import get as _cfg
+from . import briefs as briefmod
 from . import db as adb
 from . import diretrizes as dirmod
 from . import modelos as modmod
@@ -197,6 +199,90 @@ def listar_diretrizes(anot: ConAnotacao) -> dict[str, Any]:
     isto foi anotado?" vira uma consulta em vez de uma arqueologia de git.
     """
     return {"items": dirmod.vigentes(anot)}
+
+
+@router.get("/api/briefs", summary="O brief vigente de cada projeto")
+def listar_briefs(anot: ConAnotacao) -> dict[str, Any]:
+    """O ENQUADRAMENTO de cada projeto, com a versão — o outro eixo da instrução.
+
+    ``/api/diretrizes`` responde COMO se faz um tipo de tarefa e vale em qualquer
+    projeto; isto responde o que é ESTE projeto: para que serve o dado, que
+    prompts aparecem, como se escolhe um, e o que este cliente aceita como rating
+    e como justificativa.
+
+    Todos os projetos numa chamada, e as duas línguas juntas: a tela troca de
+    projeto pelo seletor da barra e de idioma pelo botão, e nenhuma das duas
+    trocas pode piscar.
+
+    ``escopo`` sai como ids da taxonomia do corpus, não como prosa — quem
+    desenha os nomes legíveis é a tela, com a taxonomia que ela já recebe do
+    ``/api/stats`` do corpus. Traduzir id aqui faria a plataforma e o banco de
+    prompts falarem línguas diferentes sobre a mesma categoria.
+    """
+    return {"items": {str(k): v for k, v in briefmod.vigentes(anot).items()}}
+
+
+#: A taxonomia do corpus, servida a partir de ``labeling/taxonomy.json`` — a
+#: fonte ÚNICA das 32 classes. Uma segunda cópia dentro do ``index.html``
+#: divergiria, e a que diverge é sempre a da tela (é a mesma disciplina do
+#: ``/api/stats`` da curadoria).
+#:
+#: ``lru_cache`` porque o arquivo não muda em tempo de execução e a tela pede
+#: isto uma vez por sessão. Taxonomia ilegível **não derruba a rota**: ela cai
+#: para um dicionário vazio, e a tela desenha o id — que é a identidade de
+#: qualquer jeito, e é o que o escopo do brief grava.
+@lru_cache(maxsize=1)
+def _taxonomia() -> dict[str, Any]:
+    try:
+        tax = schema.load_taxonomy()
+    except (OSError, ValueError):  # pragma: no cover - arquivo do repo
+        return {"versao": None, "task_type": {}, "domain": {}}
+    return {
+        "versao": tax.get("version"),
+        **{
+            secao: {
+                chave: {
+                    # O canônico é pt-BR porque a taxonomia nasceu com o corpus,
+                    # que é pt-BR; o `nome_en` é o sidecar de exibição, exatamente
+                    # como o `*_i18n` das rubricas. O ID nunca é traduzido: é ele
+                    # que o escopo do brief guarda e que a anotação vai gravar.
+                    "nome": str(entrada.get("nome", chave)),
+                    "nome_en": str(entrada.get("nome_en") or entrada.get("nome", chave)),
+                }
+                for chave, entrada in tax.get(secao, {}).items()
+            }
+            for secao in ("task_type", "domain")
+        },
+    }
+
+
+@router.get("/api/taxonomia", summary="As 32 classes do corpus, nas duas línguas")
+def listar_taxonomia() -> dict[str, Any]:
+    """O vocabulário que o ``escopo`` do brief referencia por ID.
+
+    É o que faz a plataforma e o banco de prompts falarem a mesma língua sobre a
+    mesma categoria — e é o vocabulário que o trabalho de anotação vai PRODUZIR,
+    já que ``task_type`` e ``domain`` estão nulos em 100% do corpus.
+    """
+    return _taxonomia()
+
+
+@router.get("/api/modelos-rubrica", summary="Os modelos de partida da aba escrever-rubrica")
+def listar_modelos_rubrica() -> dict[str, Any]:
+    """O banco de perguntas — DADO, e não literais dentro do ``index.html``.
+
+    Até o P8 estes modelos eram um array de JavaScript, e um quarto modelo exigia
+    editar a tela. O construtor do admin (P5a) existe justamente para que quem
+    monta a tarefa escolha blocos sem tocar em código; ele vai trocar a fixture
+    por uma tabela, e a tela não vai notar, porque ela nunca soube de onde eles
+    vinham. Ver ``rubricas_modelo.py``.
+
+    Sem dependência de banco de propósito: é fixture do pacote, e um clone limpo
+    tem de conseguir abrir a aba antes de qualquer seed.
+    """
+    from . import rubricas_modelo
+
+    return {"items": rubricas_modelo.carregar()}
 
 
 @router.get("/api/perfis", summary="As personas cadastradas")

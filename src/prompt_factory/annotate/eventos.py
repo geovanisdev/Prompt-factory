@@ -42,6 +42,15 @@ ACOES: tuple[str, ...] = (
     # vaza por uma porta que ninguém está olhando.
     "material_importado",
     "anotacao_sintetica_importada",
+    # P4d — a conversa com o modelo local. As três já eram gravadas pelas rotas
+    # de `routes_conversa` e faltavam neste inventário: uma ação que existe no
+    # banco e não existe aqui faz a lista mentir justamente para quem a lê para
+    # saber o que procurar.
+    "turno_gerado",
+    "rodada_gerada",
+    "rodada_decidida",
+    # P5a — o admin enchendo a fila em lote, pelo painel.
+    "tarefas_geradas",
 )
 
 #: Os nomes de entidade. ``entidade`` + ``entidade_id`` é a referência lógica:

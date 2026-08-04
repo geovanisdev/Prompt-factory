@@ -102,11 +102,12 @@ def com_banco(caminho: Path):
 
 
 def test_pacote_tem_a_forma_prometida() -> None:
-    """11 itens (8 do P2 + os 3 em inglês do P3i), 5+6 tarefas, 3 tarefas-ouro."""
+    """12 itens (8 do P2 + 3 em inglês do P3i + o de severidade do P8),
+    6+6 tarefas, 3 tarefas-ouro."""
     pacote = seedmod.carregar_pacote()
-    assert len(pacote["itens"]) == 11
+    assert len(pacote["itens"]) == 12
     tipos = [t["tipo"] for t in pacote["tarefas"]]
-    assert tipos.count("avaliar_rubrica") == 5
+    assert tipos.count("avaliar_rubrica") == 6
     assert tipos.count("comparar_ab") == 6
     com_gabarito = [t for t in pacote["tarefas"] if t.get("gabarito")]
     assert len(com_gabarito) == 3
@@ -157,16 +158,16 @@ def test_todo_par_tem_uma_resposta_defensavel() -> None:
 
 
 def test_o_pacote_e_bilingue() -> None:
-    """P3i: cinco prompts em inglês, e não os dois do P2.
+    """P3i: seis prompts em inglês, e não os dois do P2.
 
     O portfólio é lido por avaliadores estrangeiros, e ler a interface traduzida
-    não é a mesma coisa que conseguir FAZER o trabalho. Com cinco itens em
+    não é a mesma coisa que conseguir FAZER o trabalho. Com seis itens em
     inglês, as filas de ``avaliar_rubrica`` e ``comparar_ab`` têm material em
     inglês nas primeiras posições — as outras duas abas vêm do pool, que também
     passou a aceitar as duas línguas.
     """
     langs = [item["lang"] for item in seedmod.carregar_pacote()["itens"]]
-    assert langs.count("en") == 5
+    assert langs.count("en") == 6
     assert langs.count("pt") == 6
 
 
@@ -213,10 +214,10 @@ def test_seed_e_idempotente(banco: Path, corpus: Path) -> None:
         corpo.close()
     assert primeira["personas"] == len(seedmod.PERSONAS)
     assert primeira["pacote"] == {
-        "prompts_demo": 11,
-        "rubricas": 11,
-        "respostas_modelo": 22,
-        "tarefas": 11,
+        "prompts_demo": 12,
+        "rubricas": 12,
+        "respostas_modelo": 24,
+        "tarefas": 12,
         # Nada a traduzir: o banco nasceu com o pacote já bilíngue.
         "traduzidas": 0,
     }
@@ -238,7 +239,7 @@ def test_seed_sem_corpus_semeia_so_o_pacote_e_avisa(banco: Path) -> None:
         relatorio = seedmod.semear(conn, None)
     finally:
         conn.close()
-    assert relatorio["pacote"]["tarefas"] == 11
+    assert relatorio["pacote"]["tarefas"] == 12
     assert relatorio["pool"] == dict.fromkeys(seedmod.TIPOS_DO_POOL, 0)
     assert any("sem corpus" in a for a in relatorio["avisos"])
 
@@ -609,10 +610,27 @@ def rubrica_ok() -> dict[str, Any]:
     }
 
 
-def notas_da_rubrica(env: dict[str, Any], nota: int = 4) -> dict[str, Any]:
+def notas_da_rubrica(env: dict[str, Any], nota: int | None = None) -> dict[str, Any]:
+    """Um payload VÁLIDO para a rubrica que veio no envelope, seja ela qual for.
+
+    Sem ``nota`` explícita, cada critério recebe o **topo da própria escala**.
+    É o único valor que serve a qualquer instrumento — a rubrica de severidade
+    do P8 vai de 1 a 3 e as do pacote vão de 1 a 5 — e também o único que não
+    dispara a regra de obrigação: abaixo do topo, um critério que declara
+    catálogo exige um tipo de issue **e** uma frase.
+
+    O ``4`` literal que estava aqui fazia a suíte inteira depender de todas as
+    rubricas do pacote terem a mesma escala, o que deixou de ser verdade no
+    momento em que a plataforma ganhou um segundo instrumento. Quem passa
+    ``nota`` explicitamente está testando a escala, e o valor vai como veio.
+    """
     return {
         "notas": [
-            {"criterio": c["nome"], "nota": nota} for c in env["rubrica"]["criterios"]
+            {
+                "criterio": c["nome"],
+                "nota": nota if nota is not None else int((c.get("escala") or {}).get("max") or 5),
+            }
+            for c in env["rubrica"]["criterios"]
         ]
     }
 
@@ -723,7 +741,9 @@ def test_submeter_grava_versao_1_e_o_schema(cliente: TestClient) -> None:
         ).fetchone()["status"]
     finally:
         conn.close()
-    assert str(linha["payload_schema"]) == "avaliar_rubrica@1"
+    # Lido da fonte, nunca literal: a versão é POR TIPO desde o P8, e um literal
+    # aqui só diria que alguém esqueceu de atualizar o teste.
+    assert str(linha["payload_schema"]) == payloads.nome_schema("avaliar_rubrica")
     assert int(linha["tempo_ativo_ms"]) == 12_345
     assert json.loads(str(linha["payload_json"]))["notas"]
     assert str(estado) == "submetida"
@@ -821,7 +841,7 @@ def test_os_quatro_tipos_fecham_o_ciclo(cliente: TestClient) -> None:
             }
         r = submeter(cliente, env, ana, payload)
         assert r.status_code == 200, (tipo, r.text)
-        gravados[tipo] = f"{tipo}@1"
+        gravados[tipo] = payloads.nome_schema(tipo)
 
     conn = com_banco(cliente.app.state.db_anotacao)
     try:

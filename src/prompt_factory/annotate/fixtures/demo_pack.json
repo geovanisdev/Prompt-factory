@@ -1,7 +1,7 @@
 {
   "schema": "demo_pack@1",
   "sobre": [
-    "Pacote de demonstração da Bancada. ONZE itens escritos à MÃO — não são prompts",
+    "Pacote de demonstração da Bancada. DOZE itens escritos à MÃO — não são prompts",
     "de pessoas reais e por isso não moram no corpus: entram em `prompts_demo`, com",
     "uid prefixado por 'demo:'. Misturá-los ao corpus destruiria a proveniência, que",
     "é o argumento inteiro deste projeto.",
@@ -25,14 +25,34 @@
     "O campo canônico (`titulo`, `nome`, `descricao`, `rotulo`) é a IDENTIDADE: é ele",
     "que `anotacoes.payload_json` grava em `notas[].criterio` e que a submissão casa",
     "contra a rubrica. Nos oito itens originais ele continua em português, byte a",
-    "byte, porque mexer nele apagaria a leitura das anotações já gravadas. Nos três",
+    "byte, porque mexer nele apagaria a leitura das anotações já gravadas. Nos quatro",
     "itens novos (`stats-qual-teste`, `carta-mudanca-de-carreira`,",
-    "`viagem-acessibilidade-lisboa`) o canônico é inglês, que é a convenção daqui",
-    "para a frente: critério de rubrica é metadado, e metadado é o que o cliente lê.",
+    "`viagem-acessibilidade-lisboa` e `procedimento-incidente-academia`) o canônico é",
+    "inglês, que é a convenção daqui para a frente: critério de rubrica é metadado, e",
+    "metadado é o que o cliente lê.",
     "",
-    "Os três itens em inglês existem para que um avaliador que não lê português",
+    "Os seis itens em inglês existem para que um avaliador que não lê português",
     "consiga percorrer o pacote FAZENDO trabalho de verdade — não só olhando a",
-    "interface traduzida."
+    "interface traduzida.",
+    "",
+    "O DÉCIMO SEGUNDO ITEM (`procedimento-incidente-academia`, P8) é diferente dos",
+    "outros onze: a rubrica dele não é escrita aqui, é uma REFERÊNCIA ao banco de",
+    "perguntas — `\"rubrica\": {\"modelo\": \"severidade\"}` aponta para",
+    "`fixtures/modelos_rubrica.json`. Copiar o instrumento para cá daria DUAS",
+    "definições da mesma coisa, e a divergência entre elas apareceria como uma tarefa",
+    "que valida contra critérios que a tela não desenha. É também o primeiro uso do",
+    "arsenal COMO arsenal: o pacote diz qual instrumento usa em vez de reenunciá-lo,",
+    "que é a indireção que o construtor do admin (P5a) herda de graça.",
+    "`seed._resolver_modelo` expande a referência na LEITURA, então teste, seed e",
+    "terminal veem todos a mesma forma que os outros itens têm.",
+    "",
+    "A resposta A dele carrega UM defeito por critério do instrumento: marcadores",
+    "onde o pedido os proíbe em voz alta, registro escorregando para juridiquês no",
+    "meio de um aviso de parede, uma citação da OSHA inventada para quem nunca disse",
+    "em que país está, e as duas perguntas que ele responde saindo como fato",
+    "assentado — quando a pessoa pediu, com todas as letras, honestidade sobre o que",
+    "não se sabe. A terceira pergunta ele nem responde. É o que faz a matriz de",
+    "severidade ser exercitada inteira, com dois tipos de issue em cada critério."
   ],
   "itens": [
     {
@@ -2465,6 +2485,53 @@
           }
         }
       ]
+    },
+    {
+      "chave": "procedimento-incidente-academia",
+      "lang": "en",
+      "genero": "procedimento",
+      "prompt": "I run the front desk at a small bouldering gym — eight staff, two of us full time. Our insurer emailed on Monday saying we need a written incident-report procedure on file, and I have to hand something over by Friday.\n\nKeep it under 200 words. One paragraph per step, no bullet points — our staff genuinely do not read bullets, I have tested this. It goes on the wall behind the desk, so it has to read like one person telling another what to do, not like a policy document.\n\nThree things I honestly do not know and need you to be straight with me about: how long we are supposed to keep the reports, whether a near-miss counts as an incident, and whether the person who got hurt has to sign it.",
+      "rubrica": {
+        "modelo": "severidade"
+      },
+      "respostas": [
+        {
+          "rotulo_modelo": "modelo-a",
+          "texto": "Absolutely — here is a procedure you can put on the wall today.\n\n**Incident Report Procedure**\n\n* **Step 1 — Make the area safe.** Clear the mats, stop any climbing in the immediate zone, and get a first aider over.\n* **Step 2 — Provide care.** Administer first aid within the limits of your training. Call an ambulance for any head impact, loss of consciousness, or suspected fracture.\n* **Step 3 — Gather details.** Record the injured party's full name, contact details, the time, the location within the facility, and the names of at least two witnesses.\n* **Step 4 — Complete the record.** The Company shall ensure that a written record is completed prior to the conclusion of the shift in which the incident occurred. The duty manager shall countersign the record and shall be responsible for its retention in accordance with the applicable retention schedule.\n* **Step 5 — File and notify.** Scan the form into the incident folder and notify the insurer within 24 hours for anything requiring medical attention.\n\n**Your three questions:**\n\n**Retention.** OSHA requires that incident records be retained for five years following the end of the calendar year they cover, so five years is your number.\n\n**Signature.** Yes — the injured party must sign the report. An unsigned report will not be accepted by your insurer, so do not let anyone leave without signing.\n\nHope this helps — you have got this!",
+          "meta": {
+            "modelo": "demonstração — resposta A",
+            "modelo_i18n": {
+              "en": "demo — response A",
+              "pt": "demonstração — resposta A"
+            },
+            "defeito_classe": "fato-inventado-com-precisao",
+            "defeito_plantado": "Quatro defeitos, um por critério do instrumento, e nenhum deles é visivel numa leitura rápida. (1) SEGUE AS INSTRUÇÕES: vem em marcadores, que o pedido probe em voz alta e explica por que probe, passa de 200 palavras, e a pergunta sobre near-miss — uma das três que a pessoa numerou — simplesmente não é respondida. (2) REGISTRO: abre humano, escorrega para 'The Company shall ensure... shall countersign' no passo 4 e volta com um 'you have got this!' de fórmula, num texto que vai para a parede. (3) EXATIDÃO: cita a OSHA e um prazo de cinco anos para alguém que nunca disse em que país está, e a regra de recordkeeping da OSHA não é a exigência de uma seguradora. (4) INCERTEZA: as duas perguntas que ele responde saem como fato assentado, quando a pessoa pediu explicitamente honestidade sobre o que não se sabe.",
+            "defeito_plantado_i18n": {
+              "en": "Four defects, one per criterion of the instrument, and none of them shows up on a fast read. (1) INSTRUCTION FOLLOWING: it comes in bullets, which the request forbids out loud and explains why it forbids; it runs past 200 words; and the near-miss question — one of the three the person numbered — is simply never answered. (2) REGISTER: it opens human, slides into 'The Company shall ensure... shall countersign' at step 4, and comes back with a canned 'you have got this!', in a text that goes on a wall. (3) ACCURACY: it cites OSHA and a five-year retention period to someone who never said what country they are in, and OSHA's recordkeeping rule is not an insurer's requirement. (4) UNCERTAINTY: the two questions it does answer come out as settled fact, when the person explicitly asked to be told what is not known.",
+              "pt": "Quatro defeitos, um por critério do instrumento, e nenhum deles é visivel numa leitura rápida. (1) SEGUE AS INSTRUÇÕES: vem em marcadores, que o pedido probe em voz alta e explica por que probe, passa de 200 palavras, e a pergunta sobre near-miss — uma das três que a pessoa numerou — simplesmente não é respondida. (2) REGISTRO: abre humano, escorrega para 'The Company shall ensure... shall countersign' no passo 4 e volta com um 'you have got this!' de fórmula, num texto que vai para a parede. (3) EXATIDÃO: cita a OSHA e um prazo de cinco anos para alguém que nunca disse em que país está, e a regra de recordkeeping da OSHA não é a exigência de uma seguradora. (4) INCERTEZA: as duas perguntas que ele responde saem como fato assentado, quando a pessoa pediu explicitamente honestidade sobre o que não se sabe."
+            },
+            "correta": false
+          }
+        },
+        {
+          "rotulo_modelo": "modelo-b",
+          "texto": "Here is something you can print and stick up.\n\nIf someone gets hurt, stop climbing in that area first. Pull a bench across the mats so nobody walks into the space while you are working.\n\nThen give whatever first aid you are trained for, and nothing past it. Call an ambulance for any head impact, any blackout, or a limb that looks wrong.\n\nWhile it is fresh, write down what happened: name, phone, the time, where in the gym, what they were climbing, and who saw it. Your memory of this will be worse in an hour than you think it will be.\n\nBefore you go home, put it in the incident book and tell whoever opens tomorrow.\n\nOn your three questions, I cannot settle any of them for you, and anyone who gives you a number without asking who your insurer is is guessing.\n\nRetention and signatures come from your policy wording, not from a general rule. Email your insurer and ask for both in writing — they wrote to you first, so you have the thread. Ask about near-misses in the same email. Most gyms log them anyway, because the pattern is what stops the real one.",
+          "meta": {
+            "modelo": "demonstração — resposta B",
+            "modelo_i18n": {
+              "en": "demo — response B",
+              "pt": "demonstração — resposta B"
+            },
+            "defeito_classe": "nenhum",
+            "defeito_plantado": "Nenhum. Sem marcadores, um parágrafo por passo, abaixo de 200 palavras, e a voz é a de uma pessoa dizendo a outra o que fazer — que é o que um aviso de parede precisa ser. As três perguntas são respondidas do único jeito honesto: recusando o número, dizendo de onde ele sai (a apólice, não uma regra geral) e apontando o e-mail que a própria pessoa já tem na caixa de entrada. É a que deve vencer.",
+            "defeito_plantado_i18n": {
+              "en": "None. No bullets, one paragraph per step, under 200 words, and the voice is one person telling another what to do — which is what a wall notice has to be. The three questions are answered the only honest way: refusing the number, saying where the number comes from (the policy wording, not a general rule) and pointing at the email the person already has in their inbox. This is the one that should win.",
+              "pt": "Nenhum. Sem marcadores, um parágrafo por passo, abaixo de 200 palavras, e a voz é a de uma pessoa dizendo a outra o que fazer — que é o que um aviso de parede precisa ser. As três perguntas são respondidas do único jeito honesto: recusando o número, dizendo de onde ele sai (a apólice, não uma regra geral) e apontando o e-mail que a própria pessoa já tem na caixa de entrada. É a que deve vencer."
+            },
+            "correta": true
+          }
+        }
+      ]
     }
   ],
   "tarefas": [
@@ -2617,6 +2684,14 @@
       "tipo": "comparar_ab",
       "item": "viagem-acessibilidade-lisboa",
       "prioridade": 75,
+      "n_anotacoes_alvo": 1,
+      "gabarito": null
+    },
+    {
+      "tipo": "avaliar_rubrica",
+      "item": "procedimento-incidente-academia",
+      "resposta": "modelo-a",
+      "prioridade": 95,
       "n_anotacoes_alvo": 1,
       "gabarito": null
     }

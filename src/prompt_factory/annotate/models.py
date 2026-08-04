@@ -502,6 +502,76 @@ class DecisaoAdminIn(BaseModel):
         return self
 
 
+#: Teto de um lote de geração de tarefas. Não é medo do INSERT: é o tamanho do
+#: erro que um dedo escorregado produz. Gerar 20 tarefas de menos custa um
+#: clique; gerar 5.000 enche a fila de todo mundo com trabalho que ninguém pediu
+#: e a única saída é apagar tarefa à mão de um banco que guarda trabalho humano.
+MAX_GERACAO = 200
+
+#: Teto de anotações independentes por tarefa. 5 é folgado para a plataforma
+#: real (o seed usa 1 e 2): passar disso significa pedir a seis pessoas o mesmo
+#: item numa equipe de três anotadores — uma fila que nunca fecha.
+MAX_ALVO_GERACAO = 5
+
+
+class GerarTarefasIn(BaseModel):
+    """``/api/admin/tarefas`` (e a prévia) — o admin enche a fila em lote.
+
+    O mesmo corpo serve à PRÉVIA e à criação, e isso é a decisão: um formulário
+    que estima com um conjunto de parâmetros e cria com outro é um formulário
+    que mente. A prévia é ``GET`` (não escreve nada), a criação é ``POST``, e o
+    plano que as duas executam é a mesma função.
+
+    ``lang``/``fonte`` são recorte do POOL, não do corpus: a rota parte sempre
+    dos uids que ``tarefas.uids_do_pool`` oferece, na ordem determinística deles.
+    Um filtro que alcançasse o corpus inteiro seria a porta lateral que o pool
+    existe para fechar (NSFW, robô repetido, prompt de 1 MB, licença fechada).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    admin_id: Annotated[int, Field(ge=1)]
+    tipo: str
+    n: Annotated[int, Field(ge=1, le=MAX_GERACAO)] = 20
+    lang: Annotated[str | None, Field(max_length=16)] = None
+    fonte: Annotated[str | None, Field(max_length=80)] = None
+    n_anotacoes_alvo: Annotated[int, Field(ge=1, le=MAX_ALVO_GERACAO)] = 1
+    #: Entre a do pool (40) e a do pacote de demonstração (60 a 90): tarefa
+    #: gerada pelo admin passa na frente do fallback do seed e continua atrás
+    #: das fixtures escritas à mão, que são o primeiro ato da demonstração.
+    prioridade: Annotated[int, Field(ge=0, le=100)] = 50
+    projeto_id: Annotated[int | None, Field(ge=1)] = None
+
+    @field_validator(
+        "admin_id", "n", "n_anotacoes_alvo", "prioridade", "projeto_id", mode="before"
+    )
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        # Quarta vez neste repositório: `bool` é subclasse de `int`, e o Pydantic
+        # coage `true` para `1` ANTES de qualquer validador comum. `{"n": true}`
+        # geraria uma tarefa só, em silêncio, com cara de sucesso.
+        if isinstance(v, bool):
+            raise ValueError("este campo não é booleano")
+        return v
+
+    @field_validator("lang", "fonte", mode="before")
+    @classmethod
+    def _vazio_e_ausencia(cls, v: Any) -> Any:
+        # O formulário manda `""` quando o campo não foi preenchido, e `""` num
+        # `WHERE lang = ?` casaria zero linhas — uma prévia de "0 tarefas" que
+        # parece falta de material e é campo em branco.
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("tipo")
+    @classmethod
+    def _tipo_conhecido(cls, v: str) -> str:
+        if v not in TIPOS_TAREFA:
+            raise ValueError(f"tipo fora de {list(TIPOS_TAREFA)}: {v!r}")
+        return v
+
+
 def perfil(linha: Any) -> dict[str, Any]:
     """Linha de ``anotadores`` -> dict JSON.
 
@@ -528,7 +598,9 @@ def perfil(linha: Any) -> dict[str, Any]:
 
 
 __all__ = [
+    "MAX_ALVO_GERACAO",
     "MAX_CAMPO",
+    "MAX_GERACAO",
     "MAX_MOTIVO",
     "MAX_NOME",
     "MAX_TEMPO_ATIVO_MS",
@@ -538,6 +610,7 @@ __all__ = [
     "DecisaoAdminIn",
     "EdicaoIn",
     "EscolherRodadaIn",
+    "GerarTarefasIn",
     "LivreIn",
     "PerfilIn",
     "ProximaIn",

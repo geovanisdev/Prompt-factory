@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import get as _cfg
+from . import briefs as briefmod
 from . import db as adb
 from . import diretrizes as dirmod
 from . import pool as poolmod
@@ -82,7 +83,17 @@ PERSONAS: tuple[tuple[str, str], ...] = (
 #: dado, não cromo, e a plataforma não inventa tradução de dado. O que NÃO mudou
 #: é o campo canônico (``titulo``, ``nome``, ``descricao``, ``rotulo``), que é a
 #: identidade referenciada por ``anotacoes.payload_json``.
-SCHEMA_RUBRICA = "rubrica@2"
+#:
+#: ``@3`` (P8) acrescentou o que faz uma rubrica virar um INSTRUMENTO: ``grupo``,
+#: ``resumo``, ``tipos_issue`` e ``ancoras[].exemplo``. Tudo opcional, e por isso
+#: nenhum ``@2`` gravado precisou mudar de forma — **mas o rótulo precisou**. Uma
+#: rubrica de severidade carimbada ``rubrica@2`` seria a mesma mentira silenciosa
+#: do ``routes_revisao:243``: o rótulo prometendo um contrato e o conteúdo
+#: falando outro. ``seed._traduzir`` reescreve o rótulo das fixtures já semeadas
+#: sozinho, porque ``schema`` está em ``CHAVES_DE_FORMA`` e não entra na
+#: identidade. Rubrica de ``origem`` diferente de ``fixture`` **não** é
+#: reescrita: registro histórico não se conserta por baixo.
+SCHEMA_RUBRICA = "rubrica@3"
 
 #: Prioridade base das tarefas geradas sobre o pool real. **Abaixo** das do
 #: pacote (60 a 90) de propósito: quem abre a demonstração precisa cair primeiro
@@ -123,6 +134,45 @@ def tem_trabalho(conn: sqlite3.Connection) -> bool:
     return bool(linha["tem"])
 
 
+def _resolver_modelo(item: dict[str, Any]) -> None:
+    """``rubrica: {"modelo": "severidade"}`` → a rubrica inteira, do arsenal.
+
+    POR QUE REFERÊNCIA E NÃO CÓPIA
+    ==============================
+    O instrumento de severidade tem cinco critérios, dois grupos, catálogo de
+    tipos de issue e três âncoras com exemplo — copiá-lo para dentro do
+    ``demo_pack.json`` daria **duas** definições do mesmo instrumento, e a
+    divergência entre elas apareceria como uma tarefa que valida contra
+    critérios que a tela não desenha.
+
+    E é o primeiro uso do banco de perguntas COMO banco: o pacote diz "esta
+    tarefa usa o instrumento X" em vez de reenunciá-lo. É essa indireção que o
+    construtor do admin (P5a) vai herdar de graça.
+
+    A resolução acontece na LEITURA e não na gravação, para que tudo o que
+    inspeciona o pacote — teste, seed, terminal — veja a mesma forma.
+    """
+    rub = item.get("rubrica") or {}
+    alvo = rub.get("modelo")
+    if not alvo:
+        return
+    # Import tardio: o pacote é carregado em contextos que não têm nada a ver
+    # com o arsenal (a validação estrutural dos testes, por exemplo).
+    from . import rubricas_modelo as modmod
+
+    modelo = next((m for m in modmod.carregar() if m["id"] == alvo), None)
+    if modelo is None:
+        raise ValueError(f"item {item.get('chave')!r}: modelo de rubrica {alvo!r} não existe")
+    # O que o pacote declarar VENCE (dá nome próprio ao instrumento neste
+    # prompt); o que ele omitir vem do modelo, que é a fonte única.
+    item["rubrica"] = {
+        "titulo": modelo["titulo"],
+        **({"titulo_i18n": modelo["titulo_i18n"]} if modelo.get("titulo_i18n") else {}),
+        "criterios": modelo["criterios"],
+        **{k: v for k, v in rub.items() if k != "modelo"},
+    }
+
+
 def carregar_pacote(caminho: Path | None = None) -> dict[str, Any]:
     """Lê e confere o ``demo_pack.json``.
 
@@ -132,6 +182,8 @@ def carregar_pacote(caminho: Path | None = None) -> dict[str, Any]:
     alvo = Path(caminho) if caminho is not None else PACOTE
     dados = json.loads(alvo.read_text(encoding="utf-8"))
     itens = dados.get("itens") or []
+    for item in itens:
+        _resolver_modelo(item)
     chaves = {item["chave"] for item in itens}
     if len(chaves) != len(itens):
         raise ValueError(f"{alvo}: duas entradas com a mesma 'chave'")
@@ -494,6 +546,10 @@ def semear(
     # As diretrizes ANTES das tarefas: uma anotação submetida antes delas
     # existirem gravaria `versao_diretriz = NULL`, que é honesto mas evitável.
     relatorio["diretrizes"] = dirmod.semear(conn)
+    # O BRIEF depois das diretrizes e antes das tarefas, pela mesma razão: uma
+    # anotação submetida antes de ele existir gravaria `versao_brief = NULL`,
+    # que é honesto mas evitável.
+    relatorio["briefs"] = briefmod.semear(conn)
     relatorio["personas"] = semear_personas(conn)
     relatorio["pacote"] = semear_pacote(conn)
     if conn_corpus is None:

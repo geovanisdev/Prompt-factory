@@ -34,6 +34,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import ValidationError
 
+from . import briefs as briefmod
 from . import catalogo as cat
 from . import conversa as convmod
 from . import db as adb
@@ -331,7 +332,7 @@ def _atribuicao_minha(
 ) -> sqlite3.Row:
     linha = conn.execute(
         "SELECT a.id, a.status, a.expira_em, a.anotador_id, a.iniciada_em, "
-        "       t.id AS tarefa_id, t.tipo, t.prompt_uid "
+        "       t.id AS tarefa_id, t.tipo, t.prompt_uid, t.projeto_id "
         "FROM atribuicoes a JOIN tarefas t ON t.id = a.tarefa_id WHERE a.id = ?",
         (atribuicao_id,),
     ).fetchone()
@@ -359,9 +360,10 @@ def _conferir_contra_a_rubrica(
     critérios sem nota"). Os dois concordarem é o que faz a validação parecer
     instantânea sem deixar de ser do servidor.
     """
-    problema = tmod.erro_contra_a_rubrica(
-        tmod.rubrica_ativa(conn, uid), [(nota.criterio, nota.nota) for nota in dados.notas]
-    )
+    # As notas vão INTEIRAS, não como `(nome, valor)`: desde o P8 a função
+    # também confere N/A, o catálogo de tipos de issue e a regra de obrigação, e
+    # uma tupla teria jogado fora justamente os campos que ela precisa ver.
+    problema = tmod.erro_contra_a_rubrica(tmod.rubrica_ativa(conn, uid), dados.notas)
     if problema:
         raise HTTPException(status_code=422, detail=problema)
 
@@ -437,9 +439,7 @@ def submeter(
         # A MESMA função pura, contra a rubrica multi-turno da plataforma. Ela é
         # de arquivo e não de tabela, e `erro_contra_a_rubrica` não precisa saber
         # disso: o que ela confere é a escala de cada critério.
-        problema = tmod.erro_contra_a_rubrica(
-            convmod.rubrica(), [(nota.criterio, nota.nota) for nota in dados.notas]
-        )
+        problema = tmod.erro_contra_a_rubrica(convmod.rubrica(), dados.notas)
         if problema:
             raise HTTPException(status_code=422, detail=problema)
 
@@ -456,15 +456,23 @@ def submeter(
     # cliente: uma tela com o JS em cache diria a versão velha, e a única coluna
     # que existe para separar "antes" de "depois" passaria a mentir.
     versao_diretriz = dirmod.versao_vigente(anot, tipo)
+    # O ENQUADRAMENTO sob o qual isto foi feito — o outro eixo da instrução, lido
+    # do banco pela mesma razão. O projeto sai da TAREFA e não do cliente: mudar
+    # a tarefa de projeto é do admin, e uma anotação carimbada com o projeto que
+    # a tela tinha em cache apontaria para o brief errado.
+    versao_brief = briefmod.versao_vigente(
+        anot, None if linha["projeto_id"] is None else int(linha["projeto_id"])
+    )
     cur = anot.execute(
         "INSERT INTO anotacoes (atribuicao_id, versao, payload_schema, versao_diretriz, "
-        "                       payload_json, tempo_ativo_ms, iniciada_em) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "                       versao_brief, payload_json, tempo_ativo_ms, iniciada_em) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             atribuicao_id,
             versao,
             payloads.nome_schema(tipo),
             versao_diretriz,
+            versao_brief,
             # `ensure_ascii=False`: acentuação vai como caractere, não como ç.
             # O payload é lido por gente no painel do admin e no export.
             json.dumps(dados.model_dump(), ensure_ascii=False),
@@ -489,6 +497,7 @@ def submeter(
         tipo=tipo,
         versao=versao,
         versao_diretriz=versao_diretriz,
+        versao_brief=versao_brief,
         tempo_ativo_ms=int(corpo.tempo_ativo_ms),
         # `versao > 1` é, por construção, uma correção de devolução: a única
         # forma de reabrir uma atribuição submetida é a triagem devolvê-la.
@@ -499,6 +508,7 @@ def submeter(
         "anotacao_id": anotacao_id,
         "versao": versao,
         "versao_diretriz": versao_diretriz,
+        "versao_brief": versao_brief,
         "expirou": expirou,
         "disponiveis": tmod.contagens_por_tipo(anot, corpo.anotador_id)[tipo],
     }
