@@ -26,6 +26,11 @@ onnx = ["optimum[onnxruntime]>=1.21"]
 
 [dependency-groups]
 dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6"]
+# Camada de análise (`analysis/`): notebooks de QC que leem os artefatos de
+# disco em SOMENTE LEITURA e renderizam HTML commitável. Fica num grupo à parte
+# porque nada em `src/` importa matplotlib — quem só roda a pipeline ou a
+# interface não precisa baixar nada disto (`uv sync --group analysis`).
+analysis = ["matplotlib>=3.8", "jupyter>=1", "nbconvert>=7"]
 
 [project.scripts]
 pf = "prompt_factory.cli:main"
