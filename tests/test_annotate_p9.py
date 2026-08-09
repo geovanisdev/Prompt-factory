@@ -35,9 +35,10 @@ from fastapi.testclient import TestClient
 from prompt_factory import db as dbmod
 from prompt_factory.annotate import briefs as briefmod
 from prompt_factory.annotate import db as adb
-from prompt_factory.annotate import migracao
+from prompt_factory.annotate import migracao, rubricas_modelo
 from prompt_factory.annotate import projetos as projmod
 from prompt_factory.annotate import seed as seedmod
+from prompt_factory.annotate import tarefas as tarmod
 from prompt_factory.annotate.main import criar_app
 
 from .fixtures_annotate_v1 import contagens_do_disco, rebaixar
@@ -135,6 +136,12 @@ def test_o_brief_do_projeto_real_carrega_regra_QUE_MORDE() -> None:
     assert "english" in texto, "a convenção de língua dos metadados não está dita"
     assert "two sentences" in texto, "o piso da justificativa não está dito"
     assert "defect type" in texto, "a regra de obrigação do P8 não está dita"
+    # As quatro regras do grill me (2026-08-06). Âncoras estáveis de propósito:
+    # o texto pode ser reescrito à vontade desde que continue DIZENDO isto.
+    assert "model-generated" in texto, "a proibição de IA no rationale não está dita"
+    assert "verif" in texto, "a regra 'verificou ou declarou' não está dita"
+    assert "triage returns" in texto, "a lista de devolução automática não está dita"
+    assert "user goal" in texto, "a caixa de user goal não está explicada"
 
 
 @pytest.mark.parametrize(
@@ -178,8 +185,11 @@ def test_o_seed_publica_um_brief_por_projeto_e_e_idempotente(semeado: Path) -> N
     try:
         vigentes = briefmod.vigentes(conn)
         assert len(vigentes) == len(briefmod.PAPEIS_PROJETO)
+        # A versão publicada é a DO ARQUIVO, nunca um literal: o grill me do
+        # dono já produziu a v2, e um `== 1` aqui congelaria o teste no passado.
+        versao_do_arquivo = int(briefmod.carregar()["versao"])
         for brief in vigentes.values():
-            assert brief["versao"] == 1
+            assert brief["versao"] == versao_do_arquivo
             assert set(brief["textos"]) == set(briefmod.IDIOMAS)
         assert briefmod.semear(conn) == 0
     finally:
@@ -201,13 +211,14 @@ def test_editar_uma_versao_ja_publicada_e_recusado(semeado: Path) -> None:
 
 def test_subir_a_versao_publica_ao_lado_sem_apagar_a_antiga(semeado: Path) -> None:
     dados = briefmod.carregar()
-    dados["versao"] = 2
+    proxima = int(dados["versao"]) + 1
+    dados["versao"] = proxima
     dados["projetos"]["padrao"]["textos"]["en"]["visao_geral"] = ["a regra apertou"]
     conn = dbmod.connect(semeado)
     try:
         assert briefmod.semear(conn, dados) == len(briefmod.PAPEIS_PROJETO)
         projeto_id = projmod.garantir(conn)
-        assert briefmod.versao_vigente(conn, projeto_id) == 2
+        assert briefmod.versao_vigente(conn, projeto_id) == proxima
         assert briefmod.vigente(conn, projeto_id)["textos"]["en"]["visao_geral"] == [
             "a regra apertou"
         ]
@@ -253,7 +264,8 @@ def test_a_submissao_grava_a_versao_do_brief_lida_do_BANCO(
         json={"anotador_id": quem, "payload": notas_da_rubrica(env)},
     )
     assert r.status_code == 200, r.text
-    assert r.json()["versao_brief"] == 1
+    versao_do_arquivo = int(briefmod.carregar()["versao"])
+    assert r.json()["versao_brief"] == versao_do_arquivo
 
     conn = dbmod.connect(semeado)
     try:
@@ -265,7 +277,7 @@ def test_a_submissao_grava_a_versao_do_brief_lida_do_BANCO(
         conn.close()
     # DOIS eixos, dois ponteiros, e eles não são o mesmo número por acaso: um
     # versiona a mecânica do tipo, o outro o enquadramento do projeto.
-    assert int(linha["versao_brief"]) == 1
+    assert int(linha["versao_brief"]) == versao_do_arquivo
     assert linha["versao_diretriz"] is not None
 
 
@@ -284,7 +296,7 @@ def test_a_versao_do_brief_sai_no_envelope_da_triagem(cliente: TestClient) -> No
     det = cliente.get(
         f"/api/revisao/{r.json()['anotacao_id']}", params={"revisor_id": revisor}
     ).json()
-    assert det["tarefa"]["anotacao"]["versao_brief"] == 1
+    assert det["tarefa"]["anotacao"]["versao_brief"] == int(briefmod.carregar()["versao"])
 
 
 # ---------------------------------------------------------------------------
@@ -572,3 +584,573 @@ def test_a_rota_da_taxonomia_devolve_as_duas_linguas(cliente: TestClient) -> Non
     assert corpo["versao"]
     assert len(corpo["task_type"]) == 16 and len(corpo["domain"]) == 16
     assert corpo["task_type"]["conversa-social"]["nome_en"] == "Social chat"
+
+
+# ---------------------------------------------------------------------------
+# 8. o skip categorizado — a promessa do brief v2 com UI de verdade
+# ---------------------------------------------------------------------------
+
+
+def _claim(cliente: TestClient, quem: int) -> dict[str, Any]:
+    env = cliente.post(
+        "/api/tarefas/proxima", json={"anotador_id": quem, "tipo": "avaliar_rubrica"}
+    ).json()["tarefa"]
+    assert env is not None
+    return env
+
+
+def test_o_skip_com_motivo_grava_o_motivo_no_EVENTO(
+    cliente: TestClient, semeado: Path
+) -> None:
+    """O padrão de skips é dado de ALOCAÇÃO, e trilha de operação mora em
+    ``eventos`` — não numa coluna que custaria a migração v7."""
+    quem = _papeis(cliente)["anotador"][0]
+    env = _claim(cliente, quem)
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/abandonar",
+        json={"anotador_id": quem, "motivo": "cannot-verify"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["motivo"] == "cannot-verify"
+
+    conn = dbmod.connect(semeado)
+    try:
+        linha = conn.execute(
+            "SELECT detalhe_json FROM eventos WHERE acao = 'tarefa_abandonada' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert json.loads(str(linha["detalhe_json"]))["motivo"] == "cannot-verify"
+
+
+def test_motivo_fora_da_lista_e_422(cliente: TestClient) -> None:
+    """A lista é fechada porque o brief a promete fechada: 'one click, no
+    essay'. Um campo livre viraria o pedágio que a regra existe para não ter."""
+    quem = _papeis(cliente)["anotador"][0]
+    env = _claim(cliente, quem)
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/abandonar",
+        json={"anotador_id": quem, "motivo": "preguica"},
+    )
+    assert r.status_code == 422
+    # A tarefa NÃO foi abandonada: validação recusada não muda estado.
+    r2 = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/abandonar",
+        json={"anotador_id": quem, "motivo": "outside-my-domain"},
+    )
+    assert r2.status_code == 200, r2.text
+
+
+def test_abandono_sem_motivo_continua_valendo_e_nao_finge_ser_skip(
+    cliente: TestClient, semeado: Path
+) -> None:
+    """Largar uma tarefa do catálogo ou mudar de ideia não é 'não sei julgar
+    isto'. O evento sai SEM a chave — ausente, nunca null."""
+    quem = _papeis(cliente)["anotador"][0]
+    env = _claim(cliente, quem)
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/abandonar",
+        json={"anotador_id": quem},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["motivo"] is None
+
+    conn = dbmod.connect(semeado)
+    try:
+        linha = conn.execute(
+            "SELECT detalhe_json FROM eventos WHERE acao = 'tarefa_abandonada' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert "motivo" not in json.loads(str(linha["detalhe_json"]))
+
+
+def test_a_tabela_de_motivos_do_JS_bate_com_o_enum_do_BACKEND(js: str) -> None:
+    """Duas listas da mesma coisa em duas linguagens. Um motivo acrescentado no
+    backend sem botão na tela seria uma categoria que ninguém consegue escolher;
+    um botão sem enum seria um clique que devolve 422."""
+    bloco = js.split("const MOTIVOS_SKIP = [", 1)[1].split("];", 1)[0]
+    ids = re.findall(r'\["([a-z-]+)", "skip\.[a-z_]+"\]', bloco)
+    assert tuple(ids) == adb.MOTIVOS_ABANDONO
+    # E o brief v2 lista exatamente estes, na prosa: a promessa e a UI são a
+    # mesma lista, com os hífens virando espaço no texto humano.
+    texto = " ".join(
+        linha
+        for secao in briefmod.SECOES
+        for linha in briefmod.carregar()["projetos"]["padrao"]["textos"]["en"][secao]
+    ).lower()
+    for motivo in adb.MOTIVOS_ABANDONO:
+        assert motivo.replace("-", " ") in texto, motivo
+
+
+# ---------------------------------------------------------------------------
+# 9. as perguntas do instrumento — a caixa de user goal
+# ---------------------------------------------------------------------------
+
+
+def _env_severidade(cliente: TestClient, quem: int) -> dict[str, Any]:
+    env = cliente.post(
+        "/api/tarefas/proxima", json={"anotador_id": quem, "tipo": "avaliar_rubrica"}
+    ).json()["tarefa"]
+    assert env is not None and env["rubrica"]["titulo"] == "Severity review"
+    return env
+
+
+def _payload_severidade(env: dict[str, Any], **extra: Any) -> dict[str, Any]:
+    corpo: dict[str, Any] = {
+        "notas": [
+            {"criterio": c["nome"], "nota": int(c["escala"]["max"])}
+            for c in env["rubrica"]["criterios"]
+        ],
+        # Caixa livre leva prosa; CATEGORIA leva o id da primeira opção — como
+        # o helper compartilhado, e pela mesma razão: qualquer outra string é
+        # "fora do vocabulário".
+        "respostas": {
+            q["id"]: str(q["opcoes"][0]["id"])
+            if q.get("tipo") == "categoria" and q.get("opcoes")
+            else "The person wanted a wall-ready procedure inside the stated limits."
+            for q in env["rubrica"]["perguntas"]
+        },
+    }
+    corpo.update(extra)
+    return corpo
+
+
+def test_o_instrumento_declara_as_perguntas_e_o_envelope_as_carrega(
+    cliente: TestClient,
+) -> None:
+    """As perguntas vêm NORMALIZADAS do servidor — a tela e a validação leem a
+    mesma lista, senão haveria um 422 impossível de satisfazer. As três, na
+    ordem do trabalho: dizer o que a pessoa queria, depois classificá-lo."""
+    quem = _papeis(cliente)["anotador"][0]
+    env = _env_severidade(cliente, quem)
+    perguntas = {p["id"]: p for p in env["rubrica"]["perguntas"]}
+    assert list(perguntas) == ["user-goal", "task-type", "domain"]
+    goal = perguntas["user-goal"]
+    assert goal["obrigatoria"] is True
+    assert goal["minimo"] == 30
+    assert goal["tipo"] == "texto"
+    assert set(goal["rotulo_i18n"]) == {"en", "pt"}
+
+
+def test_pergunta_obrigatoria_sem_resposta_e_422_ANTES_dos_criterios(
+    cliente: TestClient,
+) -> None:
+    """A ordem dos erros é a ordem do trabalho: o brief manda declarar o user
+    goal antes de dar nota, então a pergunta reclama primeiro."""
+    quem = _papeis(cliente)["anotador"][0]
+    env = _env_severidade(cliente, quem)
+    corpo = _payload_severidade(env)
+    corpo["respostas"] = {}
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={"anotador_id": quem, "payload": corpo},
+    )
+    assert r.status_code == 422
+    assert "sem resposta" in r.json()["detail"]
+
+
+def test_resposta_abaixo_do_minimo_e_422_com_o_numero(cliente: TestClient) -> None:
+    quem = _papeis(cliente)["anotador"][0]
+    env = _env_severidade(cliente, quem)
+    corpo = _payload_severidade(env, respostas={"user-goal": "too short"})
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={"anotador_id": quem, "payload": corpo},
+    )
+    assert r.status_code == 422
+    assert "mínimo é 30" in r.json()["detail"]
+
+
+def test_resposta_para_pergunta_nao_declarada_e_422(cliente: TestClient) -> None:
+    """O simétrico do critério intruso: o payload não pode afirmar uma resposta
+    que o instrumento nunca perguntou."""
+    quem = _papeis(cliente)["anotador"][0]
+    env = _env_severidade(cliente, quem)
+    corpo = _payload_severidade(env)
+    corpo["respostas"]["inventada"] = "x" * 40
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={"anotador_id": quem, "payload": corpo},
+    )
+    assert r.status_code == 422
+    assert "não declara" in r.json()["detail"]
+
+
+def test_a_resposta_valida_grava_no_payload_com_o_schema_novo(
+    cliente: TestClient, semeado: Path
+) -> None:
+    quem = _papeis(cliente)["anotador"][0]
+    env = _env_severidade(cliente, quem)
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={"anotador_id": quem, "payload": _payload_severidade(env)},
+    )
+    assert r.status_code == 200, r.text
+    conn = dbmod.connect(semeado)
+    try:
+        linha = conn.execute(
+            "SELECT payload_schema, payload_json FROM anotacoes WHERE id = ?",
+            (r.json()["anotacao_id"],),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert str(linha["payload_schema"]) == "avaliar_rubrica@3"
+    gravado = json.loads(str(linha["payload_json"]))
+    assert gravado["respostas"]["user-goal"].startswith("The person wanted")
+
+
+def test_rubrica_sem_perguntas_continua_como_sempre(cliente: TestClient) -> None:
+    """Os onze itens pré-P9 não declaram pergunta nenhuma, e nada muda para
+    eles — inclusive mandar `respostas` vazio é aceito."""
+    quem = _papeis(cliente)["anotador"][1]
+    env = cliente.post(
+        "/api/tarefas/proxima", json={"anotador_id": quem, "tipo": "avaliar_rubrica"}
+    ).json()["tarefa"]
+    while env and env["rubrica"]["titulo"] == "Severity review":
+        cliente.post(
+            f"/api/atribuicoes/{env['atribuicao_id']}/abandonar",
+            json={"anotador_id": quem},
+        )
+        env = cliente.post(
+            "/api/tarefas/proxima", json={"anotador_id": quem, "tipo": "avaliar_rubrica"}
+        ).json()["tarefa"]
+    assert env is not None, "só havia a tarefa de severidade na fila"
+    assert env["rubrica"]["perguntas"] == []
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={"anotador_id": quem, "payload": notas_da_rubrica(env)},
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_uma_resposta_booleana_e_recusada_antes_de_virar_texto() -> None:
+    """Quarta aparição da pegadinha: `True` viraria "True", uma resposta válida
+    e inventada."""
+    from prompt_factory.annotate import payloads
+
+    with pytest.raises(ValueError, match="não é texto"):
+        payloads.AvaliarRubrica.model_validate(
+            {"notas": [{"criterio": "x", "nota": 3}], "respostas": {"user-goal": True}}
+        )
+
+
+def test_editar_uma_resposta_no_RR_e_UM_caminho_de_diff() -> None:
+    """A lição do `tipos_issue`, aplicada às respostas: mapa com todos os ids
+    sempre presentes — cada edição do revisor custa exatamente um motivo."""
+    from prompt_factory.annotate import avaliacoes as avmod
+
+    antes = {"notas": [{"criterio": "x", "nota": 3}], "respostas": {"user-goal": "a" * 30}}
+    depois = {"notas": [{"criterio": "x", "nota": 3}], "respostas": {"user-goal": "b" * 30}}
+    diff = avmod.diferencas(antes, depois)
+    assert [d["campo"] for d in diff] == ["respostas.user-goal"]
+
+
+def test_o_glossario_da_entrega_explica_o_campo_novo() -> None:
+    from prompt_factory.annotate import entrega, payloads
+
+    campos = set(payloads.AvaliarRubrica.model_fields)
+    assert campos <= set(entrega.GLOSSARIO) | {"notas"}, campos - set(entrega.GLOSSARIO)
+    assert "respostas" in entrega.GLOSSARIO
+
+
+def test_a_tela_desenha_e_valida_as_perguntas(js: str) -> None:
+    """As cinco superfícies do JS: desenho, form, falta, payload, leitura."""
+    assert "function caixasDePergunta(" in js
+    assert "function perguntasDe(" in js
+    assert 'form.respostas[pergunta.id]' in js
+    assert '"falta.pergunta"' in js and '"falta.pergunta_minimo"' in js
+    # E o payload emite o mapa na ordem do INSTRUMENTO, nunca na ordem do clique.
+    assert "corpo.respostas[pergunta.id]" in js
+
+
+def test_o_seed_acrescenta_a_pergunta_a_uma_fixture_ja_semeada(
+    tmp_path: Path, corpus: Path
+) -> None:
+    """O caso do banco REAL: a rubrica de severidade foi semeada antes de o
+    instrumento perguntar qualquer coisa. Acrescentar perguntas a uma fixture
+    sem nenhuma não muda a leitura de anotação alguma (nenhum payload antigo
+    referencia `respostas`) — EDITAR uma pergunta existente continua proibido."""
+    banco = tmp_path / "annotate.sqlite"
+    conn = dbmod.connect(banco)
+    corpo = dbmod.connect(corpus, readonly=True)
+    try:
+        adb.init_db(conn)
+        # Semeia o pacote SEM as perguntas — o estado que o banco do dono tem.
+        pacote = seedmod.carregar_pacote()
+        podado = json.loads(json.dumps(pacote))
+        for item in podado["itens"]:
+            item["rubrica"].pop("perguntas", None)
+        seedmod.semear_personas(conn)
+        seedmod.semear_pacote(conn, podado)
+        antes = conn.execute(
+            "SELECT criterios_json FROM rubricas WHERE titulo = 'Severity review'"
+        ).fetchone()
+        assert "perguntas" not in json.loads(str(antes["criterios_json"]))
+
+        # O seed de HOJE acrescenta a pergunta — e é idempotente depois.
+        conta = seedmod.semear_pacote(conn)
+        assert conta["traduzidas"] >= 1
+        depois = json.loads(
+            str(
+                conn.execute(
+                    "SELECT criterios_json FROM rubricas WHERE titulo = 'Severity review'"
+                ).fetchone()["criterios_json"]
+            )
+        )
+        assert [q["id"] for q in depois["perguntas"]] == ["user-goal", "task-type", "domain"]
+        # O blob guarda a REFERÊNCIA (`vocabulario`), nunca as 16 classes: a
+        # expansão é da leitura, e materializar copiaria a taxonomia para o
+        # banco — N cópias mentindo na primeira classe renomeada.
+        assert depois["perguntas"][1]["vocabulario"] == "task_type"
+        assert "opcoes" not in depois["perguntas"][1]
+        assert seedmod.semear_pacote(conn)["traduzidas"] == 0
+
+        # E a porta é ESTREITA: mudar uma pergunta existente continua recusado.
+        mudado = json.loads(json.dumps(pacote))
+        alvo = next(
+            i for i in mudado["itens"] if i["chave"] == "procedimento-incidente-academia"
+        )
+        alvo["rubrica"]["perguntas"][0]["minimo"] = 99
+        seedmod.semear_pacote(conn, mudado)
+        final = json.loads(
+            str(
+                conn.execute(
+                    "SELECT criterios_json FROM rubricas WHERE titulo = 'Severity review'"
+                ).fetchone()["criterios_json"]
+            )
+        )
+        assert final["perguntas"][0]["minimo"] == 30, "pergunta editada por baixo"
+    finally:
+        conn.close()
+        corpo.close()
+
+
+# ---------------------------------------------------------------------------
+# 10. a pergunta de CATEGORIA — o laço com o corpus vira dado
+# ---------------------------------------------------------------------------
+
+
+def test_normalizar_pergunta_conhece_os_dois_tipos_e_degrada_o_desconhecido() -> None:
+    """Tipo fora da tupla vira caixa livre, nunca exceção: a normalização roda
+    na LEITURA, e derrubar a tarefa por um typo no blob seria pior que mostrar
+    uma caixa de texto onde se esperava um seletor — a degradação é visível."""
+    assert tarmod.normalizar_pergunta({"id": "x"})["tipo"] == "texto"
+    assert tarmod.normalizar_pergunta({"id": "x", "tipo": "categoria"})["tipo"] == "categoria"
+    assert tarmod.normalizar_pergunta({"id": "x", "tipo": "categora"})["tipo"] == "texto"
+
+
+def test_o_minimo_de_uma_categoria_e_zero_por_construcao() -> None:
+    """O comprimento de um id não mede nada — um mínimo herdado de 30 tornaria
+    `codigo` (6 caracteres) uma resposta impossível: o 422 que nenhum select
+    satisfaz."""
+    p = tarmod.normalizar_pergunta({"id": "x", "tipo": "categoria", "minimo": 30})
+    assert p["minimo"] == 0
+
+
+def test_opcoes_aceitam_a_forma_curta_como_o_catalogo_de_tipos_issue() -> None:
+    p = tarmod.normalizar_pergunta({"id": "x", "tipo": "categoria", "opcoes": ["a", "b"]})
+    assert p["opcoes"] == [{"id": "a", "rotulo": "a"}, {"id": "b", "rotulo": "b"}]
+
+
+def test_a_expansao_do_vocabulario_acontece_na_leitura() -> None:
+    """O blob guarda `vocabulario: "task_type"`; as 16 classes saem da taxonomia
+    na leitura, com as duas línguas — canônico inglês, que é a convenção de todo
+    conteúdo de instrumento."""
+    (p,) = tarmod.perguntas_da_rubrica(
+        {"perguntas": [{"id": "task-type", "tipo": "categoria", "vocabulario": "task_type"}]}
+    )
+    ids = [o["id"] for o in p["opcoes"]]
+    assert len(ids) == 16 and "geracao-criativa" in ids and "outro" in ids
+    criativa = next(o for o in p["opcoes"] if o["id"] == "geracao-criativa")
+    assert criativa["rotulo"] == "Creative writing"
+    assert criativa["rotulo_i18n"] == {"en": "Creative writing", "pt": "Geração criativa"}
+
+
+def test_opcoes_declaradas_vencem_a_referencia_e_a_expansao_e_idempotente() -> None:
+    """O que a pergunta declarar VENCE (vocabulário próprio de um instrumento é
+    legítimo) — e é isso que torna reexpandir uma lista já expandida inócuo:
+    `erro_contra_a_rubrica` chama `perguntas_da_rubrica` sobre uma rubrica que o
+    envelope já expandiu."""
+    rubrica = {
+        "perguntas": [
+            {
+                "id": "x",
+                "tipo": "categoria",
+                "vocabulario": "task_type",
+                "opcoes": [{"id": "so-esta", "rotulo": "Só esta"}],
+            }
+        ]
+    }
+    (uma_vez,) = tarmod.perguntas_da_rubrica(rubrica)
+    assert [o["id"] for o in uma_vez["opcoes"]] == ["so-esta"]
+    (duas_vezes,) = tarmod.perguntas_da_rubrica({"perguntas": [uma_vez]})
+    assert duas_vezes == uma_vez
+
+
+def test_resposta_fora_do_vocabulario_e_recusada_com_o_id_errado_na_frase() -> None:
+    rubrica = {
+        "criterios": [],
+        "perguntas": [{"id": "task-type", "tipo": "categoria", "vocabulario": "task_type"}],
+    }
+    erro = tarmod.erro_contra_a_rubrica(rubrica, [], {"task-type": "nao-existe"})
+    assert erro is not None and "não é uma categoria" in erro and "nao-existe" in erro
+    assert tarmod.erro_contra_a_rubrica(rubrica, [], {"task-type": "codigo"}) is None
+
+
+def test_categoria_sem_vocabulario_em_maos_deixa_passar() -> None:
+    """Recusar exige certeza (a lição do s02): sem opções em mãos o
+    pertencimento não é conferível, e um 422 que nenhum valor satisfaz travaria
+    a submissão por causa de um arquivo."""
+    rubrica = {"criterios": [], "perguntas": [{"id": "x", "tipo": "categoria"}]}
+    assert tarmod.erro_contra_a_rubrica(rubrica, [], {"x": "qualquer-coisa"}) is None
+
+
+def test_o_modelo_de_severidade_classifica_nos_DOIS_eixos_do_corpus() -> None:
+    """As duas perguntas de categoria apontam para as seções reais da taxonomia
+    — e um modelo com perguntas continua fora do formulário do anotador."""
+    modelo = next(m for m in rubricas_modelo.carregar() if m["id"] == "severidade")
+    por_id = {p["id"]: p for p in modelo["perguntas"]}
+    assert list(por_id) == ["user-goal", "task-type", "domain"]
+    assert por_id["task-type"]["vocabulario"] == "task_type"
+    assert por_id["domain"]["vocabulario"] == "domain"
+    assert all(p["obrigatoria"] for p in por_id.values())
+    assert modelo["cabe_no_formulario"] is False
+
+
+def test_o_arsenal_recusa_categoria_sem_vocabulario_conhecido(tmp_path: Path) -> None:
+    """Portão de FIXTURE: um arquivo do repositório falha no terminal, não como
+    um seletor que nasce vazio na tela."""
+    torto = {
+        "schema": rubricas_modelo.SCHEMA,
+        "modelos": [
+            {
+                "id": "m",
+                "nome_chave": "modelo.m",
+                "titulo": "M",
+                "escala_min": 1,
+                "escala_max": 3,
+                "criterios": [{"nome": "C", "rotulo_min": "a", "rotulo_max": "b"}],
+                "perguntas": [{"id": "x", "tipo": "categoria", "vocabulario": "task_typo"}],
+            }
+        ],
+    }
+    caminho = tmp_path / "modelos.json"
+    caminho.write_text(json.dumps(torto), encoding="utf-8")
+    with pytest.raises(rubricas_modelo.ModeloInvalido, match="vocabulário"):
+        rubricas_modelo.carregar(caminho)
+
+
+def test_a_categoria_valida_grava_os_ids_da_taxonomia_no_payload(
+    cliente: TestClient, semeado: Path
+) -> None:
+    """O momento em que o laço fecha: o payload entregue carrega o id que o
+    corpus tem como nulo nas 159.733 linhas."""
+    quem = _papeis(cliente)["anotador"][0]
+    env = _env_severidade(cliente, quem)
+    corpo = _payload_severidade(env)
+    corpo["respostas"]["task-type"] = "redacao-pratica"
+    corpo["respostas"]["domain"] = "esportes"
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={"anotador_id": quem, "payload": corpo},
+    )
+    assert r.status_code == 200, r.text
+    conn = dbmod.connect(semeado)
+    try:
+        gravado = json.loads(
+            str(
+                conn.execute(
+                    "SELECT payload_json FROM anotacoes WHERE id = ?",
+                    (r.json()["anotacao_id"],),
+                ).fetchone()["payload_json"]
+            )
+        )
+    finally:
+        conn.close()
+    assert gravado["respostas"]["task-type"] == "redacao-pratica"
+    assert gravado["respostas"]["domain"] == "esportes"
+
+
+def test_um_id_inventado_e_422_de_ponta_a_ponta(cliente: TestClient) -> None:
+    quem = _papeis(cliente)["anotador"][0]
+    env = _env_severidade(cliente, quem)
+    corpo = _payload_severidade(env)
+    corpo["respostas"]["domain"] = "memes"
+    r = cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={"anotador_id": quem, "payload": corpo},
+    )
+    assert r.status_code == 422
+    assert "não é uma categoria" in r.json()["detail"]
+
+
+def test_o_seed_acrescenta_categorias_a_fixture_que_JA_TINHA_o_user_goal(
+    tmp_path: Path, corpus: Path
+) -> None:
+    """O caso do banco REAL deste passe: a fixture já tinha a pergunta de user
+    goal quando as de categoria chegaram. A porta generalizada aceita o
+    acréscimo (toda pergunta existente preservada, idêntica) e continua
+    recusando REMOÇÃO — o outro jeito de editar."""
+    banco = tmp_path / "annotate.sqlite"
+    conn = dbmod.connect(banco)
+    corpo = dbmod.connect(corpus, readonly=True)
+    try:
+        adb.init_db(conn)
+        pacote = seedmod.carregar_pacote()
+        so_goal = json.loads(json.dumps(pacote))
+        for item in so_goal["itens"]:
+            perguntas = (item["rubrica"] or {}).get("perguntas")
+            if perguntas:
+                # A forma que o banco REAL tem: o normalizador do P9-2 não
+                # emitia `tipo`, então a pergunta gravada não carrega a chave.
+                # Foi exatamente esta diferença que fez a primeira versão da
+                # porta recusar o acréscimo no banco do dono — a comparação tem
+                # de passar pelo normalizador, que é quem define "a mesma".
+                item["rubrica"]["perguntas"] = [
+                    {k: v for k, v in p.items() if k != "tipo"}
+                    for p in perguntas
+                    if p["id"] == "user-goal"
+                ]
+        seedmod.semear_personas(conn)
+        seedmod.semear_pacote(conn, so_goal)
+
+        assert seedmod.semear_pacote(conn)["traduzidas"] >= 1
+        depois = json.loads(
+            str(
+                conn.execute(
+                    "SELECT criterios_json FROM rubricas WHERE titulo = 'Severity review'"
+                ).fetchone()["criterios_json"]
+            )
+        )
+        assert [q["id"] for q in depois["perguntas"]] == ["user-goal", "task-type", "domain"]
+
+        # Remover uma pergunta existente é edição, e edição é recusada.
+        sem_goal = json.loads(json.dumps(pacote))
+        for item in sem_goal["itens"]:
+            perguntas = (item["rubrica"] or {}).get("perguntas")
+            if perguntas:
+                item["rubrica"]["perguntas"] = [p for p in perguntas if p["id"] != "user-goal"]
+        seedmod.semear_pacote(conn, sem_goal)
+        final = json.loads(
+            str(
+                conn.execute(
+                    "SELECT criterios_json FROM rubricas WHERE titulo = 'Severity review'"
+                ).fetchone()["criterios_json"]
+            )
+        )
+        assert [q["id"] for q in final["perguntas"]] == ["user-goal", "task-type", "domain"]
+    finally:
+        conn.close()
+        corpo.close()
+
+
+def test_a_tela_desenha_o_seletor_e_mostra_o_id_junto_do_nome(js: str) -> None:
+    """O seletor nasce do mesmo `caixasDePergunta`; a opção carrega nome E id
+    (o contrato do chip de categoria do brief); o botão pede a ação certa."""
+    assert 'pergunta.tipo === "categoria"' in js
+    assert '"falta.pergunta_categoria"' in js
+    assert 't("pergunta.escolher")' in js
+    assert 'bi(o.rotulo_i18n, o.rotulo) + " · " + o.id' in js

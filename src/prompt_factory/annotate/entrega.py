@@ -98,6 +98,11 @@ GLOSSARIO: dict[str, str] = {
     "nota": "score on the criterion's own scale (see the rubric, not 1..9)",
     "justificativa": "rationale, written in English by convention",
     "comentario_geral": "optional overall comment on the item",
+    "respostas": "answers to the questions the instrument declares, as "
+    "{question_id: text}; free-text questions carry prose (the first is the user "
+    "goal the project brief requires before rating), category questions carry a "
+    "corpus-taxonomy id (task type / domain) — the label this work produces for "
+    "the corpus row",
     "nao_aplicavel": "the criterion does not apply to this response (distinct from unrated)",
     "motivo_na": "why the criterion does not apply — required whenever nao_aplicavel is true",
     "tipos_issue": "issue types for this criterion, as {catalogue_id: picked}; every id the "

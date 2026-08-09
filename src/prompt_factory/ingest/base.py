@@ -199,6 +199,7 @@ def write_raw(
     source_name: str,
     rows_iter: Iterable[dict[str, Any]],
     max_rows: int | None = None,
+    raw_dir: Path | None = None,
 ) -> Path:
     """Materializa `rows_iter` em `data/raw/<fonte>.parquet` e devolve o caminho.
 
@@ -208,6 +209,12 @@ def write_raw(
 
     Escreve em `.tmp` + `os.replace` (atômico até no Windows): um Ctrl+C no meio
     do download nunca deixa um parquet truncado no lugar do bom.
+
+    `raw_dir` redireciona a escrita (é o `--data-dir` do `pf ingest`, P6). Existe
+    porque o smoke da fonte `plataforma` precisa rodar a cadeia inteira num
+    diretório descartável: ela é a única fonte cujo insumo é LOCAL, então a
+    ingestão dela é testável de ponta a ponta — e um teste que escrevesse em
+    `data/raw/` estaria mexendo no corpus de produção para provar um ponto.
     """
     cfg = get_source_cfg(source_name)
     inicio = time.perf_counter()
@@ -236,8 +243,9 @@ def write_raw(
         }
     )
 
-    paths.RAW.mkdir(parents=True, exist_ok=True)
-    destino = paths.RAW / f"{source_name}.parquet"
+    destino_dir = paths.RAW if raw_dir is None else Path(raw_dir)
+    destino_dir.mkdir(parents=True, exist_ok=True)
+    destino = destino_dir / f"{source_name}.parquet"
     tmp = destino.parent / f"{destino.name}.tmp"
     pq.write_table(tabela, tmp, compression="zstd")
     os.replace(tmp, destino)

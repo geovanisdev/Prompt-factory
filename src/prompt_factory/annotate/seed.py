@@ -93,6 +93,15 @@ PERSONAS: tuple[tuple[str, str], ...] = (
 #: sozinho, porque ``schema`` está em ``CHAVES_DE_FORMA`` e não entra na
 #: identidade. Rubrica de ``origem`` diferente de ``fixture`` **não** é
 #: reescrita: registro histórico não se conserta por baixo.
+#:
+#: O P9 acrescentou as ``perguntas`` ao MESMO ``@3`` — primeiro a caixa de texto
+#: (user goal), depois a de ``tipo: "categoria"`` com ``vocabulario`` apontando
+#: para a taxonomia do corpus. Sem bump porque o bloco é opcional e nenhum
+#: leitor de ``@3`` quebra com ele presente — a mesma régua do ``nome_en`` da
+#: taxonomia: a versão descreve o contrato que os leitores exigem, não o
+#: inventário do que o blob pode carregar. O que o ``@2``→``@3`` do P8 corrigiu
+#: era outra coisa: um rótulo prometendo uma FORMA de critério que o conteúdo
+#: não tinha.
 SCHEMA_RUBRICA = "rubrica@3"
 
 #: Prioridade base das tarefas geradas sobre o pool real. **Abaixo** das do
@@ -169,6 +178,7 @@ def _resolver_modelo(item: dict[str, Any]) -> None:
         "titulo": modelo["titulo"],
         **({"titulo_i18n": modelo["titulo_i18n"]} if modelo.get("titulo_i18n") else {}),
         "criterios": modelo["criterios"],
+        **({"perguntas": modelo["perguntas"]} if modelo.get("perguntas") else {}),
         **{k: v for k, v in rub.items() if k != "modelo"},
     }
 
@@ -267,7 +277,43 @@ def _traduzir(
         antes, depois = json.loads(gravado or "{}"), json.loads(novo_json)
     except ValueError:  # pragma: no cover - JSON corrompido à mão
         return False
-    if _canonico(antes) != _canonico(depois):
+    iguais = _canonico(antes) == _canonico(depois)
+    # A SEGUNDA porta estreita (P9), no espírito da promoção das diretrizes:
+    # ACRESCENTAR perguntas ao instrumento. Nenhum payload antigo referencia um
+    # id de pergunta que não existia (a rubrica não o perguntava), então nada do
+    # que já foi anotado muda de leitura — diferente de EDITAR uma pergunta
+    # existente, que continua caindo no "não se edita". A prova é literal, em
+    # duas metades: toda pergunta que JÁ existia tem de continuar no depois,
+    # idêntica no canônico (tradução de sidecar continua permitida, como em
+    # tudo); e fora de `perguntas` os dois canônicos têm de ser idênticos. No
+    # P9-2 a regra era o caso trivial disto ("nenhuma pergunta antes"); o P9-3
+    # a generalizou porque a fixture do banco real já tinha a de user goal
+    # quando as de categoria chegaram.
+    if not iguais and isinstance(antes, dict) and isinstance(depois, dict):
+        # A comparação passa pelo NORMALIZADOR, e isso foi um defeito real: a
+        # pergunta gravada pelo P9-2 não tem a chave `tipo` (o normalizador da
+        # época não a emitia) e a de hoje tem `tipo: "texto"` — canônicos crus
+        # diferentes para a MESMA pergunta, e a porta recusava o banco do dono.
+        # `normalizar_pergunta` é o ponto único que define o que é "a mesma";
+        # comparar por fora dele seria manter uma segunda definição.
+        from .tarefas import normalizar_pergunta
+
+        a_perg = {
+            str(p.get("id")): _canonico(normalizar_pergunta(p))
+            for p in (antes.get("perguntas") or [])
+            if isinstance(p, dict)
+        }
+        d_perg = {
+            str(p.get("id")): _canonico(normalizar_pergunta(p))
+            for p in (depois.get("perguntas") or [])
+            if isinstance(p, dict)
+        }
+        preservadas = all(d_perg.get(pid) == corpo for pid, corpo in a_perg.items())
+        if preservadas:
+            sem_a = {k: v for k, v in antes.items() if k != "perguntas"}
+            sem_d = {k: v for k, v in depois.items() if k != "perguntas"}
+            iguais = _canonico(sem_a) == _canonico(sem_d)
+    if not iguais:
         return False
     conn.execute(f"UPDATE {tabela} SET {coluna} = ? WHERE id = ?", (novo_json, int(linha["id"])))
     return True
@@ -309,6 +355,11 @@ def semear_pacote(conn: sqlite3.Connection, dados: dict[str, Any] | None = None)
         if rub.get("titulo_i18n"):
             conteudo["titulo_i18n"] = rub["titulo_i18n"]
         conteudo["criterios"] = rub["criterios"]
+        # As PERGUNTAS do instrumento (P9) viajam no mesmo blob dos critérios:
+        # elas SÃO o instrumento, e um segundo lugar divergiria. Ausente = "este
+        # instrumento não pergunta nada", o caso de todos os itens pré-P9.
+        if rub.get("perguntas"):
+            conteudo["perguntas"] = rub["perguntas"]
         criterios_json = json.dumps(conteudo, ensure_ascii=False)
         linha = conn.execute(
             "SELECT id, criterios_json, origem FROM rubricas "

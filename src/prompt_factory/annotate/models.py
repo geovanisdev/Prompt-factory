@@ -23,6 +23,7 @@ from .db import (
     AVALIACOES_ANTES,
     AVALIACOES_DEPOIS,
     DECISOES_ADMIN,
+    MOTIVOS_ABANDONO,
     PAPEIS,
     ROTULOS_DUELO,
     TIPOS_TAREFA,
@@ -184,7 +185,30 @@ class SubmeterIn(_ComAnotador):
 
 
 class AbandonarIn(_ComAnotador):
-    """``POST /api/atribuicoes/{id}/abandonar`` — devolve a vaga na hora."""
+    """``POST /api/atribuicoes/{id}/abandonar`` — devolve a vaga na hora.
+
+    ``motivo`` é o SKIP CATEGORIZADO do brief v2 ("pick the reason from the
+    list. One click, no essay"). Opcional no contrato, e isso é decisão: o
+    abandono também serve a quem largou uma tarefa do catálogo ou mudou de ideia
+    — gestos que não são "não sei julgar isto" e não devem fingir que são. A
+    tela da FILA sempre manda um; a API não obriga.
+
+    Quando vem, é validado contra ``db.MOTIVOS_ABANDONO`` — a lista é fechada
+    porque o brief a promete fechada, e um campo livre viraria justamente o
+    pedágio que a regra existe para não ter.
+    """
+
+    motivo: str | None = None
+
+    @field_validator("motivo")
+    @classmethod
+    def _motivo_do_catalogo(cls, v: str | None) -> str | None:
+        if v is not None and v not in MOTIVOS_ABANDONO:
+            raise ValueError(
+                f"motivo de skip desconhecido: {v!r} — os válidos são "
+                f"{', '.join(MOTIVOS_ABANDONO)}"
+            )
+        return v
 
 
 #: Teto de um turno escrito pelo anotador. Generoso: um turno de red-team
@@ -570,6 +594,114 @@ class GerarTarefasIn(BaseModel):
         if v not in TIPOS_TAREFA:
             raise ValueError(f"tipo fora de {list(TIPOS_TAREFA)}: {v!r}")
         return v
+
+
+#: Teto do texto de um prompt criado na plataforma. É o mesmo teto que o pool
+#: aplica ao que ele OFERECE (``pool_fallback_max_chars``): um prompt que a
+#: plataforma não mostraria a ninguém não deveria poder nascer nela.
+MAX_TEXTO_CRIACAO = 2_000
+
+#: Teto do brief — a nota de quem escreveu sobre o que o prompt está testando.
+#: Curto de propósito: ele orienta quem for anotar, não substitui a rubrica.
+MAX_BRIEF_CRIACAO = 1_000
+
+
+class CriacaoIn(BaseModel):
+    """``POST /api/criacoes`` — o modo criar.
+
+    ``lang`` é DECLARADO e não detectado, e vale registrar que ele é um palpite:
+    quem decide o idioma de verdade é o **s02**, com dois detectores e um
+    árbitro, quando o texto atravessar a pipeline. Detectar aqui daria um
+    terceiro veredito, de uma terceira implementação, sobre a mesma pergunta —
+    e o da pipeline é o que vai para o corpus.
+
+    ``task_type_sugerido``/``domain_sugerido`` falam a língua da taxonomia do
+    corpus (os mesmos ids do escopo do brief e da pergunta de categoria do P9).
+    **Sugeridos**, no nome e no efeito: eles viajam como pista para quem revisa,
+    e não como rótulo — o rótulo do corpus sai da campanha de rotulagem.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    autor_id: Annotated[int, Field(ge=1)]
+    texto: Annotated[str, Field(max_length=MAX_TEXTO_CRIACAO)]
+    lang: str
+    task_type_sugerido: Annotated[str | None, Field(max_length=60)] = None
+    domain_sugerido: Annotated[str | None, Field(max_length=60)] = None
+    brief: Annotated[str | None, Field(max_length=MAX_BRIEF_CRIACAO)] = None
+
+    @field_validator("autor_id", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("este campo não é booleano")
+        return v
+
+    @field_validator("texto", "brief", "task_type_sugerido", "domain_sugerido", mode="before")
+    @classmethod
+    def _limpo(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            v = v.strip()
+            return v or None
+        return v
+
+    @field_validator("texto")
+    @classmethod
+    def _texto_tem_piso(cls, v: str | None) -> str:
+        # O piso sai do settings (`min_chars_criacao`), como todos os limites que
+        # a tela mostra antes do clique — uma cópia aqui divergiria do 422 na
+        # primeira vez que alguém ajustasse o arquivo.
+        piso = int(_cfg("annotate", "min_chars_criacao", default=15))
+        if v is None or len(v) < piso:
+            raise ValueError(f"o prompt precisa de pelo menos {piso} caracteres")
+        return v
+
+    @field_validator("lang")
+    @classmethod
+    def _lang_conhecida(cls, v: str) -> str:
+        # As duas do CHECK do DDL. O corpus tem outras, mas a plataforma é
+        # bilíngue e um `fr` aqui viraria IntegrityError sem nome de campo.
+        if v not in ("pt", "en"):
+            raise ValueError(f"idioma fora de ['pt', 'en']: {v!r}")
+        return v
+
+
+class RevisarCriacaoIn(BaseModel):
+    """``POST /api/criacoes/{id}/revisar`` — aprova ou recusa uma criação.
+
+    ``comentario`` é obrigatório na RECUSA, pela mesma razão da devolução da
+    triagem: recusar sem dizer por quê devolve a decisão sem devolver a
+    informação, e quem escreveu não tem como fazer diferente da próxima vez.
+    Aprovar sem comentário é normal — não há nada a corrigir.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    revisor_id: Annotated[int, Field(ge=1)]
+    aprovar: bool
+    comentario: Annotated[str | None, Field(max_length=MAX_MOTIVO)] = None
+
+    @field_validator("revisor_id", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("este campo não é booleano")
+        return v
+
+    @field_validator("comentario", mode="before")
+    @classmethod
+    def _limpo(cls, v: Any) -> Any:
+        return (v.strip() or None) if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _recusa_exige_motivo(self) -> RevisarCriacaoIn:
+        piso = int(_cfg("annotate", "min_chars_devolucao", default=20))
+        if not self.aprovar and len(self.comentario or "") < piso:
+            raise ValueError(
+                f"recusar exige um comentário de pelo menos {piso} caracteres — "
+                "ele é a única informação que quem escreveu recebe"
+            )
+        return self
 
 
 def perfil(linha: Any) -> dict[str, Any]:

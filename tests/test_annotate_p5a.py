@@ -33,6 +33,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from prompt_factory import db as dbmod
+from prompt_factory.annotate import concordancia as conmod
 from prompt_factory.annotate import db as adb
 from prompt_factory.annotate import entrega as entmod
 from prompt_factory.annotate import eventos as evmod
@@ -709,3 +710,378 @@ def test_entidade_inventada_da_422_com_o_vocabulario(cliente: TestClient) -> Non
     assert r.status_code == 422
     for nome in evmod.ENTIDADES:
         assert nome in r.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# agreement entre anotadores — o instrumento que o parecer disse estar errado
+# ---------------------------------------------------------------------------
+
+
+ESCALA5 = [1, 2, 3, 4, 5]
+
+
+def test_o_peso_quadratico_normaliza_pela_escala_DECLARADA() -> None:
+    """Um degrau numa escala de 3 posições vale mais que um degrau numa de 5, e
+    é a verdade: em três posições, um degrau é metade do instrumento."""
+    w5 = conmod._matriz_de_pesos(5, "quadratico")
+    w3 = conmod._matriz_de_pesos(3, "quadratico")
+    assert w5[2][3] == pytest.approx(0.9375)
+    assert w3[0][1] == pytest.approx(0.75)
+    # As pontas não contam NADA como concordância, em qualquer escala.
+    assert w5[0][4] == 0.0 and w3[0][2] == 0.0
+    # E no nominal a distância não significa nada: só a diagonal conta.
+    assert conmod._matriz_de_pesos(5, "nominal")[2][3] == 0.0
+
+
+def test_os_dois_extremos_dao_os_dois_extremos() -> None:
+    conc = conmod._pi([("a", "a")] * 6 + [("b", "b")] * 6, ["a", "b"], "nominal")
+    assert conc["kappa"] == 1.0 and conc["observada"] == 1.0
+    disc = conmod._pi([("a", "b")] * 6 + [("b", "a")] * 6, ["a", "b"], "nominal")
+    assert disc["kappa"] == -1.0 and disc["observada"] == 0.0
+
+
+def test_sem_variancia_e_None_com_MOTIVO_e_nunca_zero() -> None:
+    """O paradoxo clássico: todos na mesma categoria ⟹ esperança 1 ⟹ 0/0.
+
+    As duas saídas preguiçosas mentem. ``1.0`` afirmaria concordância perfeita
+    onde não houve escolha a fazer; ``0.0`` afirmaria concordância ao nível do
+    acaso — a acusação mais forte que este número sabe fazer — justamente quando
+    as duas pessoas concordaram em tudo.
+    """
+    r = conmod._pi([("a", "a")] * 12, ["a", "b"], "nominal")
+    assert r["kappa"] is None
+    assert r["motivo"] == conmod.MOTIVO_SEM_VARIANCIA
+    assert r["observada"] == 1.0, "a observada continua sendo um fato sobre os pares"
+
+
+def test_a_observada_sobrevive_ao_piso_e_o_kappa_nao() -> None:
+    """A separação que o piso governa: a observada é DESCRITIVA (vale com um par
+    só), o kappa é INFERENCIAL (o acaso sai das marginais, que precisam de n)."""
+    r = conmod._pi([(3, 3), (4, 5)], ESCALA5, "quadratico")
+    assert r["n_pares"] == 2
+    assert r["observada"] > 0, "a observada é publicada em qualquer n"
+    assert r["kappa"] is None and r["motivo"] == conmod.MOTIVO_POUCOS
+
+
+def test_o_PONDERADO_e_o_EXATO_discordam_e_e_por_isso_que_o_modulo_existe() -> None:
+    """O número medido que justifica o marco.
+
+    Mesma equipe, mesmo trabalho: oito pares exatos e quatro errando por UM
+    degrau numa escala de cinco. Ponderado 0,894 — descreve o que aconteceu.
+    Igualdade exata 0,571 — descreveria uma equipe com problema de calibração.
+    O plano original publicaria o segundo.
+    """
+    pares = [(5, 5), (4, 4), (3, 3), (2, 2), (1, 1), (5, 5), (4, 4), (3, 3),
+             (4, 5), (3, 2), (2, 3), (5, 4)]
+    ponderado = conmod._pi(pares, ESCALA5, "quadratico")
+    exato = conmod._pi(pares, ESCALA5, "nominal")
+    assert ponderado["kappa"] == pytest.approx(0.8943, abs=1e-4)
+    assert exato["kappa"] == pytest.approx(0.5714, abs=1e-4)
+    assert ponderado["kappa"] > exato["kappa"] + 0.3
+
+
+def test_discordancia_SISTEMATICA_da_observada_alta_e_kappa_negativo() -> None:
+    """Os dois números respondem perguntas diferentes, e os dois estão certos.
+
+    Sempre a um degrau de distância (3 contra 4): concordam quase sempre em
+    valor (0,9375) e **nunca** mais que o acaso já daria — usando só duas
+    posições da escala, o acaso sozinho produziria 0,9688. É por isso que a tela
+    nunca mostra um destes números sem o outro.
+    """
+    r = conmod._pi([(3, 4)] * 6 + [(4, 3)] * 6, ESCALA5, "quadratico")
+    assert r["observada"] == pytest.approx(0.9375)
+    assert r["esperada"] == pytest.approx(0.9688, abs=1e-4)
+    assert r["kappa"] == -1.0
+
+
+def test_sem_par_nenhum_nao_vira_linha_com_zero() -> None:
+    assert conmod.medir("x", [], ESCALA5, "quadratico") is None
+
+
+# --- o caminho pelo banco ---------------------------------------------------
+
+
+def duas_pessoas_na_mesma_tarefa(
+    cliente: TestClient, tipo: str = "avaliar_rubrica"
+) -> dict[str, Any]:
+    """Duas anotações independentes sobre a MESMA tarefa.
+
+    Passa pelo modo livre (``/api/tarefas/livre``) porque a fila do locked
+    entrega tarefas diferentes a pessoas diferentes — que é o desenho correto
+    dela e o oposto do que um par de agreement precisa.
+    """
+    quem = papeis(cliente)["anotador"][:2]
+    assert len(quem) >= 2
+    env0 = cliente.post(
+        "/api/tarefas/proxima", json={"anotador_id": quem[0], "tipo": tipo}
+    ).json()["tarefa"]
+    assert env0 is not None
+    # O uid mora no PROMPT do envelope: `tarefa` só carrega as chaves que a tela
+    # usa, e o uid do prompt não é uma delas.
+    uid = env0["prompt"]["uid"]
+    env1 = cliente.post(
+        "/api/tarefas/livre", json={"anotador_id": quem[1], "tipo": tipo, "prompt_uid": uid}
+    ).json()["tarefa"]
+    assert env1 is not None
+    assert env1["tarefa"]["id"] == env0["tarefa"]["id"], "find-or-create devia reusar"
+    return {"quem": quem, "envs": [env0, env1], "uid": uid}
+
+
+def payload_com_notas(env: dict[str, Any], notas: dict[str, int]) -> dict[str, Any]:
+    """O payload que o FORMULÁRIO produziria com estas notas por critério.
+
+    Baixar a nota abaixo do topo obriga, num critério com catálogo, a marcar um
+    tipo de issue **e** escrever a frase (a regra do P8). O helper faz o que a
+    tela faz — sem isso o cenário morreria num 422 que não tem nada a ver com o
+    que estes testes medem.
+    """
+    corpo = notas_da_rubrica(env)
+    por_nome = {c["nome"]: c for c in env["rubrica"]["criterios"]}
+    for nota in corpo["notas"]:
+        if nota["criterio"] not in notas:
+            continue
+        nota["nota"] = notas[nota["criterio"]]
+        criterio = por_nome[nota["criterio"]]
+        catalogo = criterio.get("tipos_issue") or []
+        if catalogo and nota["nota"] < int(criterio["escala"]["max"]):
+            nota["tipos_issue"] = {str(t["id"]): (i == 0) for i, t in enumerate(catalogo)}
+            nota["justificativa"] = (
+                "The answer drops a constraint the prompt states, and the gap is visible "
+                "in the second paragraph."
+            )
+    return corpo
+
+
+def submeter_notas(cliente: TestClient, quem: int, env: dict[str, Any], notas: dict[str, int]):
+    return cliente.post(
+        f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+        json={
+            "anotador_id": quem,
+            "payload": payload_com_notas(env, notas),
+            "tempo_ativo_ms": 20_000,
+        },
+    )
+
+
+def test_duas_pessoas_no_mesmo_item_viram_UM_par(cliente: TestClient, semeado: Path) -> None:
+    cenario = duas_pessoas_na_mesma_tarefa(cliente)
+    for quem, env in zip(cenario["quem"], cenario["envs"], strict=True):
+        assert submeter_notas(cliente, quem, env, {}).status_code == 200
+
+    conn = com_banco(semeado)
+    try:
+        comparaveis, resumo = conmod.coletar(conn)
+    finally:
+        conn.close()
+    assert resumo["tarefas_com_2_ou_mais"] == 1
+    assert resumo["anotadores_distintos"] == 2
+    assert len(comparaveis[0]["pessoas"]) == 2
+
+
+def test_a_medida_usa_o_payload_COMO_SUBMETIDO_e_nao_o_corrigido(
+    cliente: TestClient, semeado: Path
+) -> None:
+    """O revisor convergir as duas pessoas não é as duas pessoas concordarem.
+
+    Aqui elas discordam num critério, e o Rate and Review reescreve a nota de
+    uma delas para a da outra. Medir pelo corrigido devolveria concordância
+    perfeita — uma medida que responde "o quanto o revisor trabalhou" com o nome
+    de "o quanto a equipe concorda", e cuja resposta é sempre lisonjeira.
+    """
+    from prompt_factory.annotate import avaliacoes as avmod
+
+    cenario = duas_pessoas_na_mesma_tarefa(cliente)
+    env0, env1 = cenario["envs"]
+    alvo = env0["rubrica"]["criterios"][0]
+    baixo = {alvo["nome"]: int(alvo["escala"]["min"])}
+    submetido = payload_com_notas(env0, baixo)
+
+    ids = []
+    for quem, env, notas in (
+        (cenario["quem"][0], env0, baixo),
+        (cenario["quem"][1], env1, {}),
+    ):
+        r = submeter_notas(cliente, quem, env, notas)
+        assert r.status_code == 200, r.text
+        ids.append(r.json()["anotacao_id"])
+
+    conn = com_banco(semeado)
+    try:
+        antes = conmod.relatorio(conn)
+    finally:
+        conn.close()
+    linha_notas = next(x for x in antes["linhas"] if x["campo"].startswith("avaliar_rubrica.notas"))
+    assert linha_notas["observada"] < 1.0, "elas discordam num critério"
+
+    # O revisor tria e depois CORRIGE a nota divergente para a da outra pessoa.
+    # A correção é MÍNIMA (só a nota sobe), então o diff é um caminho só — e é o
+    # servidor quem o confere contra os motivos declarados.
+    revisor = papeis(cliente)["revisor"][0]
+    triar(cliente, revisor, ids[0])
+    corrigido = json.loads(json.dumps(submetido))
+    for nota in corrigido["notas"]:
+        if nota["criterio"] == alvo["nome"]:
+            nota["nota"] = int(alvo["escala"]["max"])
+    # `valor_antes`/`valor_depois` viajam como TEXTO no contrato (é o que a tela
+    # mostrou); quem confere os valores de verdade é o servidor, contra o diff
+    # que ele mesmo calcula.
+    edicoes = [
+        {
+            "campo": d["campo"],
+            "valor_antes": None if d["valor_antes"] is None else str(d["valor_antes"]),
+            "valor_depois": None if d["valor_depois"] is None else str(d["valor_depois"]),
+            "motivo": "aligned the score with what the text supports",
+        }
+        for d in avmod.diferencas(submetido, corrigido)
+    ]
+    assert edicoes, "a correção tem de produzir diff"
+    r = cliente.post(
+        f"/api/avaliacao/{ids[0]}",
+        json={
+            "revisor_id": revisor,
+            "avaliacao_antes": "ajustavel",
+            "avaliacao_depois": "adequado",
+            "justificativa": "The low score did not match the evidence in the answer.",
+            "payload_corrigido": corrigido,
+            "edicoes": edicoes,
+            "tempo_ativo_ms": 9_000,
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    conn = com_banco(semeado)
+    try:
+        depois = conmod.relatorio(conn)
+    finally:
+        conn.close()
+    igual = next(x for x in depois["linhas"] if x["campo"].startswith("avaliar_rubrica.notas"))
+    assert igual["observada"] == linha_notas["observada"], (
+        "a correção do revisor não pode mexer no agreement dos anotadores"
+    )
+
+
+def test_sintetica_fica_de_FORA_e_o_numero_dela_aparece(
+    cliente: TestClient, semeado: Path
+) -> None:
+    """Concordar com um defeito plantado não é virtude, e discordar não é falha.
+
+    Sem a exclusão, a medida responderia a quantas sintéticas a campanha gerou.
+    """
+    cenario = duas_pessoas_na_mesma_tarefa(cliente)
+    for quem, env in zip(cenario["quem"], cenario["envs"], strict=True):
+        assert submeter_notas(cliente, quem, env, {}).status_code == 200
+
+    conn = com_banco(semeado)
+    try:
+        # Carimba UMA das duas como sintética — o sinal único de sempre.
+        alvo = conn.execute("SELECT id FROM anotacoes ORDER BY id DESC LIMIT 1").fetchone()["id"]
+        conn.execute(
+            f"UPDATE anotacoes SET {adb.COLUNA_GABARITO_AVALIACAO} = ? WHERE id = ?",
+            (json.dumps({"avaliacao_antes": "ajustavel", "familia_defeito": "x", "nota": 1}), alvo),
+        )
+        conn.commit()
+        _, resumo = conmod.coletar(conn)
+    finally:
+        conn.close()
+    assert resumo["sinteticas_excluidas"] == 1
+    assert resumo["tarefas_com_2_ou_mais"] == 0, "sobrou uma pessoa só na tarefa"
+
+
+def test_NA_sai_do_kappa_numerico_e_vira_linha_propria(
+    cliente: TestClient, semeado: Path
+) -> None:
+    """N/A não é um ponto da escala — é justamente por isso que ele é campo
+    próprio no contrato. Empurrá-lo para dentro exigiria escolher um número, que
+    é a sentinela numérica que ``NotaCriterio`` existe para não ter."""
+    cenario = duas_pessoas_na_mesma_tarefa(cliente)
+    env0, env1 = cenario["envs"]
+    alvo = env0["rubrica"]["criterios"][0]["nome"]
+    for quem, env, na in ((cenario["quem"][0], env0, True), (cenario["quem"][1], env1, False)):
+        corpo = notas_da_rubrica(env)
+        if na:
+            for nota in corpo["notas"]:
+                if nota["criterio"] == alvo:
+                    nota.pop("nota", None)
+                    nota["nao_aplicavel"] = True
+                    nota["motivo_na"] = "This criterion does not apply to the answer given."
+        r = cliente.post(
+            f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
+            json={"anotador_id": quem, "payload": corpo, "tempo_ativo_ms": 20_000},
+        )
+        assert r.status_code == 200, r.text
+
+    conn = com_banco(semeado)
+    try:
+        rel = conmod.relatorio(conn)
+    finally:
+        conn.close()
+    campos = {x["campo"]: x for x in rel["linhas"]}
+    na = campos["avaliar_rubrica.nao_aplicavel"]
+    assert na["observada"] < 1.0, "uma disse N/A e a outra não"
+    notas = next(v for k, v in campos.items() if k.startswith("avaliar_rubrica.notas"))
+    # O critério com N/A de um lado não entrou no numérico: sobraram os outros.
+    assert notas["n_pares"] == len(env0["rubrica"]["criterios"]) - 1
+
+
+def test_escalas_DIFERENTES_nao_entram_na_mesma_matriz(cliente: TestClient) -> None:
+    """Um par de uma rubrica 1..5 e um do instrumento de severidade 1..3 não
+    cabem juntos: ou se inventam categorias que ninguém podia escolher, ou se
+    achata a distância entre as que existem. Uma linha por escala, com a escala
+    no rótulo."""
+    linha3 = conmod.medir("x", [(1, 2)] * 12, [1, 2, 3], "quadratico", escala={"min": 1, "max": 3})
+    linha5 = conmod.medir("y", [(1, 2)] * 12, ESCALA5, "quadratico", escala={"min": 1, "max": 5})
+    assert linha3 and linha5
+    assert linha3["categorias"] == 3 and linha5["categorias"] == 5
+    # A MESMA discordância de um degrau pesa diferente, e é essa a razão da separação.
+    assert linha3["observada"] < linha5["observada"]
+
+
+def test_a_rota_devolve_a_concordancia_com_o_piso_declarado(cliente: TestClient) -> None:
+    r = cliente.get("/api/admin/metricas", params={"admin_id": admin_de(cliente)})
+    assert r.status_code == 200, r.text
+    conc = r.json()["concordancia"]
+    assert conc["piso_pares"] == conmod.piso_de_pares()
+    assert set(conc["resumo"]) == {
+        "tarefas_com_2_ou_mais",
+        "tarefas_com_1",
+        "anotadores_distintos",
+        "sinteticas_excluidas",
+    }
+    # Toda linha carrega o instrumento pelo nome: um agreement sem o nome do
+    # instrumento que o produziu não é conferível.
+    for linha in conc["linhas"]:
+        assert linha["instrumento"].startswith("pi_")
+        assert "observada" in linha and "kappa" in linha
+
+
+def test_a_concordancia_e_so_do_admin(cliente: TestClient) -> None:
+    anotador = papeis(cliente)["anotador"][0]
+    r = cliente.get("/api/admin/metricas", params={"admin_id": anotador})
+    assert r.status_code == 403
+
+
+def test_a_tela_nunca_mostra_o_kappa_sem_a_observada() -> None:
+    """A regra dura do card, e ela é de LEITURA, não de estética.
+
+    Medido: pares sempre a um degrau de distância dão observada 0,9375 e kappa
+    -1,0. Um painel com "-1,0" sozinho faria alguém refazer um lote que está
+    bom; um com "94%" sozinho esconderia um viés real entre dois anotadores.
+    """
+    from .test_annotate_i18n import _sem_comentarios
+
+    js = (
+        Path(__file__).resolve().parents[1]
+        / "src" / "prompt_factory" / "annotate" / "static" / "index.html"
+    ).read_text(encoding="utf-8")
+    assert "function blocoConcordancia(" in js
+    # As duas colunas são declaradas juntas, na mesma lista de cabeçalhos.
+    cabecalho = js[js.index("function blocoConcordancia(") :][:2000]
+    assert '"metricas.col_observada"' in cabecalho and '"metricas.col_kappa"' in cabecalho
+    # E o motivo do kappa ausente sai de uma TABELA de chaves inteiras: uma
+    # chave montada por concatenação seria invisível para o teste de chave órfã.
+    #
+    # A varredura ignora COMENTÁRIO pela mesma razão que a do i18n ignora: a
+    # prosa deste arquivo cita o padrão proibido para explicar por que ele é
+    # proibido, e uma varredura ingênua acusaria a própria explicação.
+    assert "const MOTIVO_CONC" in js
+    assert 't("conc." +' not in _sem_comentarios(js)

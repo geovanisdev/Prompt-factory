@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from prompt_factory import paths, report
+from prompt_factory import config, paths, report
 from prompt_factory.ingest import REGISTRY, resolve_names
 from prompt_factory.ingest.base import RAW_COLUMNS, dump_meta, make_row, to_iso, write_raw
 
@@ -137,13 +137,40 @@ def test_to_iso_aceita_datetime_str_e_none() -> None:
 # ---------------------------------------------------------------------------
 
 
+#: Fontes que estão no REGISTRY e NUNCA entram no `pf ingest` sem argumentos,
+#: cada uma com o motivo por escrito. A lista é nomeada em vez de subtraída
+#: porque os dois motivos são diferentes, e "tudo menos lmsys" já escondia isso:
+#: uma exclusão nova entraria em silêncio, bastando outra sair.
+FORA_DO_PADRAO: dict[str, str] = {
+    # gated, licença proíbe redistribuir -> enabled = false
+    "lmsys": "enabled",
+    # é a fonte que a PRÓPRIA plataforma escreve: ingerir o próprio demo tem de
+    # ser ato explícito -> default_on = false E ausência de ORDEM_PADRAO
+    "plataforma": "default_on",
+}
+
+
 def test_resolve_names_vazio_expande_para_as_default_on() -> None:
     padrao = resolve_names([])
-    # lmsys está no REGISTRY mas é enabled=false: nunca entra no padrão.
-    assert set(padrao) == set(REGISTRY) - {"lmsys"}
+    assert set(padrao) == set(REGISTRY) - set(FORA_DO_PADRAO)
     assert padrao[-2:] == ["wildchat_pt", "wildchat_en"]  # os caros por último
     assert resolve_names(None) == padrao
     assert resolve_names(["all"]) == padrao
+
+
+@pytest.mark.parametrize(("fonte", "chave"), sorted(FORA_DO_PADRAO.items()))
+def test_quem_esta_fora_do_padrao_esta_fora_pelo_motivo_declarado(
+    fonte: str, chave: str
+) -> None:
+    """O motivo é cobrado, não só o efeito.
+
+    Sem isto, alguém poderia tirar uma fonte do padrão mexendo em ``ORDEM_PADRAO``
+    e deixar o TOML dizendo o contrário — e o TOML é o que uma pessoa lê para
+    saber o que o comando faz.
+    """
+    assert config.sources()[fonte][chave] is False
+    assert fonte not in resolve_names([])
+    assert resolve_names([fonte]) == [fonte]  # pedida pelo nome, roda
 
 
 def test_resolve_names_preserva_ordem_e_remove_repetidas() -> None:

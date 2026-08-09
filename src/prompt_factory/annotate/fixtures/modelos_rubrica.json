@@ -88,6 +88,46 @@
       "_nota": "O INSTRUMENTO DE SEVERIDADE, expresso no MESMO contrato de rubrica: uma escala ancorada de tres pontos mais um catalogo de tipos de issue por criterio. Nenhum tipo de tarefa novo, nenhuma coluna nova, nenhuma migracao — e isto e a prova de que o instrumento e dado. Como as tres ancoras significam o mesmo em todo criterio, a matriz desenha UM cabecalho de escala por grupo e as linhas caem para a altura minima. E o UNICO modelo com `*_i18n`, e a assimetria e a regra: ele nao cabe no formulario, entao a unica maneira de aplica-lo e MATERIALIZAR o JSON verbatim — o que ele diz e o que a pessoa le. Os outros tres passam pelo formulario do anotador, que so tem os campos canonicos e descarta sidecar por construcao; traduzi-los seria decorar um caminho que joga a traducao fora.",
       "escala_min": 1,
       "escala_max": 3,
+      "perguntas": [
+        {
+          "id": "user-goal",
+          "rotulo": "User goal",
+          "rotulo_i18n": { "en": "User goal", "pt": "Objetivo do usuário" },
+          "descricao": "Before rating, state in one or two sentences what this person was trying to get. If you cannot say, the prompt may be out of scope.",
+          "descricao_i18n": {
+            "en": "Before rating, state in one or two sentences what this person was trying to get. If you cannot say, the prompt may be out of scope.",
+            "pt": "Antes de dar nota, diga em uma ou duas frases o que esta pessoa queria obter. Se você não consegue dizer, o prompt pode estar fora de escopo."
+          },
+          "obrigatoria": true,
+          "minimo": 30
+        },
+        {
+          "id": "task-type",
+          "tipo": "categoria",
+          "vocabulario": "task_type",
+          "rotulo": "Task type",
+          "rotulo_i18n": { "en": "Task type", "pt": "Tipo de tarefa" },
+          "descricao": "Pick the corpus taxonomy class that best describes what the prompt asks for — this label flows back to the corpus row. If nothing fits, use 'outro'.",
+          "descricao_i18n": {
+            "en": "Pick the corpus taxonomy class that best describes what the prompt asks for — this label flows back to the corpus row. If nothing fits, use 'outro'.",
+            "pt": "Escolha a classe da taxonomia do corpus que melhor descreve o que o prompt pede — o rótulo volta para a linha do corpus. Se nada servir, use 'outro'."
+          },
+          "obrigatoria": true
+        },
+        {
+          "id": "domain",
+          "tipo": "categoria",
+          "vocabulario": "domain",
+          "rotulo": "Domain",
+          "rotulo_i18n": { "en": "Domain", "pt": "Domínio" },
+          "descricao": "Pick the subject area the prompt lives in. If nothing fits, use 'geral'.",
+          "descricao_i18n": {
+            "en": "Pick the subject area the prompt lives in. If nothing fits, use 'geral'.",
+            "pt": "Escolha a área de assunto em que o prompt vive. Se nada servir, use 'geral'."
+          },
+          "obrigatoria": true
+        }
+      ],
       "ancoras": [
         {
           "valor": 1,

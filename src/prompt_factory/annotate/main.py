@@ -183,6 +183,7 @@ def criar_app(
         routes_admin,
         routes_avaliacao,
         routes_conversa,
+        routes_criacoes,
         routes_meta,
         routes_revisao,
         routes_trabalho,
@@ -191,6 +192,7 @@ def criar_app(
     app.include_router(routes_meta.router)
     app.include_router(routes_trabalho.router)
     app.include_router(routes_conversa.router)
+    app.include_router(routes_criacoes.router)
     app.include_router(routes_revisao.router)
     app.include_router(routes_avaliacao.router)
     app.include_router(routes_admin.router)

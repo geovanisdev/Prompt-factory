@@ -363,7 +363,9 @@ def _conferir_contra_a_rubrica(
     # As notas vão INTEIRAS, não como `(nome, valor)`: desde o P8 a função
     # também confere N/A, o catálogo de tipos de issue e a regra de obrigação, e
     # uma tupla teria jogado fora justamente os campos que ela precisa ver.
-    problema = tmod.erro_contra_a_rubrica(tmod.rubrica_ativa(conn, uid), dados.notas)
+    problema = tmod.erro_contra_a_rubrica(
+        tmod.rubrica_ativa(conn, uid), dados.notas, dados.respostas
+    )
     if problema:
         raise HTTPException(status_code=422, detail=problema)
 
@@ -565,10 +567,18 @@ def abandonar(atribuicao_id: int, corpo: AbandonarIn, anot: ConAnotacao) -> dict
         tarefa_id=int(linha["tarefa_id"]),
         tipo=str(linha["tipo"]),
         turnos_apagados=turnos_apagados,
+        # O MOTIVO DO SKIP (P9) mora no evento, não numa coluna: o padrão de
+        # pulos é dado de ALOCAÇÃO (quem pula o quê diz ao admin o que realocar),
+        # e trilha de operação é exatamente o que `eventos` guarda. Uma coluna em
+        # `atribuicoes` custaria a migração v7 para um dado que nenhuma regra de
+        # negócio consulta. Só entra quando veio — abandono sem motivo (catálogo,
+        # mudança de ideia) não é skip e não deve fingir que é.
+        **({"motivo": corpo.motivo} if corpo.motivo else {}),
     )
     return {
         "atribuicao_id": atribuicao_id,
         "status": "abandonada",
+        "motivo": corpo.motivo,
         "turnos_apagados": turnos_apagados,
     }
 

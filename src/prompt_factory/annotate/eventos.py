@@ -49,6 +49,15 @@ ACOES: tuple[str, ...] = (
     "turno_gerado",
     "rodada_gerada",
     "rodada_decidida",
+    # P4 — o modo criar. O evento da submissão carrega `duplicata_corpus` e o
+    # uid do prompt com que o texto colidiu: é a prova do aviso, e sem ela
+    # "avisamos" seria uma afirmação que ninguém confere meses depois.
+    "criacao_submetida",
+    "criacao_revisada",
+    # P6 — `pf ingest plataforma`. Um evento por PASSE (a ingestão é atômica),
+    # com os ids no detalhe, e `entidade_id` NULO: o fato não é sobre uma
+    # criação, é sobre o lote que atravessou para `data/raw/`.
+    "criacao_exportada",
     # P5a — o admin enchendo a fila em lote, pelo painel.
     "tarefas_geradas",
 )
@@ -57,7 +66,7 @@ ACOES: tuple[str, ...] = (
 #: não há FK de propósito, porque um evento sobre algo apagado continua sendo um
 #: fato que aconteceu — e uma FK com CASCADE apagaria o registro de que existiu.
 ENTIDADES: tuple[str, ...] = (
-    "tarefa", "atribuicao", "anotacao", "avaliacao", "banco", "lote"
+    "tarefa", "atribuicao", "anotacao", "avaliacao", "banco", "lote", "criacao"
 )
 
 

@@ -109,11 +109,20 @@ def _ingest(args: argparse.Namespace) -> int:
     do HuggingFace retomam do cache e o WildChat retoma do checkpoint.
 
     Dois contratos de ingester (ver ``ingest/__init__.py``): ``run_ingest`` para
-    quem controla a própria escrita (WildChat, streaming com checkpoint) e
+    quem controla a própria escrita (WildChat, streaming com checkpoint; e a
+    ``plataforma``, que precisa carimbar o banco DEPOIS de o parquet existir) e
     ``iter_rows`` + ``write_raw`` para as fontes pequenas do M2.
+
+    ``--data-dir`` redireciona o ``raw/`` e é o que permite o smoke da fonte
+    ``plataforma`` rodar a cadeia inteira num diretório descartável (é a única
+    fonte com insumo local, logo a única testável de ponta a ponta). O WildChat
+    **recusa** a flag em vez de honrá-la pela metade: checkpoints e part-files
+    dele moram em ``data/raw/_parts``.
 
     ``datasets``/``pyarrow`` entram só aqui dentro: ``pf --help`` não paga por eles.
     """
+    from pathlib import Path
+
     from . import paths
     from .ingest import REGISTRY, resolve_names
     from .ingest.base import get_source_cfg, write_raw
@@ -133,6 +142,13 @@ def _ingest(args: argparse.Namespace) -> int:
     if args.downsample and fontes != ["wildchat_en"]:
         print("[pf] --downsample só vale para `pf ingest wildchat-en`", file=sys.stderr)
         return 2
+    if args.annotate_db and fontes != ["plataforma"]:
+        print("[pf] --annotate-db só vale para `pf ingest plataforma`", file=sys.stderr)
+        return 2
+
+    raw_dir = Path(args.data_dir).resolve() / "raw" if args.data_dir else None
+    if raw_dir is not None:
+        print(f"[pf] --data-dir: o raw vai para {raw_dir}")
 
     print(f"[pf] ingerindo {len(fontes)} fonte(s): {', '.join(fontes)}")
     for nome in fontes:
@@ -148,6 +164,7 @@ def _ingest(args: argparse.Namespace) -> int:
                     nome,
                     modulo.iter_rows(get_source_cfg(nome), args.max_rows),
                     args.max_rows,
+                    raw_dir=raw_dir,
                 )
         except Exception as exc:  # o traceback inteiro vai para o stderr logo abaixo
             import traceback
@@ -1309,7 +1326,15 @@ COMMANDS: tuple[_Cmd, ...] = (
                 ("--downsample",),
                 {"action": "store_true", "help": "só wildchat-en: pool -> 100.000 estratificadas, sem rede"},
             ),
+            (
+                ("--annotate-db",),
+                {
+                    "metavar": "ARQ",
+                    "help": "só plataforma: outro annotate.sqlite (padrão: data/db/annotate.sqlite)",
+                },
+            ),
             _MAX_ROWS,
+            _DATA_DIR,
             _FORCE,
         ],
         implemented=True,

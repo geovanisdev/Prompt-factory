@@ -624,7 +624,7 @@ def notas_da_rubrica(env: dict[str, Any], nota: int | None = None) -> dict[str, 
     momento em que a plataforma ganhou um segundo instrumento. Quem passa
     ``nota`` explicitamente está testando a escala, e o valor vai como veio.
     """
-    return {
+    corpo: dict[str, Any] = {
         "notas": [
             {
                 "criterio": c["nome"],
@@ -633,6 +633,20 @@ def notas_da_rubrica(env: dict[str, Any], nota: int | None = None) -> dict[str, 
             for c in env["rubrica"]["criterios"]
         ]
     }
+    # As PERGUNTAS do instrumento (P9): o payload válido responde o que o
+    # instrumento declara, como o formulário faz. Caixa livre leva uma resposta
+    # genérica acima de qualquer mínimo razoável; pergunta de CATEGORIA leva o
+    # id da primeira opção — qualquer outra string seria "fora do vocabulário".
+    # Quem testa a obrigação em si a testa explicitamente, omitindo a chave.
+    perguntas = env["rubrica"].get("perguntas") or []
+    if perguntas:
+        corpo["respostas"] = {
+            p["id"]: str(p["opcoes"][0]["id"])
+            if p.get("tipo") == "categoria" and p.get("opcoes")
+            else "The person wanted a usable answer to the request as stated."
+            for p in perguntas
+        }
+    return corpo
 
 
 def submeter(cliente: TestClient, env: dict[str, Any], quem: int, payload: dict[str, Any]):

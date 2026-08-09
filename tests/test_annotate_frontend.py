@@ -233,6 +233,10 @@ ROTAS_DO_FRONT: frozenset[str] = frozenset(
         "/api/avaliacao/",
         "/api/escalacao/fila",
         "/api/escalacao/",
+        # P4: o modo criar — escrever, listar as minhas e decidir sobre as
+        # dos outros. O prefixo cobre `/api/criacoes/{id}/revisar`.
+        "/api/criacoes",
+        "/api/criacoes/",
         # P4d: o runtime de modelos locais e a conversa ao vivo.
         "/api/modelos",
         "/api/conversa/",
@@ -601,10 +605,23 @@ def test_criar_persona_convida_o_autor_pelo_nome(html: str) -> None:
 
 
 def test_a_devolucao_usa_o_vocabulario_novo(js: str) -> None:
-    """``rejeitada`` saiu do vocabulário: nada é recusado na triagem, o trabalho
-    volta para ajuste — e o status da anotação tem exatamente este nome."""
+    """``rejeitada`` saiu do vocabulário DA ANOTAÇÃO: nada é recusado na triagem,
+    o trabalho volta para ajuste — e o status tem exatamente este nome.
+
+    A palavra continua existindo, e num lugar só: o funil do modo CRIAR
+    (``db.STATUS_CRIACAO``), onde ela é a palavra certa. Uma criação recusada é
+    recusada de vez — não há re-trabalho a devolver, porque corrigir o texto de
+    outra pessoa e ingerir o resultado como prompt escrito por gente destruiria
+    a proveniência. O teste passou a exigir o ESCOPO em vez da ausência: era
+    `"rejeitada" not in js`, e uma proibição absoluta obrigaria o modo criar a
+    inventar um sinônimo para um estado que o banco já nomeia.
+    """
     assert 'anterior.veredito !== "devolvida"' in js
-    assert "rejeitada" not in js
+    fora_do_criar = [
+        linha for linha in js.splitlines()
+        if "rejeitada" in linha and "criar." not in linha
+    ]
+    assert not fora_do_criar, fora_do_criar
 
 
 # ---------------------------------------------------------------------------

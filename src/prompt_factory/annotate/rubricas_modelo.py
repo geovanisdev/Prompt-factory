@@ -150,7 +150,7 @@ def carregar(caminho: Path | None = None) -> list[dict[str, Any]]:
     """
     # Import tardio: `tarefas` puxa `conversa` e `pool`, e quem só quer listar
     # os modelos não deve pagar por isso.
-    from .tarefas import normalizar_criterio
+    from .tarefas import normalizar_criterio, normalizar_pergunta
 
     dados = json.loads((caminho or ARQUIVO).read_text(encoding="utf-8"))
     if dados.get("schema") != SCHEMA:
@@ -178,7 +178,7 @@ def carregar(caminho: Path | None = None) -> list[dict[str, Any]]:
         # tela do anotador filtra por esta flag em vez de oferecer e mutilar.
         completo = not any(
             c.get("grupo") or c.get("resumo") or c.get("tipos_issue") for c in criterios
-        )
+        ) and not m.get("perguntas")
         modelo: dict[str, Any] = {
             "id": str(m.get("id") or ""),
             "nome_chave": str(m.get("nome_chave") or ""),
@@ -186,6 +186,33 @@ def carregar(caminho: Path | None = None) -> list[dict[str, Any]]:
             "cabe_no_formulario": completo,
             "criterios": [normalizar_criterio(c) for c in criterios],
         }
+        # As PERGUNTAS do instrumento (P9): a caixa de user goal foi a primeira;
+        # a de categoria (task_type/domain da taxonomia) veio depois. Normalizadas
+        # pela mesma função que `rubrica_ativa` usa na leitura — duas formas para
+        # a mesma coisa é o defeito que o `routes_revisao:243` custou meses para
+        # revelar.
+        if m.get("perguntas"):
+            perguntas = [
+                q for q in (normalizar_pergunta(x) for x in m["perguntas"]) if q.get("id")
+            ]
+            # Portão de FIXTURE, não de leitura: uma pergunta de categoria sem
+            # vocabulário conhecido e sem opções próprias degradaria para caixa
+            # livre na tela — visível lá, mas um arquivo do repositório tem de
+            # falhar AQUI, no terminal, como todo o resto deste carregador.
+            from .tarefas import VOCABULARIOS
+
+            for q in perguntas:
+                if (
+                    q["tipo"] == "categoria"
+                    and not q.get("opcoes")
+                    and q.get("vocabulario") not in VOCABULARIOS
+                ):
+                    raise ModeloInvalido(
+                        f"{modelo['id']!r}: a pergunta {q['id']!r} é de categoria e não "
+                        f"aponta para um vocabulário conhecido {VOCABULARIOS} nem traz "
+                        "opções próprias — o seletor nasceria vazio"
+                    )
+            modelo["perguntas"] = perguntas
         # O sidecar do título só existe onde ele será MATERIALIZADO. Ver o
         # comentário de `completo` acima e o `_nota` da fixture: o formulário
         # descarta sidecar por construção.

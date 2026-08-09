@@ -51,7 +51,9 @@ VERSAO_PAYLOAD = 1
 #: ``avaliar_rubrica`` para 2 renomearia os outros cinco, que não mudaram. O
 #: ``entrega.py`` grava ``payload_schema`` dentro do JSONL entregue, então cinco
 #: contratos passariam a **declarar publicamente uma versão que nunca existiu**.
-VERSOES: dict[str, int] = {"avaliar_rubrica": 2}
+# `avaliar_rubrica`: @2 = P8 (N/A, tipos_issue, trecho); @3 = P9 (respostas
+# às perguntas do instrumento — a caixa de user goal).
+VERSOES: dict[str, int] = {"avaliar_rubrica": 3}
 
 #: Separador entre o contrato e a identidade do INSTRUMENTO em ``payload_schema``.
 #:
@@ -206,21 +208,48 @@ class NotaCriterio(_Base):
 
 
 class AvaliarRubrica(_Base):
-    """``avaliar_rubrica@2`` — uma nota por critério da rubrica, mais o geral.
+    """``avaliar_rubrica@3`` — uma nota por critério da rubrica, mais o geral.
 
-    ``@1`` continua legível e nada o reescreve: a versão viaja na coluna
-    ``payload_schema``, que é o motivo de a coluna existir. Uma linha gravada em
-    ``@1`` não tem `tipos_issue` nem `nao_aplicavel`, e é isso mesmo — inventar
-    as chaves na leitura afirmaria que alguém decidiu algo que ninguém decidiu.
+    ``@1`` e ``@2`` continuam legíveis e nada os reescreve: a versão viaja na
+    coluna ``payload_schema``, que é o motivo de a coluna existir. Uma linha
+    gravada em ``@1`` não tem `tipos_issue` nem `nao_aplicavel`, e é isso mesmo
+    — inventar as chaves na leitura afirmaria que alguém decidiu algo que
+    ninguém decidiu.
+
+    ``@3`` (P9) acrescenta ``respostas`` — as PERGUNTAS ABERTAS que o
+    instrumento declara (``rubrica.perguntas``), sendo a primeira delas a caixa
+    de user goal que o brief v2 manda preencher antes de dar nota. É um **mapa
+    ``{id: texto}`` com todos os ids sempre presentes**, nunca lista, pela mesma
+    razão do ``tipos_issue``: ``avaliacoes.achatar`` trata lista como folha, e
+    com o mapa cada resposta editada no Rate and Review é exatamente UM caminho
+    de diff com UM motivo.
+
+    O Pydantic só barra a forma (string, teto de tamanho, bool disfarçado).
+    Quem confere obrigatoriedade, mínimo e pergunta desconhecida é
+    ``tarefas.erro_contra_a_rubrica`` — a rubrica está lá, não aqui.
     """
 
     notas: Annotated[list[NotaCriterio], Field(min_length=1, max_length=32)]
     comentario_geral: Annotated[str | None, Field(max_length=MAX_TEXTO_LIVRE)] = None
+    respostas: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("comentario_geral")
     @classmethod
     def _geral_limpo(cls, v: str | None) -> str | None:
         return (_limpo(v) or None) if v is not None else None
+
+    @field_validator("respostas", mode="before")
+    @classmethod
+    def _respostas_sao_texto(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            for chave, valor in v.items():
+                # A pegadinha de sempre, quarta aparição: `True` passaria por
+                # `str(valor)` como "True" — uma resposta válida e inventada.
+                if not isinstance(valor, str):
+                    raise ValueError(f"a resposta de {chave!r} não é texto")
+                if len(valor) > MAX_TEXTO_LIVRE:
+                    raise ValueError(f"a resposta de {chave!r} passa do teto da plataforma")
+        return v
 
     @model_validator(mode="after")
     def _sem_criterio_repetido(self) -> AvaliarRubrica:

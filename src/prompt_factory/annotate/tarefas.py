@@ -33,6 +33,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Mapping, Sequence
+from functools import lru_cache
 from typing import Any
 
 from ..config import get as _cfg
@@ -45,7 +46,7 @@ from . import pool as poolmod
 #: porque este formato é lexicograficamente ordenável — trocar por
 #: ``datetime('now')`` (que sai com espaço e sem Z) quebraria toda a expiração
 #: em silêncio, com os dois lados parecendo datas.
-SQL_AGORA = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+SQL_AGORA = adb.SQL_AGORA
 
 #: Quantas tarefas o claim examina antes de desistir. O laço só existe por causa
 #: dos uids sumidos: sem eles, a primeira candidata sempre serve. 50 é folgado o
@@ -480,6 +481,126 @@ def normalizar_criterio(bruto: Any) -> dict[str, Any]:
     return c
 
 
+#: Os tipos de pergunta que o instrumento sabe declarar. ``texto`` é a caixa
+#: livre (a de user goal foi a primeira); ``categoria`` é escolha única num
+#: vocabulário — e o vocabulário que interessa é o da taxonomia do corpus, que é
+#: como o trabalho de anotação passa a PRODUZIR o ``task_type``/``domain`` nulo
+#: nas 159.733 linhas. Tipo fora da tupla degrada para ``texto`` em vez de
+#: levantar: a normalização roda na LEITURA, e uma exceção aqui derrubaria a
+#: tarefa inteira por causa de um typo no blob — a degradação é visível (quem
+#: montou o instrumento vê uma caixa livre onde esperava um seletor) e a
+#: resposta continua capturável.
+TIPOS_PERGUNTA = ("texto", "categoria")
+
+#: As seções da taxonomia que uma pergunta pode referenciar por nome. É a mesma
+#: dupla que o ``escopo`` do brief usa — ``quality`` e ``nsfw`` existem no
+#: arquivo, mas não são vocabulário de classificação.
+VOCABULARIOS = ("task_type", "domain")
+
+
+def normalizar_pergunta(bruto: Any) -> dict[str, Any]:
+    """Uma pergunta do instrumento (P9), na forma canônica.
+
+    ``id`` é a IDENTIDADE: é a chave que ``payload_json`` grava em ``respostas``
+    e nunca é traduzida — o rótulo legível é exibição, com o sidecar ``*_i18n``
+    de sempre. ``obrigatoria`` default ``True`` porque uma pergunta que o
+    instrumento declarou e ninguém precisa responder é decoração; ``minimo`` em
+    caracteres, default 0 ("responda algo").
+
+    Numa pergunta de CATEGORIA a resposta é o **id** de uma classe, e ``minimo``
+    é forçado a zero: o comprimento de um id não mede nada, e um mínimo herdado
+    de 30 tornaria ``codigo`` (6 caracteres) uma resposta impossível — o 422
+    que nenhum select satisfaz. As ``opcoes`` literais aceitam a forma curta
+    (uma string por opção), como o catálogo de ``tipos_issue``.
+    """
+    if not isinstance(bruto, dict):  # pragma: no cover - JSON nosso, sempre dict
+        return {}
+    p = dict(bruto)
+    p["id"] = str(p.get("id") or p.get("rotulo") or "")
+    p["rotulo"] = str(p.get("rotulo") or p["id"])
+    p["obrigatoria"] = bool(p.get("obrigatoria", True))
+    tipo = str(p.get("tipo") or "texto")
+    p["tipo"] = tipo if tipo in TIPOS_PERGUNTA else "texto"
+    p["minimo"] = 0 if p["tipo"] == "categoria" else int(p.get("minimo") or 0)
+    opcoes = p.get("opcoes")
+    if isinstance(opcoes, list):
+        p["opcoes"] = [
+            {"id": str(o), "rotulo": str(o)}
+            if not isinstance(o, dict)
+            else {**o, "id": str(o.get("id") or o.get("rotulo") or "")}
+            for o in opcoes
+        ]
+    return p
+
+
+@lru_cache(maxsize=1)
+def _vocabulario_taxonomia() -> dict[str, list[dict[str, Any]]]:
+    """As classes da taxonomia como OPÇÕES de pergunta, por seção.
+
+    Uma segunda projeção do mesmo ``labeling/taxonomy.json`` que o
+    ``/api/taxonomia`` serve — e não a mesma função, de propósito: lá a forma é
+    a dos chips da tela (``{id: {nome, nome_en}}``, canônico pt-BR); aqui é a do
+    INSTRUMENTO (``{id, rotulo, rotulo_i18n}``, canônico inglês, que é a
+    convenção de todo conteúdo de instrumento), e ``tarefas`` importar uma rota
+    inverteria as camadas. O arquivo continua sendo a fonte única; divergir dele
+    é impossível porque ninguém copia classe nenhuma — as duas projeções o leem.
+
+    Taxonomia ilegível degrada para vazio em vez de levantar, pela mesma razão
+    da rota: uma pergunta de categoria sem opções vira caixa livre na tela e a
+    validação de pertencimento deixa de recusar (recusar exige certeza; deixar
+    passar, não — a lição do s02). O trabalho continua; o seletor é que some.
+    """
+    try:
+        from .. import schema
+
+        tax = schema.load_taxonomy()
+    except (OSError, ValueError):  # pragma: no cover - arquivo do repo
+        return {secao: [] for secao in VOCABULARIOS}
+    return {
+        secao: [
+            {
+                "id": str(chave),
+                "rotulo": str(entrada.get("nome_en") or entrada.get("nome") or chave),
+                "rotulo_i18n": {
+                    "en": str(entrada.get("nome_en") or entrada.get("nome") or chave),
+                    "pt": str(entrada.get("nome") or chave),
+                },
+            }
+            for chave, entrada in (tax.get(secao) or {}).items()
+        ]
+        for secao in VOCABULARIOS
+    }
+
+
+def perguntas_da_rubrica(rubrica: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """As perguntas declaradas, já normalizadas, expandidas e sem as sem-id.
+
+    Ponto único de leitura: a validação, o envelope e (via envelope) a tela leem
+    a mesma lista — uma pergunta que a validação cobra e a tela não desenha
+    seria um 422 impossível de satisfazer.
+
+    A EXPANSÃO DO VOCABULÁRIO acontece aqui, e não na gravação: o blob guarda a
+    referência (``vocabulario: "task_type"``) e as opções saem da taxonomia na
+    leitura — o mesmo desenho do ``seed._resolver_modelo``, pela mesma razão.
+    Materializar as 16 classes dentro de cada rubrica copiaria a taxonomia para
+    o banco, e uma classe renomeada no arquivo deixaria N cópias mentindo. O
+    que a pergunta declarar em ``opcoes`` VENCE (vocabulário próprio de um
+    instrumento é legítimo); a referência só preenche o que está vazio — e é
+    isso que torna a expansão idempotente sobre uma lista já expandida.
+    """
+    if not rubrica:
+        return []
+    saida = []
+    for bruta in rubrica.get("perguntas") or []:
+        p = normalizar_pergunta(bruta)
+        if not p.get("id"):
+            continue
+        if p["tipo"] == "categoria" and not p.get("opcoes"):
+            p["opcoes"] = list(_vocabulario_taxonomia().get(str(p.get("vocabulario")), []))
+        saida.append(p)
+    return saida
+
+
 def rubrica_ativa(conn: sqlite3.Connection, uid: str) -> dict[str, Any] | None:
     linha = conn.execute(
         "SELECT id, titulo, criterios_json, origem FROM rubricas "
@@ -501,6 +622,10 @@ def rubrica_ativa(conn: sqlite3.Connection, uid: str) -> dict[str, Any] | None:
         # Normalizado na LEITURA, e é o que conserta as rubricas já gravadas na
         # forma errada — ver `normalizar_criterio`.
         "criterios": [normalizar_criterio(c) for c in conteudo.get("criterios", [])],
+        # As PERGUNTAS ABERTAS do instrumento (P9) — a caixa de user goal é a
+        # primeira. Normalizadas aqui pela mesma razão dos critérios: a tela e a
+        # validação têm de ver a mesma forma.
+        "perguntas": perguntas_da_rubrica(conteudo),
         "origem": str(linha["origem"]),
         "nota_chave": None,
     }
@@ -540,7 +665,9 @@ def _como_dict(nota: Any) -> dict[str, Any]:
 
 
 def erro_contra_a_rubrica(
-    rubrica: Mapping[str, Any] | None, notas: Sequence[Any]
+    rubrica: Mapping[str, Any] | None,
+    notas: Sequence[Any],
+    respostas: Mapping[str, str] | None = None,
 ) -> str | None:
     """A nota cabe na escala DAQUELE critério, todo critério foi decidido, e o
     que foi sinalizado está explicado?
@@ -572,6 +699,41 @@ def erro_contra_a_rubrica(
     """
     if rubrica is None:
         return None
+
+    # AS PERGUNTAS DO INSTRUMENTO vêm antes dos critérios, como na tela: o
+    # brief manda declarar o user goal ANTES de dar nota, e a ordem dos erros
+    # deve ser a ordem do trabalho. `respostas=None` (chamador antigo, rubrica
+    # multi-turno da conversa) equivale a "nenhuma dada" — uma rubrica sem
+    # perguntas passa igual, e uma com pergunta obrigatória cobra.
+    perguntas = perguntas_da_rubrica(rubrica)
+    dadas_r = dict(respostas or {})
+    conhecidas = {p["id"] for p in perguntas}
+    intrusas = sorted(set(dadas_r) - conhecidas)
+    if intrusas:
+        return f"resposta para pergunta que o instrumento não declara: {', '.join(intrusas)}"
+    for pergunta in perguntas:
+        texto = (dadas_r.get(pergunta["id"]) or "").strip()
+        if pergunta["obrigatoria"] and not texto:
+            return f"a pergunta '{pergunta['rotulo']}' está sem resposta"
+        if texto and len(texto) < int(pergunta["minimo"]):
+            return (
+                f"a resposta de '{pergunta['rotulo']}' tem {len(texto)} caractere(s); "
+                f"o mínimo é {pergunta['minimo']}"
+            )
+        # CATEGORIA: a resposta é o id de uma classe, e pertencer ao vocabulário
+        # é a validação inteira — é este id que vai virar o rótulo da linha do
+        # corpus. Sem opções em mãos (taxonomia ilegível, instrumento sem
+        # vocabulário) o pertencimento não é conferível e a resposta passa:
+        # recusar exige certeza, e um 422 que nenhum valor satisfaz travaria a
+        # submissão por causa de um arquivo — a mesma guarda do recheck do s06.
+        if texto and pergunta["tipo"] == "categoria":
+            validas = {str(o.get("id")) for o in pergunta.get("opcoes") or []}
+            if validas and texto not in validas:
+                return (
+                    f"a resposta de '{pergunta['rotulo']}' não é uma categoria "
+                    f"do instrumento: {texto!r}"
+                )
+
     esperados = {
         str(c.get("nome")): c for c in rubrica.get("criterios", []) if isinstance(c, dict)
     }

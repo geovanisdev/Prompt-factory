@@ -419,6 +419,23 @@ min_chars_motivo_edicao = 10
 # que é justamente o que este projeto existe para não fazer.
 permitir_autorrevisao = false
 
+# --- agreement entre anotadores (P5a) -----------------------------------------
+# QUANTOS PARES um número de concordância precisa para ser publicado.
+#
+# A separação que este piso governa não é cosmética. A concordância OBSERVADA
+# ("com que frequência as duas pessoas disseram a mesma coisa") é uma estatística
+# descritiva: ela é um fato sobre os pares que existem e vale com n = 1. O kappa
+# é INFERENCIAL — ele desconta o acerto por acaso, e "acaso" é estimado das
+# marginais, que com poucos pares são ruído. Publicar um kappa de 3 pares é
+# publicar o resultado de um sorteio com cara de medida de QC.
+#
+# Abaixo do piso a plataforma devolve a observada e `null` no kappa, com o motivo
+# nomeado — nunca zero. `None` e `0.0` são coisas diferentes: zero significa
+# "concordam no nível do acaso", que é uma afirmação forte sobre a equipe. É a
+# mesma lição do agreement da campanha de rotulagem (M5) e da calibração do
+# revisor (P5b), e ela já custou caro uma vez.
+agreement_min_pares = 10
+
 # --- projetos (escopo) --------------------------------------------------------
 # Toda tarefa nasce dentro de um projeto desde o P3a. Dois nascem com o banco:
 #  * `projeto_padrao` — o trabalho REAL sobre o corpus, o que compõe o

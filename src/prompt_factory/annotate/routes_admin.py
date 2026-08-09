@@ -19,6 +19,12 @@ Duas medidas nascem aqui porque não existem no artefato: ``por_anotador``
 (win-rate por modelo e o viés de posição A/B). As duas saem dos itens que
 ``coletar`` já devolveu — nenhuma segunda consulta.
 
+A terceira, ``concordancia``, é a única que paga uma consulta própria, e paga
+por uma razão de MEDIDA e não de arquitetura: ela precisa do payload **como
+submetido** e de uma população diferente (tudo que foi submetido, inclusive o que
+a triagem devolveu). Ver ``concordancia.py`` — é lá que mora o motivo de o
+instrumento não ser igualdade exata.
+
 O TETO, DECLARADO
 =================
 ``entrega.coletar()`` é **em memória, numa passagem** (ver a docstring dele:
@@ -55,6 +61,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 
 from . import catalogo as cat
+from . import concordancia as conmod
 from . import db as adb
 from . import entrega as entmod
 from . import eventos as evmod
@@ -258,7 +265,13 @@ def metricas(
         "panorama": entmod.panorama(itens),
         "calibracao_revisor": entmod.calibracao_do_revisor(itens),
         "vazamento_triagem": entmod.triagem_deixou_passar(itens),
-        # E as duas que só existem aqui.
+        # E as três que só existem aqui. A concordância tem POPULAÇÃO PRÓPRIA e
+        # por isso não sai de `itens`: ela mede o que os anotadores submeteram,
+        # inclusive o que a triagem ainda não viu e o que ela devolveu, e mede
+        # pelo payload COMO SUBMETIDO. `coletar` entrega o corrigido em
+        # `payload_final` — usá-lo mediria o quanto o revisor convergiu as duas
+        # pessoas, que é outra pergunta e de resposta sempre lisonjeira.
+        "concordancia": conmod.relatorio(anot, projeto),
         "por_anotador": _por_anotador(itens),
         "duelos": _duelos(itens),
     }

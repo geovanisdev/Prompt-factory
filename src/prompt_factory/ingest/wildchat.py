@@ -49,6 +49,7 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -993,6 +994,22 @@ def run_ingest(source_name: str, cfg: Mapping[str, Any], args: argparse.Namespac
     modo = MODOS[source_name]
     if not cfg.get("enabled", False):
         print(f"[{source_name}] fonte desabilitada em config/sources.toml (enabled = false)")
+        return 2
+
+    if getattr(args, "data_dir", None):
+        # RECUSA em vez de honrar pela metade. O `--data-dir` do P6 redireciona
+        # o `raw/`, e o passe deste módulo escreve em três lugares: o parquet
+        # final, os part-files (`raw/_parts/`) e o checkpoint
+        # (`raw/_checkpoints/`) — os dois últimos com caminho absoluto próprio.
+        # Honrar só o primeiro deixaria um passe de 45 min gravando part-files
+        # na árvore de produção e consolidando num diretório temporário: o pior
+        # dos dois mundos, e sem nada na tela dizendo isso.
+        print(
+            f"[{source_name}] --data-dir não vale para o WildChat: os part-files e o "
+            "checkpoint deste passe moram em data/raw/_parts e data/raw/_checkpoints, "
+            "com caminho próprio. Rode sem a flag.",
+            file=sys.stderr,
+        )
         return 2
 
     if getattr(args, "downsample", False):

@@ -1261,7 +1261,7 @@ def _validar_item_anotacao(
     # ela, uma sintética entraria com nota 7 num critério de 1..5, e a tela
     # desenharia cinco botões e um valor que não é nenhum deles.
     if isinstance(dados, payloads.AvaliarRubrica):
-        problema = tmod.erro_contra_a_rubrica(rubrica, dados.notas)
+        problema = tmod.erro_contra_a_rubrica(rubrica, dados.notas, dados.respostas)
         if problema:
             erros.append(f"tarefa {tid}: {problema}")
 

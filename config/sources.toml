@@ -160,3 +160,20 @@ attribution = "Zheng, Lianmin; Chiang, Wei-Lin; Sheng, Ying; et al. \"LMSYS-Chat
 expected_min = 20000
 expected_max = 60000
 notes = "DESLIGADA. É o maior pool de pt existente (pt é o 2º idioma do dataset), mas é gated, a licença proíbe redistribuição e os nomes vêm anonimizados como NAME_1. Ligar só para uso local; o export nunca inclui redistributable=false. `pf ingest lmsys` já existe: com enabled=false ele faz ZERO rede, imprime o passo a passo para habilitar e sai com código 2 (ingest/lmsys_chat_1m.py)."
+
+# ---------------------------------------------------------------------------
+# Local — a única fonte que NÃO vem do Hub. Última de propósito.
+# ---------------------------------------------------------------------------
+
+[plataforma]
+enabled = true
+default_on = false
+hf_id = ""
+lang = "pt"
+license = "cc0-1.0"
+commercial_ok = true
+redistributable = true
+attribution = "Prompts escritos por pessoas na Bancada (plataforma de anotação do Prompt Factory) e dedicados ao domínio público sob CC0 1.0 Universal. Cada linha corresponde a uma criação aprovada em revisão; o identificador da criação viaja em meta_json."
+expected_min = 0
+expected_max = 100000
+notes = "A ÚNICA fonte sem Hub: o insumo é o data/db/annotate.sqlite desta máquina, e por isso `hf_id` está vazio (não há repo a citar; vazio é mais honesto que um id inventado). `default_on = false` porque ingerir o que a própria plataforma escreveu tem de ser ato explícito — e há uma segunda guarda: `plataforma` não está em ingest.ORDEM_PADRAO, que é o que o `all` expande. expected_min/max é o ÚNICO deste arquivo que não é medido: a contagem cresce com a plataforma, então a faixa é frouxa de propósito (e o `pf report raw` nem a consulta, porque só olha fontes default_on). Quem confere o número de verdade é o funil do `pf annotate status`. A seção é a última também por causa do desempate do dedup — mas quem de fato decide ali é o LICENSE_RANK, onde o cc0-1.0 fica atrás das cinco (True,True) do Hub para que uma criação colada não substitua o prompt original."

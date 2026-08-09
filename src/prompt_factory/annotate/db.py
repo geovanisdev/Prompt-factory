@@ -141,6 +141,28 @@ ROTULOS_DUELO: tuple[str, ...] = ("A", "B")
 #: sabe onde ficam as pontas.
 ESCALA_TURNO: tuple[int, int] = (1, 5)
 
+#: Os motivos de SKIP (P9) — a lista fechada que o brief v2 promete: "pick the
+#: reason from the list. One click, no essay". Ids em inglês kebab porque são
+#: IDENTIDADE (viajam no evento e um dia no export), como os ids de
+#: ``tipos_issue``; o rótulo legível é cromo e mora no dicionário da tela.
+#:
+#: O motivo NÃO vira coluna de ``atribuicoes`` — ele é gravado no
+#: ``detalhe_json`` do evento ``tarefa_abandonada``, que é onde metadado de ação
+#: já mora e que o painel do admin (P5a) agrega. Uma coluna nova em tabela
+#: existente custaria a migração v7 para guardar um dado que é, por natureza,
+#: trilha: o padrão de skips é dado de ALOCAÇÃO, não estado da atribuição.
+#:
+#: A lista é fechada (o Pydantic recusa fora dela) porque o brief a promete
+#: fechada: "um clique, sem redação". Um campo livre aqui viraria justamente o
+#: pedágio que a regra existe para não ter.
+MOTIVOS_ABANDONO: tuple[str, ...] = (
+    "outside-my-domain",
+    "prompt-unclear",
+    "out-of-scope",
+    "broken-material",
+    "cannot-verify",
+)
+
 #: De onde a tarefa veio. ``semente`` = ``pf annotate seed``; ``admin`` = gerada
 #: no painel; ``livre`` = o anotador escolheu o prompt no catálogo (find-or-
 #: create); ``continuacao`` = oferecida ao concluir outra (rubrica -> SFT).
@@ -295,14 +317,25 @@ STATUS_CRIACAO: tuple[str, ...] = ("submetida", "aprovada", "rejeitada", "export
 PREFIXO_DEMO = "demo:"
 
 
+#: A expressão SQL do carimbo de tempo (UTC, ISO-8601 com milissegundos), e a
+#: ÚNICA definição dela no pacote — ``tarefas.SQL_AGORA`` aponta para cá.
+#:
+#: Não é economia de caracteres: o formato é load-bearing. A expiração compara
+#: ``expira_em`` com o agora **como string**, e isso só funciona porque este
+#: formato é lexicograficamente ordenável. Duas cópias que divergissem (basta
+#: um ``datetime('now')``, que sai com espaço e sem ``Z``) quebrariam a
+#: comparação em silêncio, com os dois lados parecendo datas.
+SQL_AGORA = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+
+
 def _agora() -> str:
-    """A expressão SQL do carimbo de tempo (UTC, ISO-8601 com milissegundos).
+    """A expressão do carimbo, para interpolar no DDL.
 
     A mesma de ``db.DDL``, e por isso comparável entre os dois bancos numa
     leitura humana. Não há trigger de ``atualizado_em`` em lugar nenhum: quem
     escreve pela API é quem seta a coluna.
     """
-    return "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+    return SQL_AGORA
 
 
 def _lista(valores: tuple[str, ...]) -> str:
@@ -966,6 +999,7 @@ __all__ = [
     "DESFECHO_AVALIACAO",
     "DESFECHO_DECISAO",
     "ESCALA_TURNO",
+    "MOTIVOS_ABANDONO",
     "ORIGENS_RESPOSTA",
     "ORIGENS_RUBRICA",
     "ORIGENS_TAREFA",
@@ -975,6 +1009,7 @@ __all__ = [
     "ROTULOS_DUELO",
     "ROTULOS_MODELO",
     "SCHEMA_VERSION_ANOTACAO",
+    "SQL_AGORA",
     "STATUS_ANOTACAO",
     "STATUS_ATRIBUICAO",
     "STATUS_CRIACAO",

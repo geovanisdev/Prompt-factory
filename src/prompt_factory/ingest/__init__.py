@@ -21,7 +21,18 @@ from __future__ import annotations
 from collections.abc import Sequence
 from types import ModuleType
 
-from . import arena140k, aya, dolly, hh_rlhf, lmsys_chat_1m, no_robots, oasst, prism, wildchat
+from . import (
+    arena140k,
+    aya,
+    dolly,
+    hh_rlhf,
+    lmsys_chat_1m,
+    no_robots,
+    oasst,
+    plataforma,
+    prism,
+    wildchat,
+)
 
 #: nome da fonte (seção do sources.toml) -> módulo com `iter_rows` ou `run_ingest`.
 REGISTRY: dict[str, ModuleType] = {
@@ -35,10 +46,16 @@ REGISTRY: dict[str, ModuleType] = {
     "wildchat_pt": wildchat,
     "wildchat_en": wildchat,
     "lmsys": lmsys_chat_1m,
+    "plataforma": plataforma,
 }
 
 #: Ordem de execução do `all`: barato -> caro. `lmsys` não entra (enabled=false;
-#: só roda se pedida pelo nome, e ainda assim sai 2).
+#: só roda se pedida pelo nome, e ainda assim sai 2). `plataforma` também não, e
+#: por outro motivo: ela é a fonte que a PRÓPRIA plataforma escreve, e ingerir o
+#: que a gente mesmo produziu tem de ser um ato explícito. São duas guardas
+#: independentes — `default_on = false` no toml e a ausência aqui — porque a
+#: consequência de errar é o corpus ganhar linhas de demonstração sem ninguém
+#: ter pedido, e nada nele denunciaria isso depois.
 ORDEM_PADRAO: tuple[str, ...] = (
     "no_robots",
     "dolly",

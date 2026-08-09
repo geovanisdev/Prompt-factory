@@ -115,6 +115,7 @@ class License(StrEnum):
 
     ODC_BY_1_0 = "odc-by-1.0"
     APACHE_2_0 = "apache-2.0"
+    CC0_1_0 = "cc0-1.0"
     CC_BY_4_0 = "cc-by-4.0"
     CC_BY_SA_3_0 = "cc-by-sa-3.0"
     CC_BY_NC_4_0 = "cc-by-nc-4.0"
@@ -136,6 +137,14 @@ class LicensePolicy(NamedTuple):
 LICENSE_POLICY: dict[str, LicensePolicy] = {
     License.ODC_BY_1_0.value: LicensePolicy(True, True),
     License.APACHE_2_0.value: LicensePolicy(True, True),
+    # CC0 1.0 — dedicação ao domínio público, a licença dos prompts escritos na
+    # Bancada (modo criar, fonte `plataforma`). É a única que quem escreve o
+    # texto pode conceder no instante em que o escreve, e é o que torna a
+    # criação ingerível sem uma negociação de direitos por linha. Nem crédito
+    # ela exige — a `attribution` do sources.toml sai no export mesmo assim,
+    # porque o export credita TODA linha e uma exceção ali seria uma coluna
+    # vazia que ninguém sabe interpretar.
+    License.CC0_1_0.value: LicensePolicy(True, True),
     License.CC_BY_4_0.value: LicensePolicy(True, True),
     License.CC_BY_SA_3_0.value: LicensePolicy(True, True),
     # NonCommercial: redistribuir pode, vender o derivado não.

@@ -6,9 +6,11 @@ respondem à mesma pergunta depois: **qual das linhas do grupo sobrevive?**
 A resposta é sempre a mesma ordem lexicográfica de desempate, e ela é
 determinística de ponta a ponta (rodar de novo dá o mesmo canônico):
 
-1. **Licença mais permissiva primeiro** (``LICENSE_RANK``). Não é gosto: manter
-   a cópia Apache-2.0 em vez da LMSYS faz a linha continuar exportável. Este é o
-   único critério com consequência jurídica; os demais só desempatam.
+1. **Licença de política mais aberta primeiro** (``LICENSE_RANK``). Não é gosto:
+   manter a cópia Apache-2.0 em vez da LMSYS faz a linha continuar exportável.
+   Este é o único critério com consequência jurídica; os demais só desempatam.
+   Dentro de uma mesma política a ordem é editorial — e é lá que mora a
+   exceção do ``cc0-1.0`` da plataforma, explicada na própria ``LICENSE_RANK``.
 2. **Ordem das seções em ``config/sources.toml``** — que é a ordem editorial das
    fontes (português primeiro, WildChat antes de aya, etc.).
 3. Linha **com** ``source_id`` antes de linha sem (rastreabilidade).
@@ -26,16 +28,35 @@ from . import config
 from .schema import License
 from .textnorm import norm_for_hash
 
-#: Menor = mais permissiva = preferida como canônica.
+#: Menor = preferida como canônica. O que o número ordena é a **política**
+#: (``commercial_ok``/``redistributable``), não a fama da licença: as SEIS
+#: primeiras são todas ``(True, True)`` e formam uma classe de equivalência —
+#: entre elas o export não vê diferença nenhuma, e a ordem é editorial.
+#:
+#: É dentro dessa classe que o ``cc0-1.0`` da plataforma fica por ÚLTIMO,
+#: apesar de ser a licença mais permissiva que existe. O motivo não é jurídico,
+#: é de proveniência: quando uma criação da Bancada colapsa com um prompt real,
+#: o caso dominante não é coincidência — é alguém ter COLADO o texto do corpus
+#: no formulário (foi exatamente assim que o P4 foi verificado). Se o cc0
+#: ganhasse o desempate, aprovar essa criação substituiria a linha do aya (com
+#: autor, citação e atribuição publicada) por uma linha cuja proveniência é o
+#: nosso próprio demo — em silêncio, sem nada para sinalizar. O banco inteiro
+#: existe para provar de onde cada linha veio; essa propriedade não pode ser
+#: sobrescrita por um Ctrl+V.
+#:
+#: E não é a ordem das seções do ``sources.toml`` que resolve isto: o critério
+#: 2 só roda quando o 1 empata, e com o cc0 sozinho na sua posição ele nunca
+#: empata contra outra fonte. Quem decide é esta tabela.
 LICENSE_RANK: dict[str, int] = {
     License.APACHE_2_0.value: 0,
     License.MIT.value: 1,
     License.CC_BY_4_0.value: 2,
     License.ODC_BY_1_0.value: 3,
     License.CC_BY_SA_3_0.value: 4,
-    License.CC_BY_NC_4_0.value: 5,
-    License.LMSYS_1M.value: 6,
-    License.UNKNOWN.value: 7,
+    License.CC0_1_0.value: 5,
+    License.CC_BY_NC_4_0.value: 6,
+    License.LMSYS_1M.value: 7,
+    License.UNKNOWN.value: 8,
 }
 
 # Licença nova em schema.py sem entrada aqui viraria "pior que unknown" em

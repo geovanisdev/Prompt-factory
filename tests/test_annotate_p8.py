@@ -92,7 +92,7 @@ def test_subir_um_contrato_nao_renomeia_os_outros_cinco() -> None:
     cinco contratos passariam a declarar publicamente uma versão que nunca
     existiu.
     """
-    assert payloads.nome_schema("avaliar_rubrica") == "avaliar_rubrica@2"
+    assert payloads.nome_schema("avaliar_rubrica") == "avaliar_rubrica@3"
     for tipo in adb.TIPOS_TAREFA:
         if tipo == "avaliar_rubrica":
             continue
@@ -106,15 +106,15 @@ def test_o_schema_reserva_a_identidade_do_instrumento() -> None:
     o formato se decide antes de existir alguma linha com instrumento.
     """
     completo = payloads.nome_schema("avaliar_rubrica", "severidade@1")
-    assert completo == "avaliar_rubrica@2+severidade@1"
-    assert payloads.partes_do_schema(completo) == ("avaliar_rubrica", "2", "severidade@1")
+    assert completo == "avaliar_rubrica@3+severidade@1"
+    assert payloads.partes_do_schema(completo) == ("avaliar_rubrica", "3", "severidade@1")
     # E o formato de hoje continua legível pelo mesmo leitor.
     assert payloads.partes_do_schema("comparar_ab@1") == ("comparar_ab", "1", None)
 
 
 def test_quem_chaveia_por_tipo_ignora_o_instrumento() -> None:
     """É o que faz uma linha com instrumento continuar legível por código antigo."""
-    tipo, _, _ = payloads.partes_do_schema("avaliar_rubrica@2+qualquer-coisa@7")
+    tipo, _, _ = payloads.partes_do_schema("avaliar_rubrica@3+qualquer-coisa@7")
     assert tipo in payloads.MODELOS
 
 
@@ -458,9 +458,19 @@ def test_o_payload_entregue_declara_a_versao_do_contrato(
         {"criterio": c["nome"], "nota": int(c["escala"]["max"])}
         for c in env["rubrica"]["criterios"]
     ]
+    # E as perguntas do instrumento (P9): o payload válido responde o que a
+    # rubrica declara — a fila abre no instrumento de severidade, que pergunta.
+    # Categoria leva o id da primeira opção; qualquer prosa seria "fora do
+    # vocabulário".
+    respostas = {
+        q["id"]: str(q["opcoes"][0]["id"])
+        if q.get("tipo") == "categoria" and q.get("opcoes")
+        else "The person wanted a wall-ready procedure inside the limits stated."
+        for q in env["rubrica"].get("perguntas") or []
+    }
     r = cliente.post(
         f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
-        json={"anotador_id": quem, "payload": {"notas": notas}},
+        json={"anotador_id": quem, "payload": {"notas": notas, "respostas": respostas}},
     )
     assert r.status_code == 200, r.text
 
@@ -580,10 +590,20 @@ def test_a_fila_do_avaliar_abre_no_instrumento_e_ele_cobra_evidencia(
     criterios = env["rubrica"]["criterios"]
     topo = [{"criterio": c["nome"], "nota": int(c["escala"]["max"])} for c in criterios]
 
+    # As perguntas do instrumento respondidas em tudo: este teste é sobre a
+    # regra de obrigação dos CRITÉRIOS, e uma pergunta em aberto (ou uma
+    # categoria fora do vocabulário) mascararia o erro que ele quer ver.
+    respostas = {
+        q["id"]: str(q["opcoes"][0]["id"])
+        if q.get("tipo") == "categoria" and q.get("opcoes")
+        else "The person wanted a wall-ready procedure inside the limits stated."
+        for q in env["rubrica"].get("perguntas") or []
+    }
+
     def enviar(notas: list[dict[str, Any]]) -> Any:
         return cliente.post(
             f"/api/atribuicoes/{env['atribuicao_id']}/submeter",
-            json={"anotador_id": quem, "payload": {"notas": notas}},
+            json={"anotador_id": quem, "payload": {"notas": notas, "respostas": respostas}},
         )
 
     alvo = next(i for i, c in enumerate(criterios) if c.get("tipos_issue"))

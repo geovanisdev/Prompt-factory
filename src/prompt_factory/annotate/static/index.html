@@ -438,6 +438,25 @@ main{padding:22px 18px 60px;max-width:1180px;margin:0 auto}
 .chip-cat .cat-id{color:var(--texto-3);font-family:var(--fonte-mono);font-size:.72rem}
 .brief-versao{font-weight:400;color:var(--texto-3);font-size:.82rem}
 
+/* O leque de skip (P9): inline, abaixo da barra de ações. Botões do mesmo
+   tamanho — a lista é fechada e nenhum motivo é "o recomendado". */
+.skip-motivos{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  margin-top:10px;padding:10px 12px;border:1px solid var(--linha);
+  border-radius:var(--raio);background:var(--superficie-2);
+}
+.skip-titulo{font-size:.88rem;color:var(--texto-2);margin-right:4px}
+.skip-motivo{font-size:.85rem}
+
+/* As perguntas abertas do instrumento (P9). Antes da matriz, compactas: a caixa
+   de user goal pede 1-2 frases, não um ensaio — duas linhas bastam e a área
+   cresce sozinha se precisar. */
+.perguntas-instrumento{margin-bottom:14px;display:grid;gap:10px}
+.pergunta-aberta textarea{min-height:3.2em}
+.pergunta-aberta select{max-width:34rem}
+.pergunta-desc{color:var(--texto-2);font-size:.82rem;margin-top:2px}
+.pergunta-lida{margin:2px 0 0;color:var(--texto-2);white-space:pre-wrap}
+
 .vazio{padding:34px 26px;text-align:center}
 .vazio-titulo{font-size:1.08rem;font-weight:600;margin-bottom:8px}
 .vazio-linha{color:var(--texto-2);max-width:620px;margin:0 auto 6px}
@@ -519,6 +538,26 @@ main{padding:22px 18px 60px;max-width:1180px;margin:0 auto}
    de QC está afrouxada — e um aviso que se fecha vira um aviso que ninguém viu
    na hora que importava. Âmbar (a cor de "devolvido"), e não vermelho: não é
    erro, é uma escolha explícita de quem configurou. */
+/* --- modo criar (P4) --- */
+.criar-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.cc0{
+  margin:16px 0 0;padding:11px 14px;font-size:.86rem;color:var(--texto-2);
+  background:var(--fundo-2);border-left:3px solid var(--acento);border-radius:var(--raio);
+}
+.card-criacao{
+  padding:13px 15px;margin-bottom:12px;
+  background:var(--fundo-2);border:1px solid var(--borda);border-radius:var(--raio);
+}
+.criacao-topo{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.criacao-texto{margin:0 0 10px;font-family:var(--serifa);white-space:pre-wrap}
+.criacao-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--borda)}
+/* O aviso de duplicata é RESULTADO, não erro: cor de nota, não de alarme. */
+.aviso-dup{
+  margin-top:10px;padding:9px 12px;font-size:.87rem;
+  color:var(--devolvido);background:var(--devolvido-fundo);
+  border:1px solid var(--devolvido);border-radius:var(--raio);
+}
+
 .faixa-solo{
   display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
   padding:9px 14px;margin-bottom:12px;font-size:.88rem;
@@ -1641,7 +1680,15 @@ function detalhe(corpo) {
   if (!d) return "";
   if (typeof d === "string") return d;
   if (Array.isArray(d)) {
-    return d.map((e) => (e.loc ? e.loc.slice(1).join(".") + ": " : "") + (e.msg || "")).join(" · ");
+    // O caminho pode ser VAZIO, e aí não há prefixo. Um erro de `model_validator`
+    // chega com `loc: ["body"]`, então `slice(1)` é `[]` e a versão antiga
+    // escrevia ": " no começo da frase — "não deu para enviar: : recusar exige…".
+    // O prefixo `Value error, ` é do Pydantic e não diz nada a quem lê a tela.
+    return d.map((e) => {
+      const onde = (e.loc || []).slice(1).join(".");
+      const msg = String(e.msg || "").replace(/^Value error, /, "");
+      return onde ? onde + ": " + msg : msg;
+    }).join(" · ");
   }
   return String(d.mensagem || "");
 }
@@ -1853,6 +1900,69 @@ const TEXTOS = {
   "subaba.avaliacao.titulo": "Rate and Review — what triage let through",
   "subaba.avaliacao.vazio": "Nothing waiting to be evaluated.",
   "subaba.avaliacao.linha": "What triage approves lands here. You score the work as it arrived, fix what can be fixed, score the result — and none of it goes back to whoever annotated.",
+  "subaba.criacoes.nome": "Written prompts",
+  "subaba.criacoes.titulo": "Prompts written here — waiting for a decision",
+  "subaba.criacoes.vazio": "No prompt waiting for a decision.",
+  "subaba.criacoes.linha": "One pass, not two: either the text works as a prompt and enters the corpus, or it does not. Rewriting someone else's text and ingesting the result as a human-written prompt would destroy the provenance this project exists to keep — so a refusal comes with a comment instead.",
+  "vista.criar": "Write a prompt",
+  "criar.titulo": "Write a prompt",
+  "criar.linha": "The other two modes take prompts from the corpus. This one feeds it: what you write here goes through review, ingestion and the whole pipeline, and comes back as a corpus row with its own id.",
+  "criar.texto": "The prompt",
+  "criar.texto_ph": "Write it as you would type it to an assistant — a real request, not a description of one.",
+  "criar.lang": "Language",
+  "criar.lang_pt": "Brazilian Portuguese",
+  "criar.lang_en": "English",
+  "criar.lang_nota": "A hint. The pipeline decides for real, with two detectors and a tie-breaker.",
+  "criar.task_type": "Task type (suggestion)",
+  "criar.domain": "Domain (suggestion)",
+  "criar.sem_sugestao": "— no suggestion —",
+  "criar.sugestao_nota": "A hint for whoever reviews. The corpus label comes from the labelling campaign.",
+  "criar.brief": "What is this prompt testing? (optional)",
+  "criar.brief_ph": "One or two sentences on what a good answer would have to get right.",
+  "criar.cc0": "By submitting, you dedicate this text to the public domain under CC0 1.0. Every row in this project carries its licence, and this is the one you can grant for something you just wrote.",
+  "criar.enviar": "Submit for review",
+  "criar.enviando": "Submitting…",
+  "criar.falta": "{n} more character(s)",
+  "criar.minhas": "What you have written",
+  "criar.minhas_vazio": "Nothing yet. What you submit shows up here with the review decision.",
+  "criar.carregando": "Loading…",
+  "criar.item": "Written prompt",
+  "criar.escolha": "Pick one on the left to decide.",
+  "criar.aprovar": "Approve",
+  "criar.recusar": "Refuse",
+  "criar.comentario": "Comment (required to refuse)",
+  "criar.comentario_ph": "What would have to change for this to work as a prompt.",
+  "criar.dup_selo": "already in the corpus",
+  "criar.dup_titulo": "Already in the corpus.",
+  "criar.dup_linha": "The exact-duplicate chain matched this text against {uid}. That is the deduplication working, not a mistake — but approving it adds no new row.",
+  "criar.rot_licenca": "Licence",
+  "criar.rot_task_type": "Task type",
+  "criar.rot_domain": "Domain",
+  "criar.rot_uid": "Predicted corpus id",
+  "criar.rot_comentario": "Reviewer comment",
+  "criar.status.submetida": "waiting for review",
+  "criar.status.aprovada": "approved",
+  "criar.status.rejeitada": "refused",
+  "criar.status.exportada": "ingested",
+  "recado.criada": "prompt submitted for review",
+  "recado.criada_dup": "submitted — and it already exists in the corpus, see the note",
+  "recado.criacao_aprovada": "approved — it will enter the corpus on the next ingestion",
+  "recado.criacao_recusada": "refused, with your comment",
+  "recado.erro_criar": "could not submit: {erro}",
+  "recado.erro_criacoes": "could not load the written prompts: {erro}",
+  "recado.erro_decidir": "could not record the decision: {erro}",
+  "falta.pergunta": "“{rotulo}” has no answer yet",
+  "falta.pergunta_categoria": "“{rotulo}” has no category picked yet",
+  "falta.pergunta_minimo": "“{rotulo}” needs {n} more character(s)",
+  "pergunta.escolher": "— pick a category —",
+  "skip.titulo": "Why are you skipping?",
+  "skip.cancelar": "keep the task",
+  "skip.outside_my_domain": "outside my domain",
+  "skip.prompt_unclear": "prompt unclear",
+  "skip.out_of_scope": "out of scope",
+  "skip.broken_material": "broken material",
+  "skip.cannot_verify": "cannot verify",
+  "recado.pulada": "Skipped — reason recorded.",
   "brief.titulo": "Project brief — {projeto}",
   "brief.titulo_versao": "Project brief — {projeto} (version {versao})",
   "brief.sem": "No brief published for this project yet — the administration screen shows how to load the demo content.",
@@ -2301,6 +2411,28 @@ const TEXTOS = {
   "metricas.cal_eixos": "Rows: the hidden target. Columns: what the reviewer said.",
   "metricas.confusao": "Hidden target versus reviewer",
   "metricas.familias": "By planted defect family",
+  "metricas.conc_titulo": "Agreement between annotators",
+  "metricas.conc_nota": "Two people, one item. Observed agreement says how often they said the same thing; kappa says how much of that beats chance — they answer different questions and are read together. Rubric scores use quadratic weights over the declared scale, so being one step apart is not the same as being four. Measured on what the annotators submitted, never on what the reviewer fixed.",
+  "metricas.conc_vazia": "No item has been annotated by two people yet, so there is no pair to compare. This is not zero agreement — it is no measurement.",
+  "metricas.conc_vazia_saida": "Generate tasks with a target of 2 or more annotations, in the tab next door, and the pairs appear here as they come in.",
+  "metricas.conc_tarefas": "Items with 2 or more annotators",
+  "metricas.conc_sozinhas": "Items with a single annotator",
+  "metricas.conc_pessoas": "Annotators involved",
+  "metricas.conc_sinteticas": "Synthetic annotations excluded",
+  "metricas.conc_piso": "Pairs required to publish a kappa",
+  "metricas.col_campo": "What was compared",
+  "metricas.col_pares": "Pairs",
+  "metricas.col_observada": "Observed",
+  "metricas.col_kappa": "Kappa",
+  "metricas.col_instrumento": "Instrument",
+  "agr.notas": "Rubric scores, scale {min} to {max}",
+  "agr.na": "Whether the criterion applies",
+  "agr.issue": "Issue types flagged",
+  "agr.preferencia": "A/B preference",
+  "agr.categoria": "Category: {rotulo}",
+  "agr.outro": "Other field",
+  "conc.poucos_pares": "too few pairs",
+  "conc.sem_variancia": "no variance to correct for",
   "metricas.vaz_titulo": "Did triage let anything through?",
   "metricas.vaz_nota": "This measures the triage pass, not the person who wrote the annotation: an item approved in pass 1 and found unusable in pass 2 went through a gate that should have stopped it.",
   "metricas.vaz_aprovados": "Approved by triage",
@@ -2529,6 +2661,69 @@ const TEXTOS = {
   "subaba.avaliacao.titulo": "Rate and Review — o que passou na triagem",
   "subaba.avaliacao.vazio": "Nada esperando avaliação.",
   "subaba.avaliacao.linha": "O que a triagem aprova cai aqui. Você avalia o trabalho como ele chegou, corrige o que dá para corrigir, avalia o resultado — e nada disso volta para quem anotou.",
+  "subaba.criacoes.nome": "Prompts escritos",
+  "subaba.criacoes.titulo": "Prompts escritos aqui — esperando decisão",
+  "subaba.criacoes.vazio": "Nenhum prompt esperando decisão.",
+  "subaba.criacoes.linha": "Uma passagem, não duas: ou o texto serve de prompt e entra no corpus, ou não serve. Reescrever o texto de outra pessoa e ingerir o resultado como prompt escrito por gente destruiria a proveniência que este projeto existe para preservar — por isso a recusa vem com comentário.",
+  "vista.criar": "Escrever um prompt",
+  "criar.titulo": "Escrever um prompt",
+  "criar.linha": "Os outros dois modos tiram prompts do corpus. Este alimenta: o que você escreve aqui passa por revisão, ingestão e a pipeline inteira, e volta como uma linha do corpus com id próprio.",
+  "criar.texto": "O prompt",
+  "criar.texto_ph": "Escreva como você escreveria para um assistente — um pedido de verdade, não a descrição de um.",
+  "criar.lang": "Idioma",
+  "criar.lang_pt": "Português do Brasil",
+  "criar.lang_en": "Inglês",
+  "criar.lang_nota": "Um palpite. Quem decide de verdade é a pipeline, com dois detectores e um árbitro.",
+  "criar.task_type": "Tipo de tarefa (sugestão)",
+  "criar.domain": "Domínio (sugestão)",
+  "criar.sem_sugestao": "— sem sugestão —",
+  "criar.sugestao_nota": "Uma pista para quem revisa. O rótulo do corpus sai da campanha de rotulagem.",
+  "criar.brief": "O que este prompt está testando? (opcional)",
+  "criar.brief_ph": "Uma ou duas frases sobre o que uma boa resposta teria de acertar.",
+  "criar.cc0": "Ao enviar, você dedica este texto ao domínio público sob CC0 1.0. Toda linha deste projeto carrega a licença dela, e esta é a que você pode conceder sobre algo que acabou de escrever.",
+  "criar.enviar": "Enviar para revisão",
+  "criar.enviando": "Enviando…",
+  "criar.falta": "faltam {n} caractere(s)",
+  "criar.minhas": "O que você já escreveu",
+  "criar.minhas_vazio": "Nada ainda. O que você enviar aparece aqui com a decisão da revisão.",
+  "criar.carregando": "Carregando…",
+  "criar.item": "Prompt escrito",
+  "criar.escolha": "Escolha um à esquerda para decidir.",
+  "criar.aprovar": "Aprovar",
+  "criar.recusar": "Recusar",
+  "criar.comentario": "Comentário (obrigatório para recusar)",
+  "criar.comentario_ph": "O que teria de mudar para isto funcionar como prompt.",
+  "criar.dup_selo": "já está no corpus",
+  "criar.dup_titulo": "Já está no corpus.",
+  "criar.dup_linha": "A cadeia do dedup exato casou este texto com {uid}. Isso é o dedup funcionando, não um erro — mas aprovar não acrescenta linha nenhuma.",
+  "criar.rot_licenca": "Licença",
+  "criar.rot_task_type": "Tipo de tarefa",
+  "criar.rot_domain": "Domínio",
+  "criar.rot_uid": "Id previsto no corpus",
+  "criar.rot_comentario": "Comentário de quem revisou",
+  "criar.status.submetida": "esperando revisão",
+  "criar.status.aprovada": "aprovada",
+  "criar.status.rejeitada": "recusada",
+  "criar.status.exportada": "ingerida",
+  "recado.criada": "prompt enviado para revisão",
+  "recado.criada_dup": "enviado — e ele já existe no corpus, veja a nota",
+  "recado.criacao_aprovada": "aprovada — ela entra no corpus na próxima ingestão",
+  "recado.criacao_recusada": "recusada, com o seu comentário",
+  "recado.erro_criar": "não deu para enviar: {erro}",
+  "recado.erro_criacoes": "não deu para carregar os prompts escritos: {erro}",
+  "recado.erro_decidir": "não deu para registrar a decisão: {erro}",
+  "falta.pergunta": "“{rotulo}” ainda está sem resposta",
+  "falta.pergunta_categoria": "“{rotulo}” ainda está sem categoria",
+  "falta.pergunta_minimo": "“{rotulo}” precisa de mais {n} caractere(s)",
+  "pergunta.escolher": "— escolha uma categoria —",
+  "skip.titulo": "Por que você está pulando?",
+  "skip.cancelar": "ficar com a tarefa",
+  "skip.outside_my_domain": "fora do meu domínio",
+  "skip.prompt_unclear": "prompt incompreensível",
+  "skip.out_of_scope": "fora de escopo",
+  "skip.broken_material": "material quebrado",
+  "skip.cannot_verify": "não consigo verificar",
+  "recado.pulada": "Pulada — motivo registrado.",
   "brief.titulo": "Brief do projeto — {projeto}",
   "brief.titulo_versao": "Brief do projeto — {projeto} (versão {versao})",
   "brief.sem": "Nenhum brief publicado para este projeto ainda — a tela de administração mostra como carregar o conteúdo de demonstração.",
@@ -2977,6 +3172,28 @@ const TEXTOS = {
   "metricas.cal_eixos": "Linhas: a nota-alvo escondida. Colunas: o que quem revisou disse.",
   "metricas.confusao": "Nota-alvo contra o que a revisão disse",
   "metricas.familias": "Por família de defeito plantado",
+  "metricas.conc_titulo": "Concordância entre anotadores",
+  "metricas.conc_nota": "Duas pessoas, um item. A concordância observada diz com que frequência elas disseram o mesmo; o kappa diz quanto disso supera o acaso — são perguntas diferentes e se leem juntas. As notas de rubrica usam peso quadrático sobre a escala declarada, então errar por um degrau não é o mesmo que errar por quatro. Medido sobre o que os anotadores submeteram, nunca sobre o que a revisão corrigiu.",
+  "metricas.conc_vazia": "Nenhum item foi anotado por duas pessoas ainda, então não há par para comparar. Isto não é concordância zero — é ausência de medida.",
+  "metricas.conc_vazia_saida": "Gere tarefas com alvo de 2 ou mais anotações, na aba ao lado, e os pares aparecem aqui conforme chegam.",
+  "metricas.conc_tarefas": "Itens com 2 ou mais anotadores",
+  "metricas.conc_sozinhas": "Itens com um anotador só",
+  "metricas.conc_pessoas": "Anotadores envolvidos",
+  "metricas.conc_sinteticas": "Anotações sintéticas excluídas",
+  "metricas.conc_piso": "Pares exigidos para publicar um kappa",
+  "metricas.col_campo": "O que foi comparado",
+  "metricas.col_pares": "Pares",
+  "metricas.col_observada": "Observada",
+  "metricas.col_kappa": "Kappa",
+  "metricas.col_instrumento": "Instrumento",
+  "agr.notas": "Notas da rubrica, escala {min} a {max}",
+  "agr.na": "Se o critério se aplica",
+  "agr.issue": "Tipos de issue marcados",
+  "agr.preferencia": "Preferência A/B",
+  "agr.categoria": "Categoria: {rotulo}",
+  "agr.outro": "Outro campo",
+  "conc.poucos_pares": "pares de menos",
+  "conc.sem_variancia": "sem variância a descontar",
   "metricas.vaz_titulo": "A triagem deixou passar alguma coisa?",
   "metricas.vaz_nota": "Isto mede a passagem de triagem, e não quem escreveu a anotação: um item aprovado na passagem 1 e julgado inutilizável na passagem 2 atravessou um portão que devia tê-lo barrado.",
   "metricas.vaz_aprovados": "Aprovadas na triagem",
@@ -3267,6 +3484,8 @@ const SUBABAS_REVISOR = [
     vazio: "subaba.anotacoes.vazio", linha: "subaba.anotacoes.linha" },
   { id: "avaliacao", nome: "subaba.avaliacao.nome", titulo: "subaba.avaliacao.titulo",
     vazio: "subaba.avaliacao.vazio", linha: "subaba.avaliacao.linha" },
+  { id: "criacoes", nome: "subaba.criacoes.nome", titulo: "subaba.criacoes.titulo",
+    vazio: "subaba.criacoes.vazio", linha: "subaba.criacoes.linha" },
 ];
 
 /* AS DUAS ESCALAS DA PASSAGEM 2, como TABELA com a chave inteira — pelo mesmo
@@ -3393,6 +3612,18 @@ const CAMPOS_LEGIVEIS = {
   rubrica: "rr.campo.rubrica",
 };
 
+/** Os motivos de SKIP da fila (P9) — os ids têm de bater com
+    `db.MOTIVOS_ABANDONO`, e há teste comparando as duas listas. O id é a
+    identidade que viaja no evento; o rótulo é cromo e vem do dicionário pela
+    CHAVE INTEIRA, nunca por concatenação. */
+const MOTIVOS_SKIP = [
+  ["outside-my-domain", "skip.outside_my_domain"],
+  ["prompt-unclear", "skip.prompt_unclear"],
+  ["out-of-scope", "skip.out_of_scope"],
+  ["broken-material", "skip.broken_material"],
+  ["cannot-verify", "skip.cannot_verify"],
+];
+
 /** As seções do brief, na ordem em que a tela as desenha.
 
     O par (campo do dado, chave do dicionário) e não `"brief." + secao`: chave
@@ -3444,11 +3675,17 @@ const ABAS_ADMIN = [
    ========================================================================== */
 const CHAVE = "bancada.";
 
-/** As três vistas do anotador. A FILA é o caminho principal e vem primeiro. */
+/** As vistas do anotador. A FILA é o caminho principal e vem primeiro.
+
+    `criar` é o TERCEIRO modo de seleção do produto (locked = fila, livre =
+    catálogo, criar = escrever), e por isso ele mora aqui e não nas abas de tipo:
+    escrever um prompt não é um estilo de tarefa, é a origem de um. Ele vem por
+    último porque é o único que não consome o corpus — alimenta. */
 const VISTAS = [
   { id: "fila", nome: "vista.fila" },
   { id: "catalogo", nome: "vista.catalogo" },
   { id: "minhas", nome: "vista.minhas" },
+  { id: "criar", nome: "vista.criar" },
 ];
 
 const est = {
@@ -3502,6 +3739,9 @@ const est = {
   // A seção do brief à vista. Da SESSÃO, não persistida: quem volta depois de
   // um tempo começa pela visão geral, que é onde o brief começa.
   briefSecao: null,
+  // O leque de motivos de skip está aberto? Da tarefa em mãos, não da sessão:
+  // trocar de envelope o fecha sozinho.
+  skipAberto: false,
   // A folha de atalhos está aberta? Não é persistida: ela é consulta, não
   // preferência — abrir a plataforma com um painel de ajuda por cima do trabalho
   // seria o contrário do que ela existe para fazer.
@@ -3528,6 +3768,16 @@ const est = {
   abertoEm: 0,
   catalogo: { q: "", lang: "", fonte: "", faixa: "", page: 1, dados: null },
   minhas: null,
+
+  /* ---- P4: o modo criar ---- */
+  // O RASCUNHO mora aqui, e não no DOM, pela razão de sempre: trocar de idioma
+  // redesenha a tela a partir de `est`, e um texto que a pessoa está escrevendo
+  // não pode sumir porque ela clicou em `EN`.
+  criacao: { texto: "", lang: "pt", task_type: "", domain: "", brief: "", enviando: false },
+  // O que ELA já escreveu (a vista "criar" lista abaixo do formulário) e o que
+  // o revisor tem para decidir. `null` = nunca pedido, que é diferente de vazio.
+  minhasCriacoes: null,
+  criacoes: null,
 
   /* ---- P4d: a conversa com o modelo local ---- */
   // A GERAÇÃO EM VOO: {desde, dois}. Existe só enquanto a chamada está aberta,
@@ -4301,6 +4551,11 @@ function desenharArea() {
     if (!est.minhas) carregarMinhas();
     return;
   }
+  if (est.vista === "criar") {
+    desenharCriar(area);
+    if (!est.minhasCriacoes) carregarMinhasCriacoes();
+    return;
+  }
   desenharFila(area);
   // A FILA PUXA SOZINHA: não existe botão "buscar tarefa". Fechar o laço antes
   // de pedir a próxima coisa é o que impede a tela de perguntar "e agora?".
@@ -4548,11 +4803,44 @@ function barraAcoes() {
   juntar(barra, aviso, enviarBtn, el("span", "atalho", "Ctrl+Enter"));
 
   barra.appendChild(el("span", "crescer"));
+  // O SKIP da fila não abandona direto: abre o leque de motivos do brief v2
+  // ("pick the reason from the list. One click, no essay"). Inline e não modal,
+  // como toda caixa de decisão desta tela — e o segundo clique no botão fecha,
+  // que é o "cancelar" de quem mudou de ideia sem procurar um X.
   const pular = el("button", "botao discreta", t("botao.devolver_pegar_outra"));
   pular.type = "button";
-  pular.addEventListener("click", abandonar);
+  pular.setAttribute("aria-expanded", String(est.skipAberto));
+  pular.addEventListener("click", () => {
+    est.skipAberto = !est.skipAberto;
+    desenharArea();
+  });
   barra.appendChild(pular);
   return barra;
+}
+
+/** O leque de motivos de skip — a linha que o brief promete.
+
+    Um botão por motivo; o clique abandona com AQUELE motivo e puxa a próxima.
+    Sem textarea: o padrão de skips é dado de alocação, e qualquer pedágio a
+    mais empurraria a pessoa para o rating confiante que ela não sustenta. */
+function lequeDeSkip() {
+  if (!est.skipAberto) return null;
+  const caixa = el("div", "skip-motivos");
+  caixa.appendChild(el("span", "skip-titulo", t("skip.titulo")));
+  for (const [id, chave] of MOTIVOS_SKIP) {
+    const b = el("button", "botao skip-motivo", t(chave));
+    b.type = "button";
+    b.addEventListener("click", () => abandonar(id));
+    caixa.appendChild(b);
+  }
+  const ficar = el("button", "botao discreta", t("skip.cancelar"));
+  ficar.type = "button";
+  ficar.addEventListener("click", () => {
+    est.skipAberto = false;
+    desenharArea();
+  });
+  caixa.appendChild(ficar);
+  return caixa;
 }
 
 function avisoRascunho() {
@@ -4726,7 +5014,11 @@ function desenharWorkspace(env, ctx) {
   if (tipo === "comparar_ab") caixa.appendChild(wsComparar(env, c));
   if (tipo === "conversa_modelo") caixa.appendChild(wsConversa(env, c));
   if (tipo === "duelo_modelos") caixa.appendChild(wsDuelo(env, c));
-  if (meu) caixa.appendChild(barraAcoes());
+  if (meu) {
+    caixa.appendChild(barraAcoes());
+    const leque = lequeDeSkip();
+    if (leque) caixa.appendChild(leque);
+  }
   return caixa;
 }
 
@@ -5389,6 +5681,95 @@ function matrizDeCriterios(criterios, c0, opts) {
   return caixa;
 }
 
+/** As perguntas abertas do instrumento (P9). Vêm normalizadas do servidor
+    (`rubrica_ativa`), então o JS só lê. Vazio para toda rubrica pré-P9. */
+function perguntasDe(env) {
+  return (env.rubrica && env.rubrica.perguntas) || [];
+}
+
+/** As caixas de pergunta — ANTES da matriz, na ordem do brief: "state the user
+    goal before rating". Uma textarea por pergunta, com o rótulo vindo do DADO
+    (`bi()`, sidecar `*_i18n`) e o aviso de falta vindo do cromo.
+
+    Os três leitores de sempre: quem anota escreve; quem tria lê o texto como
+    parágrafo; quem faz o Rate and Review edita, e a caixa de motivo do diff
+    cobra o porquê pela MESMA mecânica dos outros campos (`c0.motivos`). */
+function caixasDePergunta(env, c0) {
+  const perguntas = perguntasDe(env);
+  if (!perguntas.length) return null;
+  const form = c0.form;
+  const caixa = el("div", "perguntas-instrumento");
+  for (const pergunta of perguntas) {
+    const id = pergunta.id;
+    const bloco = el("div", "campo pergunta-aberta");
+    const rotulo = el("span", null, bi(pergunta.rotulo_i18n, pergunta.rotulo));
+    const desc = bi(pergunta.descricao_i18n, pergunta.descricao);
+    const valor = (form.respostas || {})[id] || "";
+    // CATEGORIA: a resposta é o ID de uma classe, escolhido num seletor cujas
+    // opções o servidor já expandiu da taxonomia (`perguntas_da_rubrica`). Sem
+    // opções em mãos — taxonomia ilegível — o ramo degrada para a caixa livre:
+    // a resposta continua capturável, e a validação do servidor degrada junto.
+    const opcoes = pergunta.tipo === "categoria" ? pergunta.opcoes || [] : [];
+    if (c0.leitura) {
+      if (opcoes.length && valor) {
+        const achada = opcoes.find((o) => o.id === valor);
+        const lida = el("p", "pergunta-lida");
+        // Nome legível + id, SEMPRE os dois — o mesmo contrato do chip de
+        // categoria do brief: o id é o que atravessa a plataforma e o corpus.
+        if (achada) lida.appendChild(el("span", null, bi(achada.rotulo_i18n, achada.rotulo) + " "));
+        lida.appendChild(el("span", "cat-id", valor));
+        juntar(bloco, rotulo, lida);
+      } else {
+        juntar(bloco, rotulo, el("p", "pergunta-lida", valor || "—"));
+      }
+      caixa.appendChild(bloco);
+      continue;
+    }
+    if (opcoes.length) {
+      const sel = el("select");
+      sel.setAttribute("aria-label", bi(pergunta.rotulo_i18n, pergunta.rotulo));
+      const vazia = el("option", null, t("pergunta.escolher"));
+      vazia.value = "";
+      sel.appendChild(vazia);
+      for (const o of opcoes) {
+        // O nome na língua da interface E o id na mesma linha: é o id que o
+        // payload grava, e escondê-lo no seletor esconderia justamente a parte
+        // que casa com o banco de prompts.
+        const op = el("option", null, bi(o.rotulo_i18n, o.rotulo) + " · " + o.id);
+        op.value = o.id;
+        sel.appendChild(op);
+      }
+      sel.value = valor;
+      sel.addEventListener("change", () => {
+        form.respostas = { ...(form.respostas || {}) };
+        form.respostas[id] = sel.value;
+        c0.aoMudar();
+      });
+      juntar(bloco, rotulo, sel);
+      // A descrição não cabe num placeholder (select não tem): vira a linha de
+      // apoio embaixo, que é onde mora o "se nada servir, use 'outro'".
+      if (desc) bloco.appendChild(el("div", "pergunta-desc", desc));
+      if (c0.motivos) bloco.appendChild(c0.motivos("respostas." + id));
+      caixa.appendChild(bloco);
+      continue;
+    }
+    const area = el("textarea");
+    area.rows = 2;
+    area.value = valor;
+    if (desc) area.placeholder = desc;
+    area.setAttribute("aria-label", bi(pergunta.rotulo_i18n, pergunta.rotulo));
+    area.addEventListener("input", () => {
+      form.respostas = { ...(form.respostas || {}) };
+      form.respostas[id] = area.value;
+      c0.aoDigitar();
+    });
+    juntar(bloco, rotulo, area, dicaLinguaMeta("lingua.meta"));
+    if (c0.motivos) bloco.appendChild(c0.motivos("respostas." + id));
+    caixa.appendChild(bloco);
+  }
+  return caixa;
+}
+
 function wsAvaliar(env, ctx) {
   const c0 = ctx || ctxEdicao();
   const form = c0.form;
@@ -5413,6 +5794,11 @@ function wsAvaliar(env, ctx) {
   // um anotador vem com uma só, e é isso mesmo — ela é dado, não cromo.
   juntar(bloco, el("div", "rotulo-bloco",
     t("ws.rubrica", { titulo: bi(env.rubrica.titulo_i18n, env.rubrica.titulo) })));
+  // AS PERGUNTAS DO INSTRUMENTO vêm antes da matriz, porque é a ordem do
+  // trabalho que o brief declara: primeiro dizer o que a pessoa queria obter,
+  // depois julgar o quanto a resposta serve a isso.
+  const perguntas = caixasDePergunta(env, c0);
+  if (perguntas) bloco.appendChild(perguntas);
   // Matriz à esquerda, rail à direita — `.com-guia` já é este grid e já colapsa
   // em 900px. Abaixo disso o rail desce, e a adjacência que justifica o desenho
   // é a primeira coisa que se perde: é o preço de uma ferramenta de trabalho de
@@ -6630,6 +7016,14 @@ function formDoPayload(env, anterior) {
     const criterios = (env.rubrica && env.rubrica.criterios) || [];
     const form = camposDaMatriz(criterios);
     form.comentario_geral = "";
+    // As respostas às perguntas do instrumento: um mapa {id: texto}, casado por
+    // ID como as notas casam por nome — a rubrica pode ter ganhado uma pergunta
+    // entre a submissão e a leitura.
+    form.respostas = {};
+    for (const pergunta of perguntasDe(env)) {
+      form.respostas[pergunta.id] =
+        (anterior && anterior.respostas && anterior.respostas[pergunta.id]) || "";
+    }
     // RECONHECIMENTO EM VEZ DE MEMÓRIA: no re-trabalho o formulário volta
     // preenchido com o que a pessoa escreveu.
     if (anterior && anterior.notas) {
@@ -6715,6 +7109,24 @@ function oQueFalta() {
 
   if (tipo === "avaliar_rubrica") {
     if (!env.rubrica) return t("falta.sem_rubrica");
+    // As perguntas vêm primeiro, na mesma ordem em que a tela as desenha e o
+    // servidor as valida — o botão e o 422 têm de contar a mesma história.
+    for (const pergunta of perguntasDe(env)) {
+      const texto = ((est.form.respostas || {})[pergunta.id] || "").trim();
+      if (pergunta.obrigatoria && !texto) {
+        // Duas chaves porque o botão pede a AÇÃO que falta: numa caixa livre é
+        // escrever, num seletor de categoria é escolher.
+        const chave = pergunta.tipo === "categoria" && (pergunta.opcoes || []).length
+          ? "falta.pergunta_categoria" : "falta.pergunta";
+        return t(chave, { rotulo: bi(pergunta.rotulo_i18n, pergunta.rotulo) });
+      }
+      if (texto && texto.length < (pergunta.minimo || 0)) {
+        return t("falta.pergunta_minimo", {
+          rotulo: bi(pergunta.rotulo_i18n, pergunta.rotulo),
+          n: (pergunta.minimo || 0) - texto.length,
+        });
+      }
+    }
     return faltaNaMatriz(env.rubrica.criterios, est.form);
   }
   if (tipo === "escrever_rubrica") {
@@ -6876,10 +7288,22 @@ function montarPayload(env, form) {
   const tipo = env.tarefa.tipo;
   if (tipo === "avaliar_rubrica") {
     const criterios = env.rubrica.criterios;
-    return {
+    const corpo = {
       notas: criterios.map((c, i) => notaDoPayload(c, f, i)),
       comentario_geral: f.comentario_geral.trim() || null,
     };
+    // TODAS as perguntas declaradas, na ordem do INSTRUMENTO, sempre presentes
+    // — a lição do `tipos_issue`: com o mapa completo, cada resposta editada no
+    // Rate and Review é exatamente um caminho de diff, e a ordem estável não
+    // fabrica diferença fantasma.
+    const perguntas = perguntasDe(env);
+    if (perguntas.length) {
+      corpo.respostas = {};
+      for (const pergunta of perguntas) {
+        corpo.respostas[pergunta.id] = ((f.respostas || {})[pergunta.id] || "").trim();
+      }
+    }
+    return corpo;
   }
   if (tipo === "escrever_rubrica") {
     return {
@@ -7054,25 +7478,32 @@ async function aceitarContinuacao(cont) {
 }
 
 /** Devolve a atribuição em mãos e NÃO puxa a próxima — quem decide o que vem
-    depois é quem chamou. */
-async function devolver() {
+    depois é quem chamou.
+
+    `motivo` é o skip categorizado do brief v2. Ausente = abandono sem motivo
+    (largar uma tarefa do catálogo, mudar de ideia): gestos que não são "não sei
+    julgar isto" e não devem fingir que são. */
+async function devolver(motivo) {
   if (!est.envelope) return;
   const id = est.envelope.atribuicao_id;
   try {
-    await postar("/api/atribuicoes/" + id + "/abandonar", { anotador_id: est.persona.id });
+    const corpo = { anotador_id: est.persona.id };
+    if (motivo) corpo.motivo = motivo;
+    await postar("/api/atribuicoes/" + id + "/abandonar", corpo);
     limparRascunho(id);
-    recado(t("recado.devolvida_fila"));
+    recado(motivo ? t("recado.pulada") : t("recado.devolvida_fila"));
   } catch (e) {
     recado(e.message, true);
   }
   est.envelope = null;
   est.form = null;
+  est.skipAberto = false;
   est.motivo = "";
   est.motivoChave = null;
 }
 
-async function abandonar() {
-  await devolver();
+async function abandonar(motivo) {
+  await devolver(typeof motivo === "string" ? motivo : null);
   await carregarFila();
 }
 
@@ -7335,6 +7766,350 @@ const ROTULO_STATUS = {
   abandonada: ["pendente", "status.abandonada"],
   expirada: ["pendente", "status.expirada"],
 };
+
+/* ==========================================================================
+   O MODO CRIAR (P4) — o terceiro modo de seleção
+   ========================================================================== */
+
+/** Um seletor de classe da taxonomia, opcional, com nome legível E id.
+
+    O mesmo contrato do chip do brief e do select da pergunta de categoria: o id
+    é o que atravessa a plataforma e o corpus, e escondê-lo esconderia a única
+    parte que casa com o banco de prompts. Vazio é uma opção de verdade — a
+    sugestão é pista para quem revisa, não rótulo. */
+function seletorDeClasse(secao, valor, aoMudar) {
+  const sel = el("select");
+  const vazia = el("option", null, t("criar.sem_sugestao"));
+  vazia.value = "";
+  sel.appendChild(vazia);
+  const classes = est.taxonomia[secao] || {};
+  for (const id of Object.keys(classes)) {
+    const nome = nomeDaClasse(secao, id) || id;
+    const op = el("option", null, nome + " · " + id);
+    op.value = id;
+    sel.appendChild(op);
+  }
+  sel.value = valor || "";
+  sel.addEventListener("change", () => aoMudar(sel.value));
+  return sel;
+}
+
+/* O funil do modo criar, com a chave INTEIRA — como todas as tabelas deste
+   arquivo. `t("criar.status." + item.status)` seria invisível para o teste de
+   chave órfã, e um status novo do backend sairia cru na tela. */
+/* As duas línguas que o DDL aceita, com a chave inteira — mesma disciplina. */
+const LINGUAS_CRIACAO = [["pt", "criar.lang_pt"], ["en", "criar.lang_en"]];
+
+const STATUS_CRIACAO = {
+  "submetida": { chave: "criar.status.submetida", classe: "" },
+  "aprovada": { chave: "criar.status.aprovada", classe: "boa" },
+  "rejeitada": { chave: "criar.status.rejeitada", classe: "grave" },
+  "exportada": { chave: "criar.status.exportada", classe: "boa" },
+};
+
+/** O selo de uma criação já enviada: status + o que ele significa no funil. */
+function seloDeCriacao(item) {
+  const s = STATUS_CRIACAO[item.status] || STATUS_CRIACAO.submetida;
+  return el("span", "selo " + s.classe, t(s.chave));
+}
+
+/** Uma criação na lista — o texto, o selo, e o que a decisão produziu.
+
+    O `uid_previsto` aparece porque ele é a PROMESSA: é o identificador que a
+    linha vai ter no corpus depois do `pf ingest plataforma`. Mostrá-lo é o que
+    permite conferir, depois da ingestão, que a promessa foi cumprida. */
+function cartaoDeCriacao(item, extras) {
+  const card = el("div", "card-criacao");
+  const topo = el("div", "criacao-topo");
+  juntar(topo, seloDeCriacao(item), el("span", "crescer"),
+    el("span", "fraco mono", item.lang));
+  card.appendChild(topo);
+  card.appendChild(el("p", "criacao-texto", item.texto));
+
+  const pes = el("dl", "linhas");
+  const pares = [[t("criar.rot_licenca"), item.licenca]];
+  if (item.task_type_sugerido) {
+    pares.push([t("criar.rot_task_type"),
+      (nomeDaClasse("task_type", item.task_type_sugerido) || "") + " · " + item.task_type_sugerido]);
+  }
+  if (item.domain_sugerido) {
+    pares.push([t("criar.rot_domain"),
+      (nomeDaClasse("domain", item.domain_sugerido) || "") + " · " + item.domain_sugerido]);
+  }
+  if (item.uid_previsto) pares.push([t("criar.rot_uid"), item.uid_previsto]);
+  if (item.comentario_revisao) pares.push([t("criar.rot_comentario"), item.comentario_revisao]);
+  for (const [rotulo, valor] of pares) {
+    pes.appendChild(el("dt", null, rotulo));
+    pes.appendChild(el("dd", "dado", String(valor)));
+  }
+  card.appendChild(pes);
+
+  // O AVISO DE DUPLICATA é RESULTADO, não erro — e a frase diz isso. A mesma
+  // cadeia de normalização que junta as duplicatas do corpus acabou de
+  // reconhecer que duas pessoas escreveram a mesma coisa.
+  if (item.uid_duplicata) {
+    const aviso = el("div", "aviso-dup");
+    juntar(aviso, el("strong", null, t("criar.dup_titulo")),
+      el("span", null, " " + t("criar.dup_linha", { uid: item.uid_duplicata })));
+    card.appendChild(aviso);
+  }
+  if (extras) card.appendChild(extras);
+  return card;
+}
+
+/** O formulário + o que esta pessoa já escreveu.
+
+    A dedicação CC0 fica ACIMA do botão, não num rodapé: é a única licença que
+    quem escreve pode afirmar na hora em que escreve, e o projeto inteiro se
+    apoia em licença por linha. Quem envia precisa ver o que está cedendo. */
+function desenharCriar(area) {
+  const f = est.criacao;
+  const painel = el("div", "painel");
+  const cabeca = el("div", "painel-cabeca");
+  juntar(cabeca, el("h2", null, t("criar.titulo")), el("span", "crescer"));
+  painel.appendChild(cabeca);
+  painel.appendChild(el("p", "vazio-linha", t("criar.linha")));
+
+  const corpo = el("div", "painel-corpo");
+
+  const campoTexto = el("div", "campo");
+  const area1 = el("textarea");
+  area1.rows = 6;
+  area1.value = f.texto;
+  area1.placeholder = t("criar.texto_ph");
+  area1.setAttribute("aria-label", t("criar.texto"));
+  area1.addEventListener("input", () => {
+    f.texto = area1.value;
+    atualizarBotaoCriar();
+  });
+  juntar(campoTexto, el("span", null, t("criar.texto")), area1, dicaLinguaDado(f.lang));
+  corpo.appendChild(campoTexto);
+
+  // O IDIOMA é declarado, e a tela diz que ele é um palpite: quem decide de
+  // verdade é o s02 da pipeline, com dois detectores e um árbitro.
+  const linhaMeta = el("div", "criar-meta");
+  const campoLang = el("div", "campo");
+  const selLang = el("select");
+  for (const [id, chave] of LINGUAS_CRIACAO) {
+    const op = el("option", null, t(chave));
+    op.value = id;
+    selLang.appendChild(op);
+  }
+  selLang.value = f.lang;
+  selLang.setAttribute("aria-label", t("criar.lang"));
+  selLang.addEventListener("change", () => { f.lang = selLang.value; });
+  juntar(campoLang, el("span", null, t("criar.lang")), selLang,
+    el("div", "pergunta-desc", t("criar.lang_nota")));
+  linhaMeta.appendChild(campoLang);
+
+  for (const [secao, chave, rotulo] of [
+    ["task_type", "task_type", "criar.task_type"],
+    ["domain", "domain", "criar.domain"],
+  ]) {
+    const campo = el("div", "campo");
+    juntar(campo, el("span", null, t(rotulo)),
+      seletorDeClasse(secao, f[chave], (v) => { f[chave] = v; }),
+      el("div", "pergunta-desc", t("criar.sugestao_nota")));
+    linhaMeta.appendChild(campo);
+  }
+  corpo.appendChild(linhaMeta);
+
+  const campoBrief = el("div", "campo");
+  const areaBrief = el("textarea");
+  areaBrief.rows = 2;
+  areaBrief.value = f.brief;
+  areaBrief.placeholder = t("criar.brief_ph");
+  areaBrief.setAttribute("aria-label", t("criar.brief"));
+  areaBrief.addEventListener("input", () => { f.brief = areaBrief.value; });
+  juntar(campoBrief, el("span", null, t("criar.brief")), areaBrief,
+    dicaLinguaMeta("lingua.meta"));
+  corpo.appendChild(campoBrief);
+
+  corpo.appendChild(el("p", "cc0", t("criar.cc0")));
+
+  const acoes = el("div", "acoes");
+  const botao = el("button", "primario");
+  botao.type = "button";
+  botao.id = "botao-criar";
+  botao.addEventListener("click", enviarCriacao);
+  acoes.appendChild(botao);
+  corpo.appendChild(acoes);
+  painel.appendChild(corpo);
+  area.appendChild(painel);
+  atualizarBotaoCriar();
+
+  const lista = el("div", "painel espaco-acima-3");
+  const cab2 = el("div", "painel-cabeca");
+  juntar(cab2, el("h2", null, t("criar.minhas")), el("span", "crescer"));
+  lista.appendChild(cab2);
+  if (!est.minhasCriacoes) {
+    lista.appendChild(esqueleto("criar.carregando"));
+  } else if (!est.minhasCriacoes.length) {
+    lista.appendChild(el("p", "vazio-linha", t("criar.minhas_vazio")));
+  } else {
+    const caixa = el("div", "painel-corpo");
+    for (const item of est.minhasCriacoes) caixa.appendChild(cartaoDeCriacao(item));
+    lista.appendChild(caixa);
+  }
+  area.appendChild(lista);
+}
+
+/** O botão diz O QUE FALTA, com o piso vindo do /api/health — como em toda a
+    plataforma, para que ele e o 422 nunca contem histórias diferentes. */
+function atualizarBotaoCriar() {
+  const botao = $("#botao-criar");
+  if (!botao) return;
+  const piso = lim("min_chars_criacao", 15);
+  const falta = piso - est.criacao.texto.trim().length;
+  const impedido = falta > 0 || est.criacao.enviando;
+  botao.disabled = impedido;
+  botao.textContent = est.criacao.enviando
+    ? t("criar.enviando")
+    : falta > 0 ? t("criar.falta", { n: n(falta) }) : t("criar.enviar");
+}
+
+async function carregarMinhasCriacoes() {
+  try {
+    const r = await api(comParams("/api/criacoes", { anotador_id: est.persona.id }));
+    est.minhasCriacoes = r.items || [];
+  } catch (e) {
+    est.minhasCriacoes = [];
+    recado(t("recado.erro_criacoes", { erro: e.message }), true);
+  }
+  if (est.vista === "criar") desenharArea();
+}
+
+async function enviarCriacao() {
+  const f = est.criacao;
+  if (f.enviando) return;
+  f.enviando = true;
+  atualizarBotaoCriar();
+  try {
+    const novo = await postar("/api/criacoes", {
+      autor_id: est.persona.id,
+      texto: f.texto.trim(),
+      lang: f.lang,
+      task_type_sugerido: f.task_type || null,
+      domain_sugerido: f.domain || null,
+      brief: f.brief.trim() || null,
+    });
+    // Limpa o rascunho SÓ no sucesso: um 422 que apaga o que a pessoa escreveu
+    // é a pior forma de recusar um formulário.
+    est.criacao = { texto: "", lang: f.lang, task_type: "", domain: "", brief: "", enviando: false };
+    est.minhasCriacoes = null;
+    recado(novo.duplicata_corpus ? t("recado.criada_dup") : t("recado.criada"));
+    desenharArea();
+    carregarMinhasCriacoes();
+    return;
+  } catch (e) {
+    recado(t("recado.erro_criar", { erro: e.message }), true);
+  }
+  f.enviando = false;
+  atualizarBotaoCriar();
+}
+
+/** A fila de criações do revisor. Uma passagem só: ou o texto serve de prompt
+    e entra no corpus, ou não serve — corrigir o texto de outra pessoa e ingerir
+    o resultado como "prompt escrito por gente" destruiria a proveniência. */
+function desenharFilaCriacoes(sub) {
+  const fila = $("#revisor-fila");
+  limpar(fila);
+  const cr = est.criacoes;
+  const solo = faixaSolo();
+  if (solo) fila.appendChild(solo);
+  if (!cr.items.length) {
+    const vazia = el("div", "fila-vazia");
+    juntar(vazia, el("div", "vazio-titulo", t(sub.vazio)), el("p", "vazio-linha", t(sub.linha)));
+    fila.appendChild(vazia);
+    desenharDetalheCriacao();
+    return;
+  }
+  for (const item of cr.items) {
+    const b = el("button", "fila-item");
+    b.type = "button";
+    b.setAttribute("aria-current", String(cr.sel === item.id));
+    const topo = el("div", "fila-item-topo");
+    juntar(topo, el("strong", null, t("criar.item")), el("span", "dado", item.autor),
+      el("span", "crescer"), el("span", "fraco mono", item.lang));
+    // O aviso de duplicata aparece JÁ NA LISTA: é a informação que muda a
+    // decisão, e escondê-la atrás de um clique faria o revisor aprovar às cegas
+    // uma criação que não acrescenta linha nenhuma ao corpus.
+    if (item.uid_duplicata) topo.appendChild(el("span", "etiqueta devolvido", t("criar.dup_selo")));
+    b.appendChild(topo);
+    b.appendChild(el("div", "fila-item-trecho", item.texto));
+    b.addEventListener("click", () => { cr.sel = item.id; desenharFilaCriacoes(sub); });
+    fila.appendChild(b);
+  }
+  desenharDetalheCriacao();
+}
+
+function desenharDetalheCriacao() {
+  const det = $("#revisor-detalhe");
+  limpar(det);
+  const cr = est.criacoes;
+  const item = cr && cr.items.find((x) => x.id === cr.sel);
+  if (!item) {
+    det.appendChild(el("p", "vazio-linha", t("criar.escolha")));
+    return;
+  }
+  det.appendChild(cartaoDeCriacao(item, acoesDeCriacao(item)));
+}
+
+/** Aprovar / recusar. A recusa abre o comentário obrigatório — ele é a única
+    informação que quem escreveu recebe. */
+function acoesDeCriacao(item) {
+  const caixa = el("div", "criacao-acoes");
+  const campo = el("div", "campo");
+  const texto = el("textarea");
+  texto.rows = 2;
+  texto.placeholder = t("criar.comentario_ph");
+  texto.setAttribute("aria-label", t("criar.comentario"));
+  juntar(campo, el("span", null, t("criar.comentario")), texto,
+    dicaLinguaMeta("lingua.meta"));
+
+  const acoes = el("div", "acoes");
+  const aprovar = el("button", "primario", t("criar.aprovar"));
+  aprovar.type = "button";
+  aprovar.addEventListener("click", () => decidirCriacao(item.id, true, null));
+  const recusar = el("button", null, t("criar.recusar"));
+  recusar.type = "button";
+  recusar.addEventListener("click", () => decidirCriacao(item.id, false, texto.value));
+  juntar(acoes, aprovar, recusar);
+  juntar(caixa, campo, acoes);
+  return caixa;
+}
+
+async function decidirCriacao(id, aprovar, comentario) {
+  try {
+    await postar("/api/criacoes/" + id + "/revisar", {
+      revisor_id: est.persona.id,
+      aprovar: aprovar,
+      comentario: (comentario || "").trim() || null,
+    });
+    recado(aprovar ? t("recado.criacao_aprovada") : t("recado.criacao_recusada"));
+    est.criacoes = null;
+    desenharRevisor();
+  } catch (e) {
+    recado(t("recado.erro_decidir", { erro: e.message }), true);
+  }
+}
+
+async function carregarCriacoes() {
+  try {
+    const r = await api(comParams("/api/criacoes", {
+      anotador_id: est.persona.id, fila: true,
+    }));
+    const itens = r.items || [];
+    est.criacoes = {
+      items: itens, total: itens.length, modo_solo: !!r.modo_solo,
+      sel: itens.length ? itens[0].id : null,
+    };
+  } catch (e) {
+    est.criacoes = { items: [], total: 0, modo_solo: false, sel: null };
+    recado(t("recado.erro_criacoes", { erro: e.message }), true);
+  }
+  desenharRevisor();
+}
 
 function desenharMinhas(area) {
   const painel = el("div", "painel");
@@ -7680,7 +8455,8 @@ async function desenharRevisor() {
     b.setAttribute("aria-selected", String(est.subaba === s.id));
     // "…" e não "0" quando a fila ainda não foi lida: são estados diferentes, e
     // um zero inventado é a única leitura que faz alguém deixar de clicar.
-    const fonte = s.id === "anotacoes" ? est.triagem : est.rr;
+    const fonte = s.id === "anotacoes" ? est.triagem
+      : s.id === "avaliacao" ? est.rr : est.criacoes;
     b.appendChild(el("span", "conta", fonte ? n(fonte.total) : "…"));
     b.addEventListener("click", () => { est.subaba = s.id; desenharRevisor(); });
     b.addEventListener("keydown", (ev) => andarNasAbas(ev, SUBABAS_REVISOR, (id) => { est.subaba = id; desenharRevisor(); }, est.subaba));
@@ -7692,6 +8468,11 @@ async function desenharRevisor() {
   $("#revisor-atalhos").textContent = est.subaba === "anotacoes"
     ? t("revisor.atalhos") : t("rr.atalhos");
 
+  if (est.subaba === "criacoes") {
+    if (!est.criacoes) { await carregarCriacoes(); return; }
+    desenharFilaCriacoes(s);
+    return;
+  }
   if (est.subaba === "avaliacao") {
     if (!est.rr) { await carregarRR(); return; }
     desenharFilaRR(s);
@@ -9159,6 +9940,85 @@ function paresDe(mapa, comoRotulo) {
     .map(([chave, valor]) => [comoRotulo ? comoRotulo(chave) : chave, valor]);
 }
 
+/** Por que um kappa não pôde ser publicado — a chave INTEIRA, como todas as
+    tabelas deste arquivo. `t("conc." + motivo)` seria invisível para o teste de
+    chave órfã, e a chave que o backend inventasse amanhã sairia crua na tabela. */
+const MOTIVO_CONC = {
+  "poucos_pares": "conc.poucos_pares",
+  "sem_variancia": "conc.sem_variancia",
+};
+
+/** O rótulo de uma linha de concordância.
+
+    A chave vem do BACKEND (`chave_i18n`), como o motivo da fila vazia e as
+    frases do painel do pool: a rota fala uma língua, a tela fala duas. O nome da
+    pergunta de categoria é DADO (foi escrito no instrumento) e passa por `bi()`,
+    não pelo dicionário. */
+function rotuloDeConcordancia(linha) {
+  if (linha.chave_i18n === "agr.notas") {
+    const e = linha.escala || {};
+    return t("agr.notas", { min: e.min, max: e.max });
+  }
+  if (linha.chave_i18n === "agr.categoria") {
+    return t("agr.categoria", {
+      rotulo: bi(linha.rotulo_pergunta_i18n, linha.rotulo_pergunta || linha.campo),
+    });
+  }
+  return t(linha.chave_i18n || "agr.outro");
+}
+
+/** A tabela de agreement — e a regra dura: **observada e kappa nunca aparecem
+    um sem o outro**.
+
+    Medido: 12 pares sempre a um degrau de distância dão observada 0,9375 e kappa
+    −1,0. Os dois estão certos e respondem perguntas diferentes (concordam quase
+    sempre em valor; nunca mais do que o acaso já daria, porque usam só duas
+    posições da escala). Um painel com "−1,0" sozinho faria alguém refazer um
+    lote que está bom; um com "94%" sozinho esconderia um viés real. */
+function blocoConcordancia(conc) {
+  const caixa = el("div");
+  const resumo = conc.resumo || {};
+  const linhas = conc.linhas || [];
+  if (!linhas.length) {
+    // Vazio não é zero: não há PAR nenhum para comparar. A frase diz o que
+    // fazer para haver — um estado vazio sem saída é um beco.
+    juntar(caixa,
+      el("p", "metricas-nota", t("metricas.conc_vazia")),
+      el("p", "metricas-nota", t("metricas.conc_vazia_saida")));
+    return caixa;
+  }
+  caixa.appendChild(tabelaMetrica(
+    [["metricas.col_campo", null], ["metricas.col_pares", "num"],
+     ["metricas.col_observada", "num"], ["metricas.col_kappa", "num"],
+     ["metricas.col_instrumento", null]],
+    linhas.map((x) => [
+      [rotuloDeConcordancia(x), null],
+      [n(x.n_pares), "num"],
+      [Math.round(x.observada * 1000) / 10 + "%", "num"],
+      // `null` com o MOTIVO ao lado, nunca zero: zero afirmaria concordância ao
+      // nível do acaso, que é a acusação mais forte que este número sabe fazer.
+      [x.kappa === null || x.kappa === undefined
+        ? "— " + t(MOTIVO_CONC[x.motivo] || MOTIVO_CONC.poucos_pares)
+        : String(x.kappa), "num"],
+      // O instrumento pelo NOME: um agreement sem o nome do instrumento que o
+      // produziu não é conferível, e este painel existe para ser conferido.
+      [x.instrumento, "dado mono"],
+    ])));
+  const pe = el("dl", "linhas espaco-acima-3");
+  for (const [rotulo, valor] of [
+    ["metricas.conc_tarefas", n(resumo.tarefas_com_2_ou_mais || 0)],
+    ["metricas.conc_sozinhas", n(resumo.tarefas_com_1 || 0)],
+    ["metricas.conc_pessoas", n(resumo.anotadores_distintos || 0)],
+    ["metricas.conc_sinteticas", n(resumo.sinteticas_excluidas || 0)],
+    ["metricas.conc_piso", n(conc.piso_pares || 0)],
+  ]) {
+    pe.appendChild(el("dt", null, t(rotulo)));
+    pe.appendChild(el("dd", "num", valor));
+  }
+  caixa.appendChild(pe);
+  return caixa;
+}
+
 function cartaoMetrica(valor, rotulo) {
   const card = el("div", "card");
   juntar(card, el("div", "card-valor", n(valor || 0)), el("div", "card-rotulo", t(rotulo)));
@@ -9345,6 +10205,10 @@ function desenharMetricas() {
     }
   }
   alvo.appendChild(secaoMetrica("metricas.cal_titulo", bloco, "metricas.cal_nota"));
+
+  /* ---- concordância entre anotadores ---- */
+  alvo.appendChild(secaoMetrica(
+    "metricas.conc_titulo", blocoConcordancia(d.concordancia || {}), "metricas.conc_nota"));
 
   /* ---- o que a triagem deixou passar ---- */
   const vaz = d.vazamento_triagem || {};

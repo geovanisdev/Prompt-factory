@@ -183,11 +183,43 @@ def test_o_ingles_nao_tem_portugues(textos: dict[str, dict[str, str]]) -> None:
     assert not sujas, f"português no dicionário inglês: {sujas}"
 
 
+#: As chaves cujo valor É o mesmo nas duas línguas, DE PROPÓSITO. Nome próprio
+#: de estatística (``kappa``), sigla (``N/A``, ``EN``), estrangeirismo já
+#: incorporado (``fallback``), formato de tempo, e os dois rótulos que o dono
+#: pediu em inglês nas duas telas (``Rate and Review``, ``Borderline (Admin)``).
+#:
+#: Uma LISTA e não uma contagem: com ``len(iguais) < 12`` uma tradução esquecida
+#: nova podia entrar em silêncio, bastando outra sair da lista. O teste passava,
+#: o total continuava doze, e a única coisa que se sabia é que doze chaves eram
+#: iguais — não QUAIS.
+IDENTICAS_DE_PROPOSITO = {
+    "admin.pool_fallback",
+    "conversa.decorrido",
+    "conversa.duracao",
+    "conversa.encerrar_atalho",
+    "idioma.en",
+    "idioma.pt",
+    "lingua.selo_en",
+    "lingua.selo_pt",
+    "metricas.col_kappa",
+    "rr.depois.borderline_admin.nome",
+    "subaba.avaliacao.nome",
+    "ws.na",
+}
+
+
 def test_o_portugues_continua_portugues(textos: dict[str, dict[str, str]]) -> None:
     """O simétrico grosseiro: o pt não pode ter virado cópia do inglês."""
-    iguais = [k for k, v in textos["pt"].items() if v == textos["en"][k]]
-    # Siglas e rótulos de idioma são iguais nas duas de propósito ("EN", "en").
-    assert len(iguais) < 12, f"tradução esquecida (valor idêntico ao inglês): {sorted(iguais)}"
+    iguais = {k for k, v in textos["pt"].items() if v == textos["en"][k]}
+    assert not (iguais - IDENTICAS_DE_PROPOSITO), (
+        f"tradução esquecida (valor idêntico ao inglês): {sorted(iguais - IDENTICAS_DE_PROPOSITO)}"
+    )
+    # E o simétrico do simétrico: uma chave que SAIU da lista (porque foi
+    # traduzida) tem de sair daqui também, senão a lista vira um cemitério que
+    # perdoa a próxima.
+    assert not (IDENTICAS_DE_PROPOSITO - iguais), (
+        f"na lista de exceções e já traduzida: {sorted(IDENTICAS_DE_PROPOSITO - iguais)}"
+    )
     com_acento = sum(1 for v in textos["pt"].values() if _ACENTOS.search(str(v)))
     assert com_acento > 100, "o dicionário português perdeu a acentuação"
 
