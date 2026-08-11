@@ -216,6 +216,312 @@
         "cfe76aa434a2aa54"
       ],
       "lang": "ambos"
+    },
+    "mat_0007": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 10,
+      "claimed_at": "2026-08-11T17:54:04Z",
+      "done_at": "2026-08-11T18:21:10Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 10,
+        "respostas_modelo": 20,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "e36e9d1267397a21",
+        "e65ab0abd7acdc87",
+        "6f5329852b687f04",
+        "ec06ee56c6e09d2e",
+        "6de0c08335b7c317",
+        "9cbafa51fdc9a592",
+        "91e8756b1375e1e4",
+        "812bacc83bdfcd1b",
+        "c6289a2e64c03e02",
+        "def54f2019e77592"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0008": {
+      "campanha": "material",
+      "status": "claimed",
+      "n_items": 10,
+      "claimed_at": "2026-08-11T17:54:04Z",
+      "done_at": null,
+      "tentativas": 0,
+      "modelo": null,
+      "motivo": null,
+      "resultado": null,
+      "uids": [
+        "c350e6088ed0af41",
+        "7c6e9911a5a7581b",
+        "9dccbcce31d51a2d",
+        "4fe4be2deaa3bcb9",
+        "57119697e562561d",
+        "4c21292db4969b75",
+        "5a712a8e60fb1e55",
+        "719f06e2a6bc6282",
+        "79003426241487e0",
+        "d38235ba34839f9e"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0009": {
+      "campanha": "material",
+      "status": "done",
+      "n_items": 10,
+      "claimed_at": "2026-08-11T17:54:05Z",
+      "done_at": "2026-08-11T18:24:01Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "rubricas": 10,
+        "respostas_modelo": 20,
+        "ja_existiam": 0
+      },
+      "uids": [
+        "4924517922c35059",
+        "307fd6f7760a580b",
+        "6c711a57d2bf58e6",
+        "8115a8caed16ce84",
+        "41411e724fe37797",
+        "3eab3e3a6f7b9913",
+        "b58f5ab7ff53972e",
+        "7bd9615cf6684ecc",
+        "6a04bb4c936bb715",
+        "40151c71eb21b672"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0010": {
+      "campanha": "material",
+      "status": "claimed",
+      "n_items": 10,
+      "claimed_at": "2026-08-11T17:54:06Z",
+      "done_at": null,
+      "tentativas": 0,
+      "modelo": null,
+      "motivo": null,
+      "resultado": null,
+      "uids": [
+        "f0a020ac6b358a82",
+        "8da3d3ac1973bf4c",
+        "ed4b49c777a38ac8",
+        "fab5e987bed0268e",
+        "9be21eb49b8cb010",
+        "9d5cb3056be74a01",
+        "18397640f8beb8ce",
+        "e519b4d75efa42d2",
+        "88191f866f2e9bf1",
+        "4a09042d8a44cddf"
+      ],
+      "lang": "ambos"
+    },
+    "mat_0011": {
+      "campanha": "material",
+      "status": "claimed",
+      "n_items": 10,
+      "claimed_at": "2026-08-11T17:54:07Z",
+      "done_at": null,
+      "tentativas": 0,
+      "modelo": null,
+      "motivo": null,
+      "resultado": null,
+      "uids": [
+        "87ad727119c0b7ca",
+        "d0489f6700f0bee6",
+        "cefc47b509d696b9",
+        "4cdbc850eb57390f",
+        "d4514cbf774e39e0",
+        "db424690a831c97e",
+        "785e953bc1c1f544",
+        "d5717bf491ad1f54",
+        "3d6abd2bacd9718a",
+        "e2853c2076e5afb3"
+      ],
+      "lang": "ambos"
+    },
+    "anot_0002": {
+      "campanha": "anotacoes",
+      "status": "done",
+      "n_items": 8,
+      "claimed_at": "2026-08-11T18:24:34Z",
+      "done_at": "2026-08-11T18:31:22Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "atribuicoes": 8,
+        "anotacoes": 8
+      },
+      "plano": [
+        {
+          "tarefa_id": 5,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:fe01e5f1b935",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "nota-nao-bate-com-justificativa"
+        },
+        {
+          "tarefa_id": 6,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:dc4683c13e76",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "adequado",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 7,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:2c41aa3ad19e",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "criterio-nao-observavel"
+        },
+        {
+          "tarefa_id": 8,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:236b78e13518",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "excepcional",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 9,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "8f861097bdffde81",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "inutilizavel",
+          "familia_defeito": "nota-inflada-em-bloco"
+        },
+        {
+          "tarefa_id": 10,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "e666201b5d8f7455",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "adequado",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 11,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "4feae10c98de8fb4",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "justificativa-na-lingua-errada"
+        },
+        {
+          "tarefa_id": 12,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "cf104ab8a57feebe",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "nota-nao-bate-com-justificativa"
+        }
+      ],
+      "status_inicial": "pendente_triagem"
+    },
+    "anot_0003": {
+      "campanha": "anotacoes",
+      "status": "done",
+      "n_items": 8,
+      "claimed_at": "2026-08-11T18:31:32Z",
+      "done_at": "2026-08-11T18:37:50Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "atribuicoes": 8,
+        "anotacoes": 8
+      },
+      "plano": [
+        {
+          "tarefa_id": 5,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:fe01e5f1b935",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "adequado",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 6,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:dc4683c13e76",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "justificativa-generica"
+        },
+        {
+          "tarefa_id": 7,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:2c41aa3ad19e",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "adequado",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 8,
+          "tipo": "comparar_ab",
+          "prompt_uid": "demo:236b78e13518",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "restricao-do-prompt-ignorada"
+        },
+        {
+          "tarefa_id": 9,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "8f861097bdffde81",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "nota-inflada-em-bloco"
+        },
+        {
+          "tarefa_id": 10,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "e666201b5d8f7455",
+          "anotador_id": 2,
+          "anotador": "Bruno Tavares",
+          "avaliacao_antes": "excepcional",
+          "familia_defeito": "nenhum"
+        },
+        {
+          "tarefa_id": 11,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "4feae10c98de8fb4",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "inutilizavel",
+          "familia_defeito": "justificativa-na-lingua-errada"
+        },
+        {
+          "tarefa_id": 12,
+          "tipo": "escrever_rubrica",
+          "prompt_uid": "cf104ab8a57feebe",
+          "anotador_id": 3,
+          "anotador": "Carla Nunes",
+          "avaliacao_antes": "ajustavel",
+          "familia_defeito": "nota-nao-bate-com-justificativa"
+        }
+      ],
+      "status_inicial": "pendente_triagem"
     }
   }
 }
