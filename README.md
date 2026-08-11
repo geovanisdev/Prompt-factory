@@ -2,6 +2,8 @@
 
 Banco de **prompts escritos por pessoas reais** — o primeiro turno de usuário em conversas com LLMs, nunca texto sintético — em **português brasileiro e inglês**, deduplicado, limpo de PII e navegável numa interface local. Serve para curar coleções e exportar JSONL/CSV **com licença e atribuição em cada linha**, para alimentar plataformas de data annotation.
 
+E, sobre uma amostra dele, roda a **[Bancada](#a-bancada--plataforma-de-anotação)**: uma plataforma de anotação completa — três papéis, seis tipos de tarefa, QC em duas passagens — em que o prompt escrito na ferramenta volta para o corpus com licença e uid rastreáveis.
+
 Tudo roda **offline depois da ingestão**: a interface é um SQLite mais um arquivo HTML sem build, sem framework e sem nenhuma referência a host externo.
 
 ```
@@ -13,7 +15,7 @@ prompts de 1 a 981.656 caracteres · 541 MB de texto
 
 ## Índice
 
-1. [O que tem dentro](#o-que-tem-dentro) · 2. [Fontes e licenças](#fontes-e-licenças) · 3. [Instalação](#instalação) · 4. [Caminho rápido (5 min)](#caminho-rápido-5-min) · 5. [Reprodução completa](#reprodução-completa-em-clone-limpo) · 6. [A interface](#a-interface) · 7. [Export](#export-e-licenças) · 8. [Estado dos marcos](#estado-dos-marcos) · 9. [Estrutura](#estrutura-do-repositório)
+1. [O que tem dentro](#o-que-tem-dentro) · 2. [Fontes e licenças](#fontes-e-licenças) · 3. [Instalação](#instalação) · 4. [Caminho rápido (5 min)](#caminho-rápido-5-min) · 5. [Reprodução completa](#reprodução-completa-em-clone-limpo) · 6. [A interface](#a-interface) · 7. [Export](#export-e-licenças) · 8. [A Bancada](#a-bancada--plataforma-de-anotação) · 9. [Estado dos marcos](#estado-dos-marcos) · 10. [Estrutura](#estrutura-do-repositório)
 
 ---
 
@@ -58,6 +60,7 @@ Cada prompt carrega a licença **até a linha** no banco (`license`, `commercial
 | `no_robots` | `HuggingFaceH4/no_robots` | en | **CC-BY-NC-4.0** | **não** | sim | 9.949 |
 | `prism` | `HannahRoseKirk/prism-alignment` | en | CC-BY-4.0 | sim | sim | 7.564 |
 | `lmsys` *(desligada)* | `lmsys/lmsys-chat-1m` | pt | LMSYS-1M | **não** | **não** | 0 |
+| `plataforma` | — escrito na [Bancada](#a-bancada--plataforma-de-anotação), modo criar | pt·en | CC0-1.0 | sim | sim | 0 |
 
 **O que isso implica no export** — e é a razão de o projeto ser construído do jeito que é:
 
@@ -67,6 +70,8 @@ Cada prompt carrega a licença **até a linha** no banco (`license`, `commercial
 * **Toda linha exportada leva `attribution`.** ODC-BY, CC-BY e CC-BY-SA exigem crédito a cada uso; sem esse campo o arquivo simplesmente não cumpre a licença. Ele não é coluna do banco: é resolvido de `config/sources.toml` na hora de escrever.
 
 `lmsys` é o maior pool de português que existe, mas é *gated* no Hub e a licença proíbe redistribuição. `pf ingest lmsys` já existe: com `enabled = false` ele não faz rede nenhuma, imprime o passo a passo para ligar e sai com código 2.
+
+`plataforma` é a única fonte **sem repositório no Hub**: o insumo é o `annotate.sqlite` local, com os prompts que as pessoas escrevem no modo criar da Bancada e que um revisor aprovou. **Nunca entra no `pf ingest` sem argumentos** — ingerir o que a própria ferramenta escreveu é ato explícito (`pf ingest plataforma`). CC0 1.0 é a dedicação declarada no formulário no momento do envio; e no dedup a linha da plataforma **nunca vence** um prompt publicado de verdade — colar um texto do corpus no formulário não reescreve a proveniência dele.
 
 ---
 
@@ -226,6 +231,31 @@ E uma regra: CSV **tem** de ser lido com um parser de CSV. Os prompts têm vírg
 
 ---
 
+## A Bancada — plataforma de anotação
+
+O segundo produto do repositório: uma plataforma de **data annotation** completa, que roda sobre uma amostra do corpus e mostra por dentro como funciona um funil de anotação com controle de qualidade em duas passagens. É produto separado de propósito — outro banco (`data/db/annotate.sqlite`), outra porta, outra identidade visual — e o corpus é aberto **somente leitura**: a Bancada nunca escreve nele.
+
+```powershell
+& $uv run pf annotate seed     # personas, projetos, diretrizes e o pacote de demonstração
+& $uv run pf annotate          # http://127.0.0.1:8766  (a curadoria fica em :8765)
+```
+
+Quem abre escolhe um papel na barra superior — sem senha; é demonstração e a tela declara isso:
+
+* **Anotador** — recebe tarefas pela **fila**, escolhe no **catálogo** ou **escreve um prompt novo**. Seis tipos de trabalho: avaliar com rubrica (matriz de severidade, com tipos de issue e N/A), escrever rubrica, resposta de referência (SFT), comparação A/B, conversa com modelo local e duelo entre dois modelos. Toda tarefa nasce sob um **brief de projeto versionado** (o quê e para quê) e diretrizes por tipo (o como).
+* **Revisor** — duas passagens: a **triagem** (aprova ou devolve, com comentário obrigatório na devolução) e o **Rate and Review** (avalia o trabalho como chegou, corrige no lugar com um motivo por mudança, avalia o resultado). Item borderline sobe para a fila de escalação do admin; prompt escrito no modo criar tem fila própria.
+* **Admin** — métricas por anotador, **agreement ponderado** entre anotadores (a concordância observada e o kappa sempre lado a lado — os dois respondem perguntas diferentes), calibração do revisor contra anotações sintéticas de gabarito escondido, o funil de criações e as decisões de escalação.
+
+A interface é **inglês por padrão, com toggle pt-BR** — o portfólio é lido por avaliadores estrangeiros. A convenção de língua vale para o dado também: metadado (justificativa, critério, comentário) em inglês; o dado produzido (resposta de referência, conversa) na língua do prompt.
+
+**O ciclo que fecha o projeto**: um prompt escrito no modo criar atravessa a revisão e entra no corpus de verdade — `pf ingest plataforma` → `pf run s01-s06` → `pf load-db` — com **CC0 1.0** declarada no envio e o uid prometido já na aprovação. Quando a linha chega lá, o badge **"no corpus ✓"** acende no cartão da criação; se o texto era cópia de um prompt que já existia, a tela diz que o dedup o colapsou no original — resultado, não erro.
+
+O trabalho aprovado sai por `pf annotate export`: **seis perfis** (anotações com a trilha de QC inteira, pares de SFT, pares de preferência, relatório de qualidade, dataset card e a auditoria completa de um item), cada um com manifesto ao lado. Anotação sintética fica **fora dos exports de dado por padrão**, e o dataset card declara a composição humano/sintético.
+
+O manual de uso dos três papéis, passo a passo, está em **[`docs/manual-bancada.html`](docs/manual-bancada.html)** — pt-BR, um arquivo só, abre direto no navegador.
+
+---
+
 ## Estado dos marcos
 
 | marco | o que é | estado |
@@ -240,6 +270,19 @@ E uma regra: CSV **tem** de ser lido com um parser de CSV. Os prompts têm vírg
 | M8 | s11 carga bulk no SQLite com rebuild do FTS e swap de arquivo | ✅ |
 | M9 | interface FastAPI + página única + export com manifesto | ✅ |
 | M10 | busca semântica + este README | ✅ |
+
+### Trilha B — a Bancada
+
+| marco | o que é | estado |
+| --- | --- | --- |
+| P1–P3 | casca, anotador ponta a ponta, triagem + Rate and Review + escalação | ✅ |
+| P3i | inglês primário com toggle pt-BR, convenção de língua por campo | ✅ |
+| P8–P9 | matriz de severidade como instrumento-dado; brief do projeto versionado; perguntas do instrumento (user goal + categorias da taxonomia) | ✅ |
+| P4 + P6 | modo criar + `pf ingest plataforma` — o prompt escrito entra no corpus | ✅ |
+| P5a + P5b | painel do admin (agreement ponderado, calibração do revisor) + os seis perfis de export | ✅ — falta só o CRUD de fixtures pela tela |
+| P4c | campanha de geração de material e de anotações sintéticas por agentes | infra pronta e testada em miniatura — **falta rodar em volume** |
+| P4d | conversa e duelo com modelo local (Ollama) | telas prontas — depende do Ollama instalado |
+| P7 | acabamento: badge "no corpus ✓", este README, o manual | ✅ |
 
 ### Pendente de **decisão humana** (não de código)
 
@@ -276,14 +319,18 @@ src/prompt_factory/
   export.py         formatos, manifesto, política de licença
   app/              FastAPI: queries.py (todo o SQL de leitura), semantic.py,
                     presenters.py e static/index.html (a interface inteira, um arquivo)
+  annotate/         a Bancada: outro banco (annotate.sqlite), outra porta,
+                    o mesmo padrão — um static/index.html sem build
   cli.py            entrypoint `pf`
 analysis/           camada de data science: notebooks de QC + o HTML renderizado
                     (01 anotação: calibração do revisor, vazamento da triagem,
                      trilha de edição · 02 campanha de rotulagem + validação do
                      dedup próximo). Só LEEM; ver analysis/README.md
+docs/               manual-bancada.html (o manual dos três papéis) + artefatos
 scripts/            smoke_test.ps1, run_pipeline.ps1
-tests/              1.174 testes, ~100 s
-data/               gitignorado; regenerável
+tests/              1.273 testes, ~110 s
+data/               gitignorado; NÃO tudo regenerável: annotate.sqlite guarda
+                    trabalho humano — o resto, sim, um `pf run` refaz
 ```
 
 Cinco linhas de arquitetura:

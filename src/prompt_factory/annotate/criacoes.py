@@ -118,6 +118,24 @@ def duplicata_no_corpus(conn_corpus: sqlite3.Connection, hash_norm: str) -> str 
     return None if linha is None else str(linha["uid"])
 
 
+def uid_no_corpus(conn_corpus: sqlite3.Connection, uid: str) -> bool:
+    """O ``uid_previsto`` já virou linha do corpus?
+
+    É a checagem que acende o badge "no corpus ✓" (P7) — o fim da promessa que a
+    aprovação fez. Consulta AO VIVO, como o recheck de duplicata e pelo mesmo
+    motivo: o corpus troca por swap de arquivo embaixo desta app, e a resposta
+    de ontem ("ainda não chegou") pode ter mudado com o ``pf load-db`` de hoje.
+    """
+    if not uid:
+        return False
+    return (
+        conn_corpus.execute(
+            "SELECT 1 FROM prompts WHERE uid = ? LIMIT 1", (uid,)
+        ).fetchone()
+        is not None
+    )
+
+
 def _linha(linha: sqlite3.Row, autor: str | None = None, revisor: str | None = None) -> dict[str, Any]:
     return {
         "id": int(linha["id"]),
@@ -141,6 +159,9 @@ def _linha(linha: sqlite3.Row, autor: str | None = None, revisor: str | None = N
         "exportada_em": linha["exportada_em"],
         "criada_em": linha["criada_em"],
         "licenca": LICENCA,
+        # Preenchido por `listar` quando há conexão com o corpus. `None` é
+        # "não conferido" — um shape estável poupa o front de `in`-checks.
+        "chegou_ao_corpus": None,
     }
 
 
@@ -240,6 +261,12 @@ def listar(
         item = _linha(linha, autor=str(linha["autor"]), revisor=linha["revisor"])
         if conn_corpus is not None:
             item["uid_duplicata"] = duplicata_no_corpus(conn_corpus, item["hash_norm"])
+            # O badge "no corpus ✓" (P7): a promessa da aprovação, conferida ao
+            # vivo. `None` continua sendo o valor de quem nem tem uid ainda.
+            if item["uid_previsto"]:
+                item["chegou_ao_corpus"] = uid_no_corpus(
+                    conn_corpus, str(item["uid_previsto"])
+                )
         saida.append(item)
     return saida
 
@@ -331,5 +358,6 @@ __all__ = [
     "funil",
     "listar",
     "revisar",
+    "uid_no_corpus",
     "uid_previsto",
 ]

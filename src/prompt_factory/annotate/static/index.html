@@ -1940,6 +1940,11 @@ const TEXTOS = {
   "criar.rot_domain": "Domain",
   "criar.rot_uid": "Predicted corpus id",
   "criar.rot_comentario": "Reviewer comment",
+  "criar.corpus_ok": "in the corpus ✓",
+  "criar.corpus_ok_linha": "The promise was kept: this uid is a live row of the corpus now.",
+  "criar.corpus_pendente": "Approved — it enters the corpus on the next `pf ingest plataforma` (run by the admin, outside this app).",
+  "criar.corpus_aguardando": "Already in data/raw — waiting for `pf run s01-s06` and `pf load-db` to rebuild the corpus.",
+  "criar.corpus_colapsou": "Not in the corpus as its own row: exact dedup collapsed it into the original above. That is the system working.",
   "criar.status.submetida": "waiting for review",
   "criar.status.aprovada": "approved",
   "criar.status.rejeitada": "refused",
@@ -2701,6 +2706,11 @@ const TEXTOS = {
   "criar.rot_domain": "Domínio",
   "criar.rot_uid": "Id previsto no corpus",
   "criar.rot_comentario": "Comentário de quem revisou",
+  "criar.corpus_ok": "no corpus ✓",
+  "criar.corpus_ok_linha": "A promessa foi cumprida: este uid é uma linha viva do corpus agora.",
+  "criar.corpus_pendente": "Aprovada — entra no corpus no próximo `pf ingest plataforma` (o admin roda, fora desta app).",
+  "criar.corpus_aguardando": "Já está em data/raw — aguardando `pf run s01-s06` e `pf load-db` reconstruírem o corpus.",
+  "criar.corpus_colapsou": "Fora do corpus como linha própria: o dedup exato a colapsou no original acima. É o sistema funcionando.",
   "criar.status.submetida": "esperando revisão",
   "criar.status.aprovada": "aprovada",
   "criar.status.rejeitada": "recusada",
@@ -7821,7 +7831,16 @@ function seloDeCriacao(item) {
 function cartaoDeCriacao(item, extras) {
   const card = el("div", "card-criacao");
   const topo = el("div", "criacao-topo");
-  juntar(topo, seloDeCriacao(item), el("span", "crescer"),
+  const selos = [seloDeCriacao(item)];
+  // O BADGE DO CORPUS (P7): o fim da promessa que a aprovação fez. Só acende
+  // com `=== true` — `null` significa "não conferido" (a listagem sem conexão
+  // com o corpus), e um badge aceso por engano é pior que nenhum.
+  if (item.chegou_ao_corpus === true) {
+    const selo = el("span", "selo boa", t("criar.corpus_ok"));
+    selo.title = t("criar.corpus_ok_linha");
+    selos.push(selo);
+  }
+  juntar(topo, ...selos, el("span", "crescer"),
     el("span", "fraco mono", item.lang));
   card.appendChild(topo);
   card.appendChild(el("p", "criacao-texto", item.texto));
@@ -7852,6 +7871,22 @@ function cartaoDeCriacao(item, extras) {
     juntar(aviso, el("strong", null, t("criar.dup_titulo")),
       el("span", null, " " + t("criar.dup_linha", { uid: item.uid_duplicata })));
     card.appendChild(aviso);
+  }
+
+  // A linha do funil quando o badge NÃO acendeu: cada estado diz qual comando
+  // falta, porque a ingestão roda fora desta app e "aprovada" sozinha deixaria
+  // a pessoa esperando um badge que nenhum clique daqui produz. O caso
+  // exportada + duplicata é o texto colado: o dedup o colapsou no original do
+  // aviso logo acima — resultado, não erro.
+  if (item.chegou_ao_corpus !== true) {
+    let linhaCorpus = null;
+    if (item.status === "aprovada") linhaCorpus = t("criar.corpus_pendente");
+    else if (item.status === "exportada") {
+      linhaCorpus = item.uid_duplicata
+        ? t("criar.corpus_colapsou")
+        : t("criar.corpus_aguardando");
+    }
+    if (linhaCorpus) card.appendChild(el("p", "fraco", linhaCorpus));
   }
   if (extras) card.appendChild(extras);
   return card;

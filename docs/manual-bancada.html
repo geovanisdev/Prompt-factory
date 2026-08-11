@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual da Bancada — anotador, revisor e admin</title>
+<style>
+  /* Um arquivo, zero rede — a mesma regra da própria Bancada. */
+  :root {
+    --tinta: #1c2330;
+    --fraco: #5b6575;
+    --fundo: #fafbfd;
+    --papel: #ffffff;
+    --acento: #1d4ed8;        /* o azul-profundo da Bancada */
+    --acento-fundo: #eff4ff;
+    --borda: #dde3ec;
+    --boa: #166534;
+    --boa-fundo: #ecfdf3;
+    --atencao: #92400e;
+    --atencao-fundo: #fffbeb;
+    --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fundo); color: var(--tinta);
+    font: 16px/1.65 system-ui, "Segoe UI", sans-serif;
+  }
+  main { max-width: 54rem; margin: 0 auto; padding: 2rem 1.25rem 6rem; }
+  header.topo { border-bottom: 3px solid var(--acento); padding-bottom: 1.25rem; margin-bottom: 2rem; }
+  header.topo h1 { margin: 0 0 .35rem; font-size: 2rem; line-height: 1.2; text-wrap: balance; }
+  header.topo p.linha { margin: 0; color: var(--fraco); max-width: 46rem; }
+  .selo-doc {
+    display: inline-block; font: 600 .72rem/1 var(--mono); letter-spacing: .08em;
+    text-transform: uppercase; color: var(--acento); background: var(--acento-fundo);
+    border: 1px solid var(--acento); border-radius: 999px; padding: .3rem .7rem; margin-bottom: .8rem;
+  }
+  nav.indice {
+    background: var(--papel); border: 1px solid var(--borda); border-radius: .6rem;
+    padding: 1rem 1.25rem; margin: 0 0 2.5rem;
+  }
+  nav.indice strong { display: block; margin-bottom: .4rem; font-size: .85rem;
+    text-transform: uppercase; letter-spacing: .06em; color: var(--fraco); }
+  nav.indice ol { margin: 0; padding-left: 1.2rem; columns: 2; column-gap: 2rem; }
+  nav.indice li { margin: .15rem 0; break-inside: avoid; }
+  nav.indice a { color: var(--acento); text-decoration: none; }
+  nav.indice a:hover, main a:hover { text-decoration: underline; }
+  main a { color: var(--acento); }
+  h2 {
+    font-size: 1.45rem; margin: 3rem 0 .75rem; padding-top: .5rem;
+    border-top: 1px solid var(--borda);
+  }
+  h2 .num { color: var(--acento); font-family: var(--mono); margin-right: .5rem; }
+  h3 { font-size: 1.08rem; margin: 1.8rem 0 .5rem; }
+  h4 { font-size: .95rem; margin: 1.3rem 0 .35rem; }
+  p, li { max-width: 48rem; }
+  kbd {
+    font: 600 .82em var(--mono); background: var(--papel); border: 1px solid var(--borda);
+    border-bottom-width: 2px; border-radius: .3rem; padding: .1rem .4rem; white-space: nowrap;
+  }
+  code { font: .88em var(--mono); background: var(--acento-fundo); border-radius: .25rem; padding: .08rem .3rem; }
+  pre {
+    background: #0f1626; color: #dbe4f5; border-radius: .5rem;
+    padding: .9rem 1.1rem; overflow-x: auto; font: .84rem/1.55 var(--mono);
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { border-collapse: collapse; width: 100%; margin: .8rem 0 1.2rem; font-size: .92rem; }
+  th, td { border: 1px solid var(--borda); padding: .45rem .65rem; text-align: left; vertical-align: top; }
+  th { background: var(--acento-fundo); font-weight: 600; }
+  td.k { white-space: nowrap; }
+  .caixa {
+    border: 1px solid var(--borda); border-left: 4px solid var(--acento);
+    background: var(--papel); border-radius: .45rem; padding: .8rem 1rem; margin: 1rem 0;
+  }
+  .caixa.boa { border-left-color: var(--boa); background: var(--boa-fundo); }
+  .caixa.atencao { border-left-color: var(--atencao); background: var(--atencao-fundo); }
+  .caixa strong.rotulo { display: block; font-size: .78rem; text-transform: uppercase;
+    letter-spacing: .06em; margin-bottom: .25rem; }
+  .caixa.boa strong.rotulo { color: var(--boa); }
+  .caixa.atencao strong.rotulo { color: var(--atencao); }
+  .caixa strong.rotulo { color: var(--acento); }
+  .ui { font-style: normal; font-weight: 600; }
+  .ui::before { content: "“"; } .ui::after { content: "”"; }
+  .passo { counter-reset: none; }
+  ol.roteiro { padding-left: 1.4rem; }
+  ol.roteiro > li { margin: .5rem 0; }
+  .selo-ui {
+    display: inline-block; font: 600 .72rem/1.5 var(--mono); border-radius: 999px;
+    padding: 0 .55rem; border: 1px solid var(--borda); background: var(--papel);
+  }
+  .selo-ui.boa { color: var(--boa); border-color: var(--boa); background: var(--boa-fundo); }
+  footer { margin-top: 4rem; padding-top: 1rem; border-top: 1px solid var(--borda);
+    color: var(--fraco); font-size: .85rem; }
+  @media print {
+    body { background: #fff; } pre { white-space: pre-wrap; }
+    nav.indice ol { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="topo">
+  <span class="selo-doc">Manual · pt-BR · um arquivo, zero rede</span>
+  <h1>Bancada — manual dos três papéis</h1>
+  <p class="linha">Como trabalhar na plataforma de anotação do Prompt Factory como <strong>anotador</strong>, <strong>revisor</strong> e <strong>administrador</strong> — do primeiro clique até o prompt escrito por você aparecer no corpus.</p>
+</header>
+
+<nav class="indice">
+  <strong>Índice</strong>
+  <ol>
+    <li><a href="#começar">Antes de começar</a></li>
+    <li><a href="#anotador">O papel Anotador</a></li>
+    <li><a href="#tipos">Os seis tipos de tarefa</a></li>
+    <li><a href="#revisor">O papel Revisor</a></li>
+    <li><a href="#admin">O papel Administrador</a></li>
+    <li><a href="#criar-corpus">Do prompt escrito ao corpus</a></li>
+    <li><a href="#exports">Os artefatos de entrega</a></li>
+    <li><a href="#atalhos">Atalhos de teclado</a></li>
+    <li><a href="#lingua">A convenção de língua</a></li>
+    <li><a href="#faq">Perguntas que vão aparecer</a></li>
+  </ol>
+</nav>
+
+<!-- ================================================================ -->
+<h2 id="começar"><span class="num">1</span>Antes de começar</h2>
+
+<p>A Bancada é um produto separado da interface de curadoria: <strong>outro banco, outra porta, outra identidade</strong>. Ela lê o corpus em modo somente leitura e guarda todo o trabalho de anotação em <code>data/db/annotate.sqlite</code> — que, ao contrário do corpus, <strong>não é regenerável</strong>: é trabalho humano.</p>
+
+<pre><code># uma vez por sessão de terminal:
+$uv = "$env:USERPROFILE\.local\bin\uv.exe"
+
+& $uv run pf annotate seed     # personas, projetos, diretrizes, pacote de demonstração (idempotente)
+& $uv run pf annotate          # abre em http://127.0.0.1:8766
+& $uv run pf annotate status   # contagens, funil, política de licença do pool</code></pre>
+
+<p>Na barra superior você escolhe <strong>quem é</strong> (a persona) e <strong>o que é</strong> (o papel): Anotador, Revisor ou Administrador. Não há senha — é uma demonstração e a tela declara isso. A escolha fica no navegador; o servidor valida o papel pela linha no banco, nunca pelo que o cliente afirma.</p>
+
+<p>A língua primária da interface é o <strong>inglês</strong> (o portfólio é lido por avaliadores estrangeiros) — mas um navegador em português, como o seu, <strong>abre em português</strong>; todos os outros abrem em inglês, e a preferência salva no toggle <kbd>pt</kbd>/<kbd>en</kbd> vence o navegador. Trocar de idioma <strong>não recarrega e não perde nada</strong> — rascunho, tarefa aberta e seleções sobrevivem. Este manual cita os nomes de tela em português; entre parênteses, o nome em inglês quando difere.</p>
+
+<div class="caixa atencao">
+  <strong class="rotulo">Trabalhando sozinho (modo solo)</strong>
+  Por padrão, <em>quem revisa nunca é quem anotou</em> — a fila esconde o seu próprio trabalho. Para montar o portfólio sozinho, ligue em <code>config/settings.toml</code>: <code>[annotate] permitir_autorrevisao = true</code>. Duas coisas mudam juntas: você passa a ver as próprias submissões nas filas de revisão, e <strong>cada registro guarda que foi autorrevisão</strong> — a faixa na tela não se fecha, e o relatório de qualidade declara o número. Esconder isso seria mentir sobre o QC; declarar é o que o torna apresentável.
+</div>
+
+<!-- ================================================================ -->
+<h2 id="anotador"><span class="num">2</span>O papel Anotador</h2>
+
+<p>Quatro vistas, na barra logo abaixo do papel:</p>
+
+<table>
+  <tr><th>vista</th><th>o que é</th><th>quando usar</th></tr>
+  <tr><td class="k"><span class="ui">Fila</span> (Queue)</td><td>a plataforma <strong>entrega</strong> a próxima tarefa aberta do tipo escolhido, com trava: ninguém mais recebe a mesma vaga enquanto você a tem. O prazo é de <strong>120 minutos</strong> — vencido, a vaga volta para a fila, mas <strong>nada do que você submeter é descartado</strong> por atraso.</td><td>o dia a dia; é o modo “locked” das plataformas reais</td></tr>
+  <tr><td class="k"><span class="ui">Catálogo</span> (Catalog)</td><td>você <strong>escolhe</strong> o prompt: busca por texto no pool de 500 (250 pt + 250 en), com o botão <span class="ui">Anotar este</span> habilitado só onde há material suficiente para o tipo (A/B exige duas respostas; avaliar exige rubrica e resposta). O motivo aparece no hover quando está desabilitado.</td><td>quando você quer um prompt específico</td></tr>
+  <tr><td class="k"><span class="ui">Minhas tarefas</span> (My&nbsp;tasks)</td><td>tudo o que está com você: em andamento, submetido, <strong>devolvido</strong> (com o comentário de quem devolveu acima do formulário re-preenchido) e concluído.</td><td>retomar trabalho e ler devoluções</td></tr>
+  <tr><td class="k"><span class="ui">Escrever um prompt</span> (Write&nbsp;a&nbsp;prompt)</td><td>o terceiro modo de seleção — o único que <strong>alimenta</strong> o corpus em vez de consumir. Ver a <a href="#criar-corpus">seção 6</a>.</td><td>quando o pool não tem o que o projeto precisa</td></tr>
+</table>
+
+<h3>O painel de instrução — leia nesta ordem</h3>
+<p>Toda tarefa abre com dois painéis colapsáveis no topo, e a ordem é a do raciocínio:</p>
+<ol class="roteiro">
+  <li><strong>O brief do projeto</strong> (5 abas: visão geral · caso de uso · tipos de prompt · seleção/criação · rating e rationale) diz <em>o quê</em> é este trabalho e <em>para quê</em> o dado serve. Ele é <strong>versionado</strong>: cada anotação grava sob qual versão foi feita. O <strong>escopo</strong> — os chips de categoria com nome e id (<code>Redação prática · redacao-pratica</code>) — fica fora das abas, sempre visível, porque é o que se consulta no meio do trabalho (“este prompt está em escopo?”).</li>
+  <li><strong>As diretrizes do tipo de tarefa</strong> dizem <em>o como</em> — a mecânica do A/B, da rubrica, do SFT. Também versionadas.</li>
+</ol>
+
+<h3>O fluxo da fila</h3>
+<ol class="roteiro">
+  <li>Escolha o tipo de tarefa na aba; a próxima abre sozinha.</li>
+  <li>Trabalhe. O <strong>rascunho é salvo automaticamente</strong> no navegador — fechar a aba não perde nada.</li>
+  <li>O botão principal (<kbd>Ctrl</kbd>+<kbd>Enter</kbd>) sempre diz <strong>o que falta</strong> antes de deixar enviar: <span class="ui">“Objetivo do usuário” ainda está sem resposta</span> → <span class="ui">2 critérios sem nota em Assistência</span> → <span class="ui">Enviar e pegar a próxima</span>. A conta do botão é a mesma do servidor; se ele deixou clicar, o servidor aceita.</li>
+  <li>Não consegue julgar este item? O botão <span class="ui">Pular</span> abre um leque com <strong>cinco motivos nomeados</strong> (fora de escopo, não consigo verificar…) — um clique registra o motivo, devolve a vaga e puxa a próxima. O padrão de pulos vira dado de alocação para o admin.</li>
+</ol>
+
+<!-- ================================================================ -->
+<h2 id="tipos"><span class="num">3</span>Os seis tipos de tarefa</h2>
+
+<h3>Avaliar com rubrica (Score with a rubric)</h3>
+<p>O tipo dominante, e o de instrumento mais rico. De cima para baixo:</p>
+<ol class="roteiro">
+  <li><strong>As perguntas do instrumento</strong>, antes da matriz:
+    <ul>
+      <li><span class="ui">Objetivo do usuário</span> (User goal) — 1–2 frases, mínimo de 30 caracteres, <strong>em inglês</strong> (é metadado).</li>
+      <li><span class="ui">Tipo de tarefa</span> e <span class="ui">Domínio</span> — selects com as classes da taxonomia do corpus (<code>nome · id</code>). É aqui que a anotação <strong>produz o rótulo que falta no corpus</strong>; se nada servir, use <code>outro</code>/<code>geral</code>.</li>
+    </ul>
+  </li>
+  <li><strong>A matriz de critérios</strong> — critérios agrupados em abas, um grupo por vez; cada linha tem as células de severidade (<span class="ui">Problemas graves · Problemas leves · Sem problemas</span>) e <span class="ui">N/A</span>. As regras:
+    <ul>
+      <li>Nota <strong>abaixo do topo</strong> num critério com catálogo de issues exige <strong>≥ 1 tipo de issue marcado E uma frase</strong> — o checkbox diz o quê, a frase diz por quê. O auto-avanço do teclado para exatamente quando há o que explicar.</li>
+      <li>O campo de <strong>trecho verbatim</strong> é proeminente e <strong>opcional</strong>: se o defeito é difuso, o botão <span class="ui">sem trecho — é difuso</span> registra a escolha. Nunca cole um trecho arbitrário só para destravar o botão.</li>
+      <li><span class="ui">N/A</span> pede um motivo e <strong>não é nota</strong> — não entra em média nenhuma.</li>
+      <li>A <strong>faixa-guia</strong> no pé da matriz mostra descrição e âncoras do critério em foco; o <kbd>ⓘ</kbd> abre as âncoras com exemplo.</li>
+    </ul>
+  </li>
+  <li><strong>Os overalls</strong> ficam no rail à direita, <strong>trancados</strong> até todo critério principal estar decidido — decidir o overall primeiro e retro-preencher os critérios para bater com ele é o defeito que nenhuma auditoria pega depois.</li>
+  <li><strong>A justificativa geral</strong> — mínimo de 30 caracteres, em inglês, e ela tem de <em>explicar as notas dadas</em>, não repeti-las. O rail ecoa o que você já escreveu por critério, ao lado do campo.</li>
+</ol>
+
+<h3>Escrever rubrica (Write a rubric)</h3>
+<p>Você define o instrumento: critérios com nome, descrição e escala com as duas pontas ancoradas. Há <strong>modelos de partida</strong> colapsados (para matar a página em branco) — só aparecem os que o formulário sabe expressar. Ao concluir, a tela oferece a <strong>continuação</strong>: escrever a resposta SFT deste mesmo prompt, com a sua rubrica ao lado. A rubrica só vira instrumento oficial quando um revisor aprova.</p>
+
+<h3>Resposta de referência — SFT (Write the answer)</h3>
+<p>A resposta que um modelo <em>deveria</em> dar. <strong>Na língua do prompt</strong> (pt-BR em geral — é o dado sendo produzido, e é onde a expertise nativa aparece). Se a tarefa veio da continuação, a rubrica-guia aparece como checklist: marque o que a sua resposta cumpre — as caixas voltam preenchidas para quem revisar.</p>
+
+<h3>Comparar A/B (Compare A/B)</h3>
+<p>Duas respostas cegas (<span class="ui">modelo-a</span> / <span class="ui">modelo-b</span> — o nome real só o admin vê), colunas com rolagem sincronizada. Escolha com <kbd>←</kbd>/<kbd>→</kbd>, empate com <kbd>E</kbd>; a <strong>justificativa é obrigatória</strong>, em inglês, e empate também se justifica. Empates são contados mas nunca viram par de preferência no export.</p>
+
+<h3>Conversa e Duelo (Conversation · Duel)</h3>
+<p>As duas abas que exigem inferência ao vivo — precisam do <strong>Ollama</strong> instalado, com <code>gemma3n:e4b</code> e <code>qwen3:4b</code>. Na <strong>Conversa</strong>, você conversa multi-turno com um modelo e avalia a conversa inteira no fim (coerência entre turnos, se manteve restrições, se recuou quando corrigido), mais a marcação de turnos problemáticos. No <strong>Duelo</strong>, o mesmo prompt vai para os dois modelos; você escolhe o vencedor da rodada e <strong>continua a conversa com ele</strong> — preferência multi-turno, o dado mais raro do conjunto. A conversa é <em>dado</em> (língua do prompt); a avaliação é <em>metadado</em> (inglês).</p>
+
+<!-- ================================================================ -->
+<h2 id="revisor"><span class="num">4</span>O papel Revisor</h2>
+
+<p>Fila à esquerda, detalhe à direita — <strong>no mesmo layout em que o anotador trabalhou</strong>, para você julgar o que ele viu. Três sub-abas:</p>
+
+<h3>1ª — Anotações (a triagem)</h3>
+<p>A primeira passagem, rápida e binária: <strong>aprovar</strong> (<kbd>A</kbd>) ou <strong>devolver</strong> (<kbd>R</kbd>, com comentário obrigatório de ≥ 20 caracteres — ele é a única instrução que o anotador recebe). <kbd>J</kbd>/<kbd>K</kbd> andam na fila.</p>
+<ul>
+  <li><strong>Nada é “rejeitado” aqui</strong>: devolver reabre a mesma atribuição com prazo novo, e o re-trabalho entra como versão 2 — a história fica preservada.</li>
+  <li><strong>É a única passagem que devolve trabalho ao anotador.</strong> O que você aprovar segue para a segunda passagem e não volta mais para quem anotou.</li>
+</ul>
+
+<h3>2ª — Rate and Review (a segunda passagem)</h3>
+<p>Sobre o que a triagem aprovou. Quatro passos, nesta ordem:</p>
+<ol class="roteiro">
+  <li><strong>Avalie como chegou</strong>: <code>inutilizável · ajustável · adequado · excepcional</code>. Espera-se de “ajustável” para cima — mas “inutilizável” existe porque a triagem pode ter deixado passar, e <em>esse</em> caso precisa ficar registrado (é ele que mede a triagem).</li>
+  <li><strong>Corrija no lugar</strong>: edite notas, justificativas, caixas. <strong>Cada mudança exige um motivo próprio</strong> — as caixas de motivo aparecem sozinhas conforme você mexe, e o diff é conferido pelo servidor campo a campo. O trabalho não volta ao anotador nesta passagem; quem conserta é você.</li>
+  <li><strong>Avalie o resultado</strong>: <code>incorrigível · borderline (admin) · adequado · excepcional</code>.</li>
+  <li><strong>Justificativa geral</strong>, obrigatória sempre — mesmo sem nenhuma correção.</li>
+</ol>
+<p>Desfechos: <code>adequado</code>/<code>excepcional</code> encerram aprovado; <code>borderline (admin)</code> sobe para a fila de escalação com o seu parecer; <code>incorrigível</code> é <strong>terminal</strong> — descartado, registrado, e não volta para o anotador.</p>
+
+<div class="caixa">
+  <strong class="rotulo">Calibração às cegas</strong>
+  Parte das anotações que chegam aqui é <strong>sintética</strong>, gerada com um defeito plantado e uma nota-alvo escondida. Você revisa sem saber qual é qual; o painel do admin depois compara a sua avaliação com o alvo. Isso calibra o revisor — simétrico às tarefas-ouro que calibram o anotador. Trabalhe normal: tentar adivinhar quais são estraga a medida.
+</div>
+
+<h3>3ª — Prompts escritos (as criações)</h3>
+<p>A revisão do modo criar é <strong>uma passagem só</strong> — uma criação é um texto: ou serve de prompt e entra no corpus, ou não serve. Corrigir o texto de outra pessoa e ingerir como “escrito por gente” destruiria a proveniência que o projeto existe para preservar. Por isso:</p>
+<ul>
+  <li><strong>Aprovar</strong> grava o <code>uid previsto</code> — a promessa de qual linha o corpus vai ganhar — e não pede comentário.</li>
+  <li><strong>Recusar</strong> exige comentário (≥ 20): é a única informação que quem escreveu recebe.</li>
+  <li>O aviso <span class="ui">já está no corpus</span> é <strong>resultado, não erro</strong>: o dedup reconheceu que o texto coincide com uma linha existente. Aprovar não é proibido — só não acrescenta linha nenhuma, e a tela diz com qual uid o texto casou.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="admin"><span class="num">5</span>O papel Administrador</h2>
+
+<p>O painel opera dados e lê os números. De cima para baixo:</p>
+
+<table>
+  <tr><th>seção</th><th>o que fazer nela</th></tr>
+  <tr><td class="k"><span class="ui">Equipe</span></td><td>as personas e seus papéis; criar uma nova é digitar o nome.</td></tr>
+  <tr><td class="k"><span class="ui">Gerar tarefas em lote</span></td><td>tipo × quantidade × idioma × fonte × <strong>anotações independentes</strong> × prioridade × projeto. A prévia só lê; o botão escreve <em>o mesmo plano</em>. <strong>Alvo ≥ 2</strong> é o que torna o agreement mensurável.</td></tr>
+  <tr><td class="k"><span class="ui">Escalações</span></td><td>os borderline da passagem 2, com o parecer do revisor e as edições dele. Três decisões: <em>aprovar e encerrar</em> · <em>devolver ao anotador</em> (o único caminho de volta depois da triagem — o seu comentário é o que chega a ele) · <em>descartar</em>.</td></tr>
+  <tr><td class="k"><span class="ui">Estado do pool</span></td><td>de onde vêm os prompts (coleção da curadoria ou fallback determinístico), e <strong>quantas linhas a política de licença exclui</strong> — hoje, 9.148 <code>cc-by-nc</code> ficam fora do trabalho por construção.</td></tr>
+  <tr><td class="k"><span class="ui">Projetos</span></td><td>o que é <em>Portfólio</em> (trabalho real) e o que é <em>Demonstração</em> (fixtures) — é o que permite ao export dizer qual trabalho é de quem.</td></tr>
+  <tr><td class="k"><span class="ui">Controle de qualidade</span></td><td>os números — a seção abaixo explica como lê-los.</td></tr>
+</table>
+
+<h3>Como ler os números do QC</h3>
+<ul>
+  <li><strong>Agreement entre anotadores</strong>: dois números lado a lado, <em>sempre juntos</em>. A <strong>observada</strong> diz com que frequência duas pessoas disseram a mesma coisa (um fato, vale com 1 par). O <strong>kappa</strong> diz quanto disso supera o acaso. Eles respondem perguntas diferentes e podem divergir muito — 94% de observada com kappa −1,0 é matematicamente possível e já foi medido aqui. Notas de rubrica usam <strong>peso quadrático</strong>: errar por um degrau não é errar por quatro. Medido no que o anotador <em>submeteu</em>, nunca no que o revisor corrigiu.</li>
+  <li><strong>Kappa <code>null</code> não é zero.</strong> Abaixo de 10 pares (ou sem variância) a plataforma retém o kappa e nomeia o motivo. Zero significaria “concordam no nível do acaso” — a acusação mais forte que esse número sabe fazer; <code>null</code> significa “não medido”, que é a resposta honesta.</li>
+  <li><strong>Calibração do revisor</strong>: a comparação entre o que o revisor disse e o alvo escondido das sintéticas. Escala ordinal — saem o acerto exato, o “dentro de um degrau” e o erro médio em degraus, mais a matriz alvo × revisor e o recorte por família de defeito plantado.</li>
+  <li><strong>“A triagem deixou passar?”</strong>: mede a <em>passagem 1</em>, não o anotador. Um item aprovado na triagem que chega “inutilizável” à passagem 2 atravessou um portão que devia tê-lo barrado — inclusive quando o revisor o conserta e ele acaba entregue (o caso mais comum, e o mais caro).</li>
+  <li><strong>Funil de criações</strong>: submetida → aprovada → exportada, com o comando <code>pf ingest plataforma</code> copiável — a ingestão roda na pipeline, fora da app, e o painel diz isso com todas as letras.</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2 id="criar-corpus"><span class="num">6</span>Do prompt escrito ao corpus</h2>
+
+<p>O ciclo completo do modo criar, com quem faz o quê:</p>
+
+<ol class="roteiro">
+  <li><strong>Anotador</strong> — vista <span class="ui">Escrever um prompt</span>: texto (mínimo 15 caracteres), idioma (pt/en — é um palpite seu; quem decide de verdade são os detectores da pipeline), sugestões opcionais de tipo/domínio (pista para quem revisa, não rótulo) e um brief do porquê. A dedicação <strong>CC0 1.0</strong> está escrita acima do botão: é o que você cede ao enviar.</li>
+  <li><strong>Revisor</strong> — sub-aba <span class="ui">Prompts escritos</span>: aprova (grava o uid previsto) ou recusa com comentário.</li>
+  <li><strong>Admin (terminal)</strong> — três comandos, nesta ordem:
+<pre><code>& $uv run pf ingest plataforma    # escreve data/raw/plataforma.parquet E carimba "exportada"
+& $uv run pf run s01-s06          # a pipeline inteira (o s05 é o lento — conte minutos a horas)
+& $uv run pf load-db --allow-unlabeled-pct 100   # reconstrói o corpus e troca por swap</code></pre>
+  </li>
+  <li><strong>De volta à tela</strong>: o cartão da criação acende <span class="selo-ui boa">no corpus ✓</span> — conferido <em>ao vivo</em> contra o corpus a cada visita. Enquanto não acende, a linha do cartão diz exatamente qual comando falta.</li>
+</ol>
+
+<div class="caixa boa">
+  <strong class="rotulo">Se o texto era cópia</strong>
+  Um prompt colado do corpus atravessa tudo isso e <strong>não vira linha nova</strong>: o dedup exato o colapsa no original — e o original <em>sempre</em> vence, por construção (a linha publicada com autor e citação nunca é substituída pela nossa cópia CC0). O cartão explica: <span class="ui">o dedup exato a colapsou no original acima — é o sistema funcionando</span>.
+</div>
+
+<div class="caixa atencao">
+  <strong class="rotulo">Ensaio sem consequência</strong>
+  <code>pf ingest plataforma --data-dir tmp</code> escreve o parquet numa pasta descartável e <strong>não carimba nada</strong> — o funil não se move. Use para conferir o que sairia antes do passe de verdade.
+</div>
+
+<!-- ================================================================ -->
+<h2 id="exports"><span class="num">7</span>Os artefatos de entrega</h2>
+
+<pre><code>& $uv run pf annotate export                    # os cinco perfis coletivos
+& $uv run pf annotate export --perfil sft       # só um
+& $uv run pf annotate export --perfil audit --anotacao 7   # a auditoria de UM item</code></pre>
+
+<table>
+  <tr><th>perfil</th><th>o que sai</th></tr>
+  <tr><td class="k"><code>annotations</code></td><td>uma linha por anotação entregue: o prompt com licença, o payload final e a trilha de QC inteira (quem triou, o que o revisor mudou e por quê).</td></tr>
+  <tr><td class="k"><code>sft</code></td><td>pares prompt → resposta de referência.</td></tr>
+  <tr><td class="k"><code>preference</code></td><td>escolhida/rejeitada com o motivo — A/B de turno único e cada rodada de duelo. Empate não vira par.</td></tr>
+  <tr><td class="k"><code>quality-report</code></td><td>as duas passagens, a calibração do revisor e a métrica da triagem — os mesmos números do painel.</td></tr>
+  <tr><td class="k"><code>dataset-card</code></td><td>proveniência, licenças, composição humano/sintético e o glossário de todos os campos.</td></tr>
+  <tr><td class="k"><code>audit</code></td><td>a cadeia completa de um item: anotação v1 → triagem → cada edição com motivo → decisão final. O artefato de portfólio mais forte.</td></tr>
+</table>
+
+<p>Regras que valem sempre: só <code>status = avaliada</code> (QC completo) entra por padrão; <strong>anotação sintética fica fora dos perfis de dado</strong> (entra nos de prova, que existem para descrevê-la); cada arquivo sai com um manifesto ao lado (contagens, sha256, avisos). Os artefatos são em inglês — é o que o cliente lê.</p>
+
+<!-- ================================================================ -->
+<h2 id="atalhos"><span class="num">8</span>Atalhos de teclado</h2>
+
+<p><kbd>?</kbd> abre e fecha a folha dentro da própria Bancada; <kbd>Esc</kbd> fecha. Toda tarefa dá para completar sem mouse.</p>
+
+<table>
+  <tr><th>onde</th><th>tecla</th><th>o que faz</th></tr>
+  <tr><td rowspan="4">matriz de critérios</td><td class="k"><kbd>1</kbd>–<kbd>9</kbd></td><td>dá a nota do critério em foco (auto-avança — e <em>para</em> quando a nota exige evidência)</td></tr>
+  <tr><td class="k"><kbd>N</kbd></td><td>marca N/A e segue</td></tr>
+  <tr><td class="k"><kbd>0</kbd></td><td>pula para o primeiro critério pendente</td></tr>
+  <tr><td class="k"><kbd>↑</kbd>/<kbd>↓</kbd></td><td>anda entre critérios (a faixa-guia acompanha)</td></tr>
+  <tr><td rowspan="2">comparar A/B</td><td class="k"><kbd>←</kbd>/<kbd>→</kbd></td><td>escolhe a resposta da esquerda ou da direita</td></tr>
+  <tr><td class="k"><kbd>E</kbd></td><td>declara empate</td></tr>
+  <tr><td rowspan="2">conversa e duelo</td><td class="k"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>envia o turno enquanto a conversa está aberta</td></tr>
+  <tr><td class="k"><kbd>←</kbd>/<kbd>→</kbd></td><td>no duelo, escolhe a resposta com que a rodada continua</td></tr>
+  <tr><td rowspan="3">triagem</td><td class="k"><kbd>J</kbd>/<kbd>K</kbd></td><td>anda na fila</td></tr>
+  <tr><td class="k"><kbd>A</kbd></td><td>aprova o item aberto</td></tr>
+  <tr><td class="k"><kbd>R</kbd></td><td>abre o comentário de devolução (<kbd>Esc</kbd> cancela)</td></tr>
+  <tr><td>Rate and Review</td><td class="k"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>registra a avaliação (as escalas navegam com as setas)</td></tr>
+  <tr><td>em toda tarefa</td><td class="k"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td>envia e pega a próxima</td></tr>
+</table>
+
+<!-- ================================================================ -->
+<h2 id="lingua"><span class="num">9</span>A convenção de língua</h2>
+
+<p>A regra de mercado, dita campo a campo pela própria tela:</p>
+
+<table>
+  <tr><th>o quê</th><th>língua</th><th>por quê</th></tr>
+  <tr><td>justificativa, comentário de revisão, critério de rubrica, user goal, todo metadado</td><td class="k"><strong>inglês</strong></td><td>é o que o cliente lê</td></tr>
+  <tr><td>resposta de referência (SFT) e a conversa com o modelo</td><td class="k"><strong>língua do prompt</strong></td><td>é o dado sendo produzido</td></tr>
+  <tr><td>o prompt escrito no modo criar</td><td class="k">pt ou en</td><td>é dado — a língua é intrínseca</td></tr>
+  <tr><td>dataset card, relatório de qualidade, auditoria</td><td class="k"><strong>inglês</strong></td><td>artefato contratual</td></tr>
+</table>
+
+<p>Justificativa em português onde a convenção pede inglês é, inclusive, uma das famílias de defeito que a triagem devolve — o brief do projeto lista as devoluções automáticas.</p>
+
+<!-- ================================================================ -->
+<h2 id="faq"><span class="num">10</span>Perguntas que vão aparecer</h2>
+
+<h4>“O kappa está null — quebrou?”</h4>
+<p>Não. Abaixo de 10 pares (ou sem variância nas respostas) a plataforma <em>retém</em> o kappa e diz o motivo. <code>null</code> = não medido; <code>0,0</code> = “concordam no nível do acaso”, que é outra afirmação — e falsa nesse caso.</p>
+
+<h4>“As categorias task type/domain do corpus estão todas zeradas.”</h4>
+<p>Estão — nas 159.733 linhas. A campanha de rotulagem do corpus (M6/M7) ainda não rodou; a interface desabilita o grupo com a explicação em vez de escondê-lo. É exatamente o rótulo que a pergunta de categoria da Bancada produz item a item.</p>
+
+<h4>“Meu prazo venceu no meio da tarefa. Perdi o trabalho?”</h4>
+<p>Não. O prazo existe para devolver a vaga a quem espera, não para punir quem demorou: a submissão atrasada é aceita e marcada. E o rascunho local sobrevive a qualquer coisa que não seja limpar os dados do navegador.</p>
+
+<h4>“Aprovei um prompt escrito e o badge não acende.”</h4>
+<p>O badge depende de três comandos que rodam <em>fora</em> da app (seção 6). O cartão diz em qual degrau parou: <em>aguardando <code>pf ingest plataforma</code></em> → <em>aguardando <code>pf run</code> + <code>pf load-db</code></em> → <span class="selo-ui boa">no corpus ✓</span>. E se o texto era cópia, ele nunca acende — o cartão explica que o dedup o colapsou no original.</p>
+
+<h4>“Fechei o servidor com força e agora o load-db reclama.”</h4>
+<p>Um <code>kill</code> pula a limpeza e deixa um arquivo <code>-shm</code> órfão ao lado do corpus — que o <code>pf load-db</code> lê como “alguém está com isto aberto”. Rode <code>pf annotate status</code>: ele limpa o rastro com segurança.</p>
+
+<h4>“Posso corrigir o texto de um prompt escrito antes de aprovar?”</h4>
+<p>Não — e é decisão, não falta de recurso. Corrigir e ingerir o resultado como “escrito por uma pessoa” quebraria a proveniência. Recuse com um comentário dizendo o que mudar; quem escreveu reescreve.</p>
+
+<footer>
+  <p>Manual da Bancada · Prompt Factory · pt-BR. A referência técnica (decisões, medições e pegadinhas) está no <code>CLAUDE.md</code> do repositório; o contrato vivo da API em <code>http://127.0.0.1:8766/docs</code> com o servidor de pé. Este arquivo não referencia nenhum host externo e pode ser aberto offline.</p>
+</footer>
+
+</main>
+</body>
+</html>

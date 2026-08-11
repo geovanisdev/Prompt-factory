@@ -310,6 +310,44 @@ def test_aprovar_grava_o_uid_previsto(cliente: TestClient) -> None:
     assert corpo["licenca"] == "cc0-1.0"
 
 
+def test_o_badge_no_corpus_e_conferido_AO_VIVO(cliente: TestClient, corpus: Path) -> None:
+    """``chegou_ao_corpus`` é a promessa da aprovação, conferida a cada listagem.
+
+    Consulta ao vivo, nunca gravada: o corpus troca por swap de arquivo embaixo
+    da app, e a resposta de ontem ("ainda não chegou") muda com o ``pf load-db``
+    de hoje sem que nada na plataforma seja escrito. O teste simula exatamente
+    isso — a MESMA app, o MESMO banco da plataforma, e a resposta muda porque o
+    corpus mudou.
+    """
+    quem = papeis(cliente)["anotador"][0]
+    revisor = papeis(cliente)["revisor"][0]
+    nova = escrever(cliente, quem).json()
+    cliente.post(
+        f"/api/criacoes/{nova['id']}/revisar", json={"revisor_id": revisor, "aprovar": True}
+    )
+
+    def minha() -> dict[str, Any]:
+        itens = cliente.get(
+            "/api/criacoes", params={"anotador_id": quem}
+        ).json()["items"]
+        return next(i for i in itens if i["id"] == nova["id"])
+
+    aprovada = minha()
+    assert aprovada["chegou_ao_corpus"] is False, "o uid ainda não existe no corpus"
+
+    # O "pf load-db" do teste: a linha com o uid prometido passa a existir.
+    conn = dbmod.connect(corpus)
+    try:
+        conn.execute(
+            "UPDATE prompts SET uid = ? WHERE id = (SELECT min(id) FROM prompts)",
+            (str(aprovada["uid_previsto"]),),
+        )
+    finally:
+        conn.close()
+
+    assert minha()["chegou_ao_corpus"] is True
+
+
 def test_recusar_sem_comentario_e_422(cliente: TestClient) -> None:
     """Recusar sem dizer por quê devolve a decisão sem devolver a informação."""
     quem = papeis(cliente)["anotador"][0]
