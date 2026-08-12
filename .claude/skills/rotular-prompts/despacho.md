@@ -181,6 +181,11 @@ deixam em aberto. Onde uma convenção se aplicar, ela vence a sua intuição.**
   `trabalho-negocios` · símbolos nacionais (bandeiras, hinos) → `geral` ·
   exercício de gramática ou de tradução → `linguagem-idiomas` · portaria, ato
   e diário oficial → `direito`.
+- **Dinheiro citado não faz o domínio ser `financas`.** `financas` é a GESTÃO
+  do próprio dinheiro (investir, orçar, dívida, imposto, cripto). Recomendação
+  de produto com teto de preço é o domínio do produto ("melhor celular até
+  1800" → `tecnologia`); salário e mercado de trabalho são `trabalho-negocios`;
+  preço ou câmbio como fato pontual segue o assunto da pergunta.
 - **`outro` anda com `quality` 1.** Se a intenção é discernível o bastante
   para merecer 2 ou 3, quase sempre existe uma classe melhor que `outro`.
 
