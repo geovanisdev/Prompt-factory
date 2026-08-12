@@ -172,6 +172,11 @@ deixam em aberto. Onde uma convenção se aplicar, ela vence a sua intuição.**
   fazer no Alasca").
 - **Ranquear ou hierarquizar é `classificacao-extracao`**, mesmo sem formato
   de saída declarado ("hierarquize pokémons por poder").
+- **Pedir CONTEÚDO em formato JSON/tabela/campos NÃO é `codigo`.** `codigo`
+  exige que o produto seja um programa, script, regex ou consulta. "Crie o
+  objeto JSON de uma pergunta de quiz" é `redacao-pratica` (o produto é a
+  pergunta; o JSON é só a embalagem); extrair dados de um texto para JSON é
+  `classificacao-extracao`. O formato da saída nunca decide sozinho.
 - **Domínios que se decidem por convenção:** varejo, marcas e lojas →
   `trabalho-negocios` · símbolos nacionais (bandeiras, hinos) → `geral` ·
   exercício de gramática ou de tradução → `linguagem-idiomas` · portaria, ato
