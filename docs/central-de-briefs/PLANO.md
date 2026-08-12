@@ -522,15 +522,34 @@ linha a linha**, `pedidos` nascendo com 0, `.v6.bak` ao lado. No banco migrado,
 `rubricas` passou a aceitar `origem='criacao'` e a recusar a inventada — o CHECK
 que nenhuma contagem pegaria. Suíte: **1.296 passando**, ruff limpo.
 
-**F2 — `destilacao.py` + CLI.**
+**F2 — `destilacao.py` + CLI. FEITO (2026-08-12).**
 Manifest/estados/TTL, `preparar` (janelas + cursor por arquivo), `importar`
 (validação da §4.3), `status`; `.gitignore` da árvore `destilacao/`;
-`[pedidos]` no `settings.toml`.
+`[pedidos]` no `settings.toml`; `tests/test_central_destilacao.py` (87 testes).
 DoD: com uma cópia de UM arquivo real, `preparar -n 2` gera lote com 2
 janelas; um JSON de resposta montado à mão importa N pedidos; recorte
 adulterado (1 caractere) é recusado nomeando a janela; `task_type` inventado
 é recusado; reimportar o mesmo arquivo cria 0 pedidos novos; lote segue
 `claimed` após falha.
+
+**Medido** contra o material real: `preparar -n 2` sobre a Filosofia gerou
+`ped_0001` com 2 janelas e o cursor em 22.000 de 1.375.809 caracteres (1,6%);
+recorte adulterado em 1 caractere recusado nomeando `ped_0001/j02`; `task_type`
+inventado e `resumo` recusados com frases diferentes; `EM13MAT` recusado; a 3ª
+falha levou o lote a `failed` e `preparar --lote` o reviveu com `tentativas`
+zerado; o import bom gravou 1 pedido e o MESMO recorte por outro lote gravou
+**`1 ja_existiam`, 0 novos**. Os 35 arquivos derivam coleção e disciplina
+corretamente. Suíte: **1.383 passando**, ruff limpo.
+
+**Duas correções ao plano, as duas medidas.** (1) O regex de BNCC da §4.3
+(`EM13[A-Z]{3}\d{3}`) recusaria **4.426 das 17.226** ocorrências do material —
+quase todas `EM13LP16`, os códigos de Língua Portuguesa, que têm 2 letras e 2
+dígitos; o padrão em uso é `EM13[A-Z]{2,3}\d{2,3}` (99,94%). (2) A §4.1 dizia que
+os metadados saem "do NOME do arquivo" como se houvesse um padrão: não há —
+`ESPANHOL_SINTESIS_…` inverte a ordem, "IDENTIDADE SARAIVA" aparece com espaço e
+com underscore, e um arquivo é minúsculo-hifenizado. A derivação virou tabela com
+busca do mais longo para o mais curto, e **nome que não casa nada devolve vazio**
+em vez de chutar.
 
 **F3 — Skill `destilar-pedidos` + primeira rodada real.**
 Prompt de despacho (§4.2) numa skill no padrão `gerar-material`; rodada sobre

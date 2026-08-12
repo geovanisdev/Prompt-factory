@@ -31,6 +31,20 @@ geracao/respostas/**
 !geracao/respostas/**/
 !geracao/respostas/**/.gitkeep
 
+# Campanha de DESTILAÇÃO (Central de Briefs Pedagógicos). Mesma forma das duas
+# acima e a regra MAIS DURA das três: nas outras o texto é do corpus (licenciado,
+# com atribuição por linha); aqui é material didático de TERCEIROS — Ática,
+# Scipione e Saraiva, copyright integral, sem concessão de licença nenhuma, e
+# ainda com citações de outros titulares dentro dele. Histórico de git não se
+# apaga, então nem uma linha desse texto pode entrar. Versionado é só o
+# `manifest.json` — o livro-caixa, que guarda estado e cursor, nunca conteúdo.
+destilacao/lotes/**
+!destilacao/lotes/**/
+!destilacao/lotes/**/.gitkeep
+destilacao/respostas/**
+!destilacao/respostas/**/
+!destilacao/respostas/**/.gitkeep
+
 # cache de modelos/datasets do HuggingFace, caso alguém aponte HF_HOME pra cá
 hf-cache/
 

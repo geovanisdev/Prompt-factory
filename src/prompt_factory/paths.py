@@ -75,6 +75,18 @@ GERACAO_MANIFEST: Path = GERACAO / "manifest.json"
 GERACAO_LOTES: Path = GERACAO / "lotes"        # o que vai para o agente
 GERACAO_RESPOSTAS: Path = GERACAO / "respostas"  # o que voltou, já importado
 
+#: Campanha de DESTILAÇÃO (Central de Briefs Pedagógicos). Terceira árvore de
+#: campanha, ao lado de ``labeling/`` e ``geracao/``, e a regra do git aqui é a
+#: mais dura das três: os lotes carregam texto de MATERIAL DIDÁTICO DE TERCEIROS,
+#: com copyright integral. Versionado é só o ``manifest.json``.
+#:
+#: O material bruto NÃO mora aqui nem em lugar nenhum do repositório — ele fica
+#: fora, e o caminho vem de ``[pedidos] material_dir``.
+DESTILACAO: Path = ROOT / "destilacao"
+DESTILACAO_MANIFEST: Path = DESTILACAO / "manifest.json"
+DESTILACAO_LOTES: Path = DESTILACAO / "lotes"        # o que vai para o agente
+DESTILACAO_RESPOSTAS: Path = DESTILACAO / "respostas"  # o que voltou, já importado
+
 SCRIPTS: Path = ROOT / "scripts"
 TESTS: Path = ROOT / "tests"
 
@@ -99,6 +111,10 @@ __all__ = [
     "DB",
     "DB_BUILD",
     "DB_FILE",
+    "DESTILACAO",
+    "DESTILACAO_LOTES",
+    "DESTILACAO_MANIFEST",
+    "DESTILACAO_RESPOSTAS",
     "EMB",
     "EXPORTS",
     "FINAL",
