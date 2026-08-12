@@ -560,6 +560,20 @@ max_pedidos_por_janela = 3
 min_chars_tema = 8
 min_chars_meta = 30
 
+# Quando avisar que um recorte está hifenizado demais, em quebras por MIL
+# caracteres. Por densidade e não por presença — e o número é medido.
+#
+# A primeira versão avisava a partir de UMA quebra e disparou em 92% dos 42
+# recortes da primeira rodada real: o aviso passou a dizer "este livro veio de
+# um PDF" (verdade sobre o material inteiro) em vez de "este recorte é difícil
+# de ler". Aviso que dispara em quase tudo é ruído com cara de sinal.
+#
+# Distribuição medida (recortes de 678 caracteres na mediana): mediana 3,0
+# quebras/mil, p80 5,6, p90 8,1. Na mediana é uma quebra a cada quatro linhas, e
+# isso se lê sem esforço. 6,0 fica logo acima do p80 e avisa ~19% — o suficiente
+# para o aviso significar "este é pior que o típico".
+hifenizacao_por_mil = 6.0
+
 # AS CLASSES FORA DO ESCOPO DA v1, e o porquê está na §6 do plano: `qa-contexto`,
 # `resumo` e `reescrita-edicao` só funcionam com o texto-base DENTRO do prompt —
 # e o texto aqui é da editora. O prompt referencia o conteúdo, nunca o reproduz.

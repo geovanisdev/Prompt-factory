@@ -551,12 +551,56 @@ com underscore, e um arquivo é minúsculo-hifenizado. A derivação virou tabel
 busca do mais longo para o mais curto, e **nome que não casa nada devolve vazio**
 em vez de chutar.
 
-**F3 — Skill `destilar-pedidos` + primeira rodada real.**
-Prompt de despacho (§4.2) numa skill no padrão `gerar-material`; rodada sobre
-1–2 arquivos de disciplinas diferentes.
+**F3 — Skill `destilar-pedidos` + primeira rodada real. FEITO (2026-08-12).**
+Skill no padrão HEADLESS do M6-B (`SKILL.md` + `despacho.md` + `rodar_lote.py` +
+`diag_lote.py`), e não no padrão `gerar-material`: o material é de terceiros, e
+mantê-lo fora do contexto do maestro deixa de ser economia de tokens para ser
+parte da política de licença.
 DoD: pedidos reais no banco vindos de ≥2 disciplinas, com a distribuição por
 `task_type`/`papel` impressa pelo `status`; taxa de erro de validação da
 rodada registrada no commit (número medido, seja qual for).
+
+**A rodada, medida** (3 lotes × 8 janelas de 12.000 caracteres, Filosofia/Do Seu
+Jeito e Biologia/Ciência Viva): **42 pedidos gravados**, 7 `task_type`
+(`redacao-pratica` 16, `qa-aberta` 13, `classificacao-extracao` 4, `brainstorm`
+3, `planejamento` 3, `matematica-raciocinio` 2, `conselho-opiniao` 1), papel
+24 professor / 18 aluno, dificuldade 24 intermediária / 15 básica / 3 avançada.
+
+**Taxa de erro de validação, o número que o marco existe para medir:**
+
+| modelo | pedidos | recusados | taxa |
+| --- | ---: | ---: | ---: |
+| Sonnet 5 | 25 | **1** | **4%** |
+| Haiku 4.5 | 4 | **4** | **100%** |
+
+**Todas as recusas foram do recorte**, e o `diag_lote.py` nomeou dois modos de
+falha distintos: (1) **quebra de linha achatada** — o modelo copia 100+
+caracteres certos e troca o `\n` do arquivo por espaço, que é o "conserto" que o
+despacho proíbe (2 dos 4 casos do Haiku); (2) **frase reconstruída de memória** —
+casa 2 ou 3 caracteres e diverge (2 do Haiku, e a única do Sonnet). O retry
+dirigido de uma janela e a escalada de modelo resolveram os dois: o lote que o
+Haiku errou inteiro passou 18/18 com Sonnet.
+
+Consequência: **Sonnet é o padrão do runner** e Haiku não serve para esta
+campanha. A tarefa não é a da rotulagem — lá se escolhe 1 rótulo entre 16 sobre
+um texto curto; aqui se copia verbatim um trecho de centenas de caracteres.
+
+**Uma correção medida ao §4.3.** O aviso de hifenização disparava a partir de
+UMA quebra e acendeu em **92% dos 42 recortes** — ele passou a dizer "este livro
+veio de um PDF" (verdade sobre o material inteiro) em vez de "este recorte é
+difícil de ler", e envenenaria o `com_aviso` do funil desde o primeiro dia.
+Passou a ser por DENSIDADE (`[pedidos] hifenizacao_por_mil`, default 6,0): a
+distribuição real é mediana 3,0 quebras/mil, p80 5,6, p90 8,1, e o limiar avisa
+~19%. Os 42 pedidos já gravados tiveram os avisos recomputados (36 mudaram;
+"com ao menos um aviso" caiu de 36 para 14).
+
+**Achado para o dono decidir: `serie` saiu `indefinido` em 42 de 42.** Os três
+arquivos da rodada são de volume único, e o ano não aparece no texto. Mas as
+coleções de 3 volumes (`..._MATEM_VOL1_MP`, `..._PORTUGUES_VOL2_MP`,
+`..._MATEM_1_MP`) carregam o ano **no nome do arquivo**, onde o destilador não
+enxerga. A correção seria derivar `serie` em `metadados_do_nome` e mandá-la ao
+lote como sugestão (o agente ainda decide por janela) — mas ela depende da
+premissa "volume 1 = 1º ano", que é decisão de quem conhece o PNLD, não minha.
 
 **F4 — UI da vista criar + reserva.**
 Painel do pedido, fila "puxar próximo", devolução, blocos de rubrica/gold no

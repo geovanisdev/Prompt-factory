@@ -279,8 +279,27 @@ def test_marcador_de_gabarito_e_de_credito_viram_AVISO_com_o_porque() -> None:
     assert any("citação de terceiro" in a or "referência" in a for a in avisos)
 
 
-def test_hifenizacao_quebrada_e_avisada() -> None:
-    assert any("hifenização" in a for a in dmod.avisos_do_recorte("a natureza huma-\nna e"))
+def test_a_hifenizacao_e_avisada_por_DENSIDADE_e_nao_por_presenca() -> None:
+    """MEDIDO na primeira rodada real: avisar a partir de UMA quebra disparava em
+    **92% dos 42 recortes** — o aviso passava a dizer "este livro veio de um PDF"
+    (verdade sobre o material inteiro) em vez de "este recorte é difícil de ler".
+
+    A distribuição: mediana 3,0 quebras/mil, p80 5,6. O limiar de 6,0 avisa ~19%.
+    """
+    tipico = "a natureza huma-\nna e o mundo. " + "x" * 640  # 1 quebra em ~670
+    assert not any("hifeniza" in a for a in dmod.avisos_do_recorte(tipico))
+
+    denso = ("pala-\nvra " * 12) + "y" * 500  # 12 quebras em ~620
+    avisos = dmod.avisos_do_recorte(denso)
+    assert any("hifeniza" in a for a in avisos)
+    # o aviso diz o NÚMERO e a densidade: "está sujo" sem quanto não ajuda a triar
+    assert any("por mil" in a and "12" in a for a in avisos)
+
+
+def test_o_limiar_da_hifenizacao_sai_do_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    tipico = "a natureza huma-\nna e o mundo. " + "x" * 640
+    monkeypatch.setitem(config.settings()["pedidos"], "hifenizacao_por_mil", 0.5)
+    assert any("hifeniza" in a for a in dmod.avisos_do_recorte(tipico))
 
 
 def test_recorte_limpo_nao_gera_aviso() -> None:
@@ -834,6 +853,113 @@ def test_o_painel_conta_a_campanha_e_o_funil(
     assert f["por_status"] == {"disponivel": 1}
     assert f["por_disciplina"] == {"Filosofia": 1}
     assert f["por_papel"] == {"professor": 1}
+
+
+# ---------------------------------------------------------------------------
+# 12. o despacho da skill
+# ---------------------------------------------------------------------------
+
+
+def _runner():
+    """O ``rodar_lote.py`` da skill, importado como módulo.
+
+    Ele não é pacote (mora em ``.claude/skills/``), então entra por
+    ``importlib``. Vale o incômodo: o casamento entre os placeholders do
+    ``despacho.md`` e as substituições do runner **falha em silêncio** — um
+    ``<<TASK_TYPES>>`` não preenchido viaja literalmente para o modelo, e o
+    resultado é um destilador sem vocabulário nenhum que ainda assim responde.
+    """
+    import importlib.util
+
+    caminho = (
+        Path(__file__).resolve().parents[1]
+        / ".claude"
+        / "skills"
+        / "destilar-pedidos"
+        / "rodar_lote.py"
+    )
+    spec = importlib.util.spec_from_file_location("rodar_lote_destilacao", caminho)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_o_despacho_nao_deixa_placeholder_nenhum_por_preencher(
+    lote: dict[str, Any],
+) -> None:
+    """A prova é sobre um lote REAL, não sobre uma lista de nomes escrita à mão:
+    a lista poderia estar certa e o preenchimento errado."""
+    runner = _runner()
+    prompt, janelas = runner.compor_despacho(lote, None, None)
+    assert "<<" not in prompt and ">>" not in prompt
+    assert len(janelas) == len(lote["janelas"])
+
+
+def test_o_despacho_carrega_o_vocabulario_COM_as_definicoes(
+    lote: dict[str, Any],
+) -> None:
+    """Sem a definição o agente classifica pelo nome, e ``redacao-pratica``
+    contra ``geracao-criativa`` é justamente a fronteira que a campanha de
+    rotulagem do corpus precisou de convenção escrita para resolver."""
+    prompt, _ = _runner().compor_despacho(lote, None, None)
+    for op in lote["vocabulario"]["task_type"]:
+        assert f"`{op['id']}`" in prompt
+        assert op["definicao"][:40] in prompt
+    for excluido in dmod.task_types_excluidos():
+        assert excluido in prompt
+
+
+def test_o_despacho_repassa_os_limites_do_LOTE_e_nao_de_uma_copia(
+    lote: dict[str, Any],
+) -> None:
+    """Mexer em ``[pedidos] recorte_max_chars`` tem de mudar o que o despacho
+    promete, sem editar uma linha da skill."""
+    prompt, _ = _runner().compor_despacho(lote, None, None)
+    assert str(lote["limites"]["recorte_max_chars"]) in prompt
+    assert str(lote["limites"]["max_pedidos_por_janela"]) in prompt
+
+
+def test_o_retry_dirigido_manda_SO_as_janelas_pedidas(lote: dict[str, Any]) -> None:
+    runner = _runner()
+    prompt, janelas = runner.compor_despacho(lote, ["j02"], "recorte com espaço no fim")
+    assert [j["janela_id"] for j in janelas] == ["j02"]
+    assert "RETRY" in prompt and "espaço no fim" in prompt
+    with pytest.raises(SystemExit, match="fora do lote"):
+        runner.compor_despacho(lote, ["j99"], None)
+
+
+def test_a_nota_do_retry_vale_SEM_janelas_tambem(lote: dict[str, Any]) -> None:
+    """Uma escalada de modelo sobre o lote inteiro também é um retry, e a lição
+    da tentativa anterior é o que ela tem a acrescentar. Uma flag que o usuário
+    passa e o programa ignora em silêncio é pior que uma flag que não existe."""
+    runner = _runner()
+    prompt, janelas = runner.compor_despacho(lote, None, "achatou a quebra de linha")
+    assert len(janelas) == len(lote["janelas"])
+    assert "RETRY" in prompt and "achatou a quebra de linha" in prompt
+    # e sem nada, nenhum bloco de retry aparece
+    limpo, _ = runner.compor_despacho(lote, None, None)
+    assert "RETRY" not in limpo
+
+
+def test_o_extrator_e_tolerante_na_forma_e_NAO_toca_no_conteudo() -> None:
+    """Ao contrário do runner da rotulagem, este NÃO re-serializa: um dos campos
+    é uma cópia verbatim que a validação confere caractere a caractere, e
+    qualquer passe de normalização poderia ser a diferença entre conferir e
+    não conferir."""
+    runner = _runner()
+    recorte = "linha um\ncom  espaço  duplo e hífen-\nquebrado"
+    saida = (
+        "Aqui vão os pedidos:\n"
+        "```json\n"
+        + json.dumps({"janela_id": "j01", "recorte": recorte}, ensure_ascii=False)
+        + "\nlinha quebrada que não é json\n"
+        + json.dumps({"sem": "janela_id"}, ensure_ascii=False)
+        + "\n```\n"
+    )
+    pedidos = runner.extrair_pedidos(saida)
+    assert len(pedidos) == 1
+    assert pedidos[0]["recorte"] == recorte
 
 
 def test_a_campanha_nao_toca_o_corpus(material: Path, dp: dmod.DestilacaoPaths) -> None:

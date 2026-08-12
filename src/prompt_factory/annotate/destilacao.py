@@ -306,6 +306,29 @@ MARCADORES: dict[str, str] = {
 HIFENIZACAO = re.compile(r"[a-zà-ÿ]-\n[a-zà-ÿ]")
 
 
+def hifenizacao_limiar() -> float:
+    """Quebras por 1.000 caracteres a partir das quais o recorte é avisado.
+
+    POR DENSIDADE, E NÃO POR PRESENÇA — e o número é medido, não escolhido.
+    A primeira versão avisava a partir de UMA quebra, e na primeira rodada real
+    isso disparou em **92% dos 42 recortes**: o aviso deixou de dizer "este
+    recorte é difícil de ler" e passou a dizer "este livro veio de um PDF", que
+    é verdade sobre o material inteiro e não ajuda ninguém a triar nada. Aviso
+    que dispara em quase tudo é ruído com cara de sinal, e envenena o
+    ``com_aviso`` do funil desde o primeiro dia.
+
+    A distribuição medida nos 42 recortes (mediana de 678 caracteres): mediana
+    **3,0** quebras/1.000, p80 **5,6**, p90 **8,1**. Na mediana é uma quebra a
+    cada ~333 caracteres — a cada quatro linhas —, e isso se lê sem esforço. O
+    default **6,0** fica logo acima do p80 e avisa ~19%, que é o que faz o aviso
+    significar "este é pior que o típico".
+
+    Por densidade e não por contagem porque 3 quebras num recorte de 300
+    caracteres e 3 num de 2.000 são coisas diferentes, e o cap permite os dois.
+    """
+    return float(_cfg("pedidos", "hifenizacao_por_mil", default=6.0))
+
+
 def avisos_do_recorte(recorte: str) -> list[str]:
     """Os avisos que este recorte merece. Nunca bloqueia."""
     saida = [
@@ -313,10 +336,14 @@ def avisos_do_recorte(recorte: str) -> list[str]:
         for marca, porque in MARCADORES.items()
         if marca in recorte
     ]
-    if HIFENIZACAO.search(recorte):
+    quebras = len(HIFENIZACAO.findall(recorte))
+    densidade = 1000 * quebras / len(recorte) if recorte else 0.0
+    if densidade >= hifenizacao_limiar():
         saida.append(
-            "palavra quebrada por hifenização de PDF — a conferência de substring é "
-            "VERBATIM, então o recorte entrou com a quebra"
+            f"{quebras} palavra(s) quebrada(s) por hifenização de PDF em "
+            f"{len(recorte)} caracteres ({densidade:.1f} por mil, acima do típico) — "
+            "a conferência de substring é VERBATIM, então o recorte entrou com as "
+            "quebras e a leitura fica truncada"
         )
     return saida
 
@@ -498,22 +525,49 @@ def proximo_cursor(inicio: int, n_janelas: int, *, tamanho: int, overlap: int) -
 # ---------------------------------------------------------------------------
 
 
+def _definicoes_task_type() -> dict[str, str]:
+    """``{id: definição}`` da taxonomia. Vazio se o arquivo não abrir.
+
+    Vem do MESMO ``schema.load_taxonomy`` que ``tarefas._vocabulario_taxonomia``
+    lê por baixo — não é uma segunda fonte, é o mesmo arquivo pelo mesmo
+    carregador (que já tem cache). A definição fica fora da projeção do
+    instrumento de propósito: lá ela inflaria o blob de cada rubrica; aqui ela é
+    o que impede o agente de classificar por adivinhação.
+    """
+    try:
+        from .. import schema
+
+        tax = schema.load_taxonomy()
+    except (OSError, ValueError):  # pragma: no cover - arquivo do repo
+        return {}
+    return {
+        str(chave): str(entrada.get("definicao") or "")
+        for chave, entrada in (tax.get("task_type") or {}).items()
+    }
+
+
 def _opcoes_task_type() -> list[dict[str, Any]]:
-    """As classes permitidas, já sem as excluídas, com rótulo em inglês.
+    """As classes permitidas, já sem as excluídas, com rótulo e DEFINIÇÃO.
 
-    Sai de ``tarefas._vocabulario_taxonomia`` — a MESMA projeção que a pergunta
-    de categoria do P9 usa. Uma segunda leitura do ``taxonomy.json`` aqui daria
-    duas listas que divergiriam na primeira classe renomeada.
+    O id e o rótulo saem de ``tarefas._vocabulario_taxonomia`` — a MESMA projeção
+    que a pergunta de categoria do P9 usa. Uma segunda lista escrita aqui
+    divergiria na primeira classe renomeada.
 
-    **Sem cache aqui de propósito**, embora a leitura do arquivo abaixo tenha o
-    dela: a exclusão vem da CONFIGURAÇÃO, e um ``lru_cache`` nesta camada
-    guardaria a lista da primeira chamada e passaria a ignorar
-    ``task_types_excluidos``. O custo evitado seria uma compreensão sobre 16
-    itens; o preço seria um filtro que às vezes não filtra.
+    A DEFINIÇÃO viaja junto porque o agente é puro cômputo: sem ela ele
+    classificaria pelo nome, e ``redacao-pratica`` contra ``geracao-criativa`` é
+    exatamente a fronteira que a campanha de rotulagem do corpus precisou de
+    convenção escrita para resolver. O que não viaja no lote, o agente inventa.
+
+    **Sem cache nesta camada de propósito**, embora a leitura do arquivo tenha a
+    dela: a exclusão vem da CONFIGURAÇÃO, e um ``lru_cache`` aqui guardaria a
+    lista da primeira chamada e passaria a ignorar ``task_types_excluidos``. O
+    custo evitado seria uma compreensão sobre 16 itens; o preço seria um filtro
+    que às vezes não filtra.
     """
     fora = set(task_types_excluidos())
+    definicoes = _definicoes_task_type()
     return [
-        dict(op)
+        {**op, "definicao": definicoes.get(str(op["id"]), "")}
         for op in tmod._vocabulario_taxonomia().get("task_type", [])
         if str(op["id"]) not in fora
     ]
@@ -1299,6 +1353,7 @@ __all__ = [
     "fatiar",
     "funil",
     "gravar",
+    "hifenizacao_limiar",
     "importar",
     "janela_chars",
     "janela_overlap",
