@@ -9,6 +9,7 @@ Tudo roda **offline depois da ingestão**: a interface é um SQLite mais um arqu
 ```
 159.733 prompts · 116.051 en · 43.682 pt · 9 fontes abertas · 6 licenças
 prompts de 1 a 981.656 caracteres · 541 MB de texto
+task_type e domain em 100% das linhas: 6.560 rótulos humanos/agente + classificador próprio, com abstenção declarada
 ```
 
 ---
@@ -40,7 +41,7 @@ Distribuição do universo:
 * **fonte**: wildchat_en 67.031 · wildchat_pt 38.070 · hh_rlhf 14.878 · dolly 14.416 · no_robots 9.949 · prism 7.564 · aya 6.293 · arena140k 1.260 · oasst 272
 * **5.102 linhas ainda têm cópia exata no corpus** (`n_exact_dups > 0`): são os robôs que sobreviveram ao dedup por diferirem num detalhe. A interface mostra `×N` nelas e o filtro `max_dups=0` derruba a família inteira.
 * **1.240 linhas tiveram PII substituída** por marcadores.
-* `task_type`, `domain`, `quality` e `nsfw` estão **NULL em 100% das linhas**: a campanha de rotulagem (M6/M7) ainda não rodou. É o estado esperado, não defeito — a interface diz "rotulagem PENDENTE" e desabilita esses filtros com a explicação, em vez de escondê-los.
+* **`task_type` e `domain` estão preenchidos** (M6/M7): 82 dos 155 lotes da campanha de rotulagem rodaram (6.560 rótulos, agreement médio **0,913** contra ouro revisado à mão) e um classificador próprio — regressão logística sobre os mesmos embeddings do dedup — cobre o resto do corpus. Macro-F1 medido em teste retido: **domain 0,67** (meta 0,55) e **task_type 0,58** (meta 0,65 — as classes fronteiriças `outro`, `resumo` e `brainstorm` prendem a média, e o número fica documentado em vez de maquiado; dobrar os rótulos moveu a média em só +0,01, então o teto é da receita, não do volume). Cada linha declara a procedência: `label_method` (`manual`/`agent`/`classifier`), `label_confidence` e `needs_review`; abaixo do limiar de confiança o eixo fica **NULL — abstenção declarada** (12,2% das linhas em task_type). `quality` e `nsfw` seguem NULL de propósito: `quality` foi treinado, medido (0,50) e **não** aplicado — um 1..3 plausível e errado entraria no filtro da interface sem nada denunciando; `nsfw` tem 18 positivos em 6.560 e não treina classificador nenhum.
 
 ---
 
@@ -89,7 +90,7 @@ git clone <url> Prompt-factory
 cd Prompt-factory
 & "$env:USERPROFILE\.local\bin\uv.exe" sync          # cria o .venv a partir do uv.lock
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf --help # lista os comandos
-& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 1.174 testes, ~100 s
+& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 1.287 testes, ~2 min
 & "$env:USERPROFILE\.local\bin\uv.exe" run ruff check .
 ```
 
@@ -150,7 +151,7 @@ Total: **~4 h 15 min**, das quais 3 h 30 são os passos 2, 3, 7 e 8.
 
 `pf run` sozinho encadeia s01..s06; a tabela separa os passos 6–8 porque o **s05 é o longo — e é retomável**: ele mantém um memmap pré-alocado e um `emb/progress.json`, então um `Ctrl+C` perde no máximo um bloco de 2.048 textos. Os dois passes do WildChat também retomam: rodar o mesmo comando continua de onde parou, e `--restart` é que recomeça do zero. `scripts/run_pipeline.ps1` faz os passos 6 a 9 de uma vez.
 
-O `--allow-unlabeled-pct 100` do passo 10 **não é gambiarra**: por padrão a carga recusa um banco com mais de 1% das linhas sem rótulo, justamente porque um banco carregado com o parquet de rótulos ausente fica plausível, abre na interface e só denuncia o erro semanas depois. Antes do M7 a falta de rótulo é intencional, e a flag é como se diz isso em voz alta.
+O `--allow-unlabeled-pct 100` do passo 10 **não é gambiarra**: por padrão a carga recusa um banco com mais de 1% das linhas sem rótulo, justamente porque um banco carregado com o parquet de rótulos ausente fica plausível, abre na interface e só denuncia o erro semanas depois. Num clone limpo, **antes** de rodar a campanha de rotulagem e o classificador (M5–M7), a falta de rótulo é intencional — e a flag é como se diz isso em voz alta. Depois do M7 a sequência é `pf merge-labels` → `pf train` → `pf apply` → `pf load-db --allow-unlabeled-pct 13`: os 13% são a **abstenção honesta** do classificador (linhas em que ele não bateu a confiança mínima), não rótulo faltando.
 
 ### Por que o s05 leva 2 horas
 
@@ -264,9 +265,9 @@ O manual de uso dos três papéis, passo a passo, está em **[`docs/manual-banca
 | M2 | ingesters das 7 fontes pequenas | ✅ |
 | M3 | WildChat em streaming com checkpoint/resume: pt, pool en e downsample | ✅ |
 | M4 | s01–s06: normalize → idioma/variante → PII → dedup exato → embeddings → dedup próximo | ✅ **159.733 linhas** |
-| M5 | infraestrutura da campanha de rotulagem (s07 semente + lotes, s08 merge) | ✅ pronta — **a campanha não rodou** |
-| M6 | a campanha de rotulagem propriamente dita | ⏳ **pendente** |
-| M7 | s09 treino + s10 aplicação do classificador | ⏳ **stub** (`pf train`/`pf apply` saem com código 2) |
+| M5 | infraestrutura da campanha de rotulagem (s07 semente + lotes, s08 merge) | ✅ |
+| M6 | campanha de rotulagem por agentes headless, com portão de calibração | ✅ **82/155 lotes · 6.560 rótulos · agreement 0,913 · 0 falhados** (os 73 restantes são opcionais: o ganho de F1 saturou) |
+| M7 | s09 treino + s10 aplicação do classificador | ✅ **domain 0,67 / task_type 0,58** de macro-F1, aplicado com faixas de confiança e 12,2% de abstenção declarada |
 | M8 | s11 carga bulk no SQLite com rebuild do FTS e swap de arquivo | ✅ |
 | M9 | interface FastAPI + página única + export com manifesto | ✅ |
 | M10 | busca semântica + este README | ✅ |

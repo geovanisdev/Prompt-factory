@@ -87,7 +87,7 @@
 {"uid":"0d8fa41575c05b13","task_type":"qa-aberta","domain":"culinaria","quality":3,"nsfw":false}
 {"uid":"1d1b42256f00a3d6","task_type":"conselho-opiniao","domain":"trabalho-negocios","quality":2,"nsfw":false}
 {"uid":"2c75c33340782c60","task_type":"resumo","domain":"politica-sociedade","quality":3,"nsfw":false}
-{"uid":"326b4485ed08c875","task_type":"qa-aberta","domain":"culinaria","quality":3,"nsfw":false}
+{"uid":"326b4485ed08c875","task_type":"redacao-pratica","domain":"culinaria","quality":3,"nsfw":false}
 {"uid":"61f46a39c54fa7ba","task_type":"conselho-opiniao","domain":"saude","quality":3,"nsfw":false}
 {"uid":"e1b93eae839e2575","task_type":"qa-aberta","domain":"saude","quality":3,"nsfw":false}
 {"uid":"e93a285778d1c92d","task_type":"conselho-opiniao","domain":"geral","quality":2,"nsfw":false}
