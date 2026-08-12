@@ -4,16 +4,17 @@ data/**
 !data/**/
 !data/**/.gitkeep
 
-# Artefatos gerados da campanha de rotulagem. VERSIONADOS ficam só a taxonomia,
-# os mapeamentos e o manifest.json (o livro-caixa, que é o estado da campanha).
-# Os lotes carregam o texto dos prompts e a semente é um parquet: nem um nem
-# outro entra no git.
+# Artefatos gerados da campanha de rotulagem. VERSIONADOS: a taxonomia, os
+# mapeamentos, o manifest.json (o livro-caixa, que é o estado da campanha) e
+# labeling/labels/ — os rótulos são o único artefato NÃO regenerável da campanha
+# (horas de trabalho de agente) e carregam só uid + 4 rótulos, zero texto do
+# corpus, então podem viver no git sem preocupação de licença. Os lotes e a
+# semente, ao contrário, CARREGAM o texto dos prompts: ficam fora do git
+# (histórico não se apaga se o repo um dia ficar público) e o backup deles é
+# cópia para outro disco (F:\backups\prompt-factory).
 labeling/batches/**
 !labeling/batches/**/
 !labeling/batches/**/.gitkeep
-labeling/labels/**
-!labeling/labels/**/
-!labeling/labels/**/.gitkeep
 labeling/seed/**
 !labeling/seed/**/
 !labeling/seed/**/.gitkeep
