@@ -243,6 +243,39 @@ despachar.
 > forma informativa. Na dúvida, `false` — **exceto** qualquer sexualização de
 > menores, que é sempre `true`.
 >
+> **CONVENÇÕES DESTE PROJETO — decidem as fronteiras que as definições acima
+> deixam em aberto. Onde uma convenção se aplicar, ela vence a sua intuição.**
+> - **O que decide é o PRODUTO pedido, não a moldura em volta dele.** "Aja como
+>   um especialista e classifique esta receita" é `classificacao-extracao`;
+>   "aja como um gerador de prompts do Midjourney" é `geracao-criativa`.
+>   `roleplay-persona` fica só para quando interagir NO personagem é o pedido —
+>   não basta o prompt abrir definindo uma persona.
+> - **"Descreva X" / "Write a description of X" / "qual a melhor receita de X"
+>   é `redacao-pratica`**, não `qa-aberta`, mesmo com conteúdo factual: o que
+>   se pede é um TEXTO para ser redigido. `qa-aberta` é pergunta que se
+>   responde.
+> - **Condensar o que um texto fornecido diz — ou o que o autor dele acha — é
+>   `resumo`**, mesmo quando a frase não usa a palavra "resumo": "explique em
+>   duas frases o que o autor acha de X" é `resumo`.
+> - **`qa-contexto` é pergunta PONTUAL cuja resposta é um fato dentro do
+>   material, ou exercício feito sobre ele** ("qual evento é tratado no texto",
+>   "complete os parênteses do APÊNDICE A"). Extrair informação em PROSA
+>   também é `qa-contexto`; só vira `classificacao-extracao` quando o usuário
+>   declara a ESTRUTURA de saída (JSON, tabela, campos).
+> - **Recomendação e veredito são `conselho-opiniao`, ainda que a resposta
+>   saia em lista**: "que lojas se parecem com a X", "melhor celular até 1800",
+>   "A é melhor que B?", "como durmo melhor?", "o que você acha de X".
+>   `brainstorm` fica para "gere N ideias/opções para mim" ("20 coisas para
+>   fazer no Alasca").
+> - **Ranquear ou hierarquizar é `classificacao-extracao`**, mesmo sem formato
+>   de saída declarado ("hierarquize pokémons por poder").
+> - **Domínios que se decidem por convenção:** varejo, marcas e lojas →
+>   `trabalho-negocios` · símbolos nacionais (bandeiras, hinos) → `geral` ·
+>   exercício de gramática ou de tradução → `linguagem-idiomas` · portaria, ato
+>   e diário oficial → `direito`.
+> - **`outro` anda com `quality` 1.** Se a intenção é discernível o bastante
+>   para merecer 2 ou 3, quase sempre existe uma classe melhor que `outro`.
+>
 > **REGRAS DE SAÍDA — ESTRITAS**
 > - Responda com JSONL PURO: um objeto JSON por linha e absolutamente nada além.
 > - SEM cercas de código (```), SEM prosa antes ou depois, SEM linhas em branco,
@@ -254,6 +287,9 @@ despachar.
 > - `quality` é número JSON (1, 2 ou 3); `nsfw` é booleano JSON (`true`/`false`,
 >   minúsculo, sem aspas). Os valores de `task_type` e `domain` são exatamente as
 >   chaves acima, minúsculas e com hífen.
+> - **Mantenha a grafia exata das chaves ATÉ A ÚLTIMA LINHA.** A grafia derrapa
+>   no fim de saídas longas: `classificacao-extracao` tem DOIS "s" em
+>   "classificacao". Uma letra a menos invalida a linha.
 > - Formato de uma linha (não é gabarito):
 >   `{"uid":"0123456789abcdef","task_type":"qa-aberta","domain":"ciencia","quality":3,"nsfw":false}`
 >
@@ -262,6 +298,18 @@ despachar.
 
 ## Escalada e falhas
 
+- **`gold_uids` é FIXO por lote, e isso muda o que "reprovado" significa.** Um
+  lote devolvido pelo portão volta com os MESMOS três ouros na próxima
+  tentativa. Se dois deles caem numa fronteira genuinamente ambígua, o lote não
+  passa nunca — não é um retry que resolve. Com 6 comparações e portão em 0,80,
+  um único item fronteiriço já custa 0,33, e mesmo um agente com 85% de acerto
+  por comparação reprova ~22% dos lotes. **Reprovação repetida é sinal para
+  olhar o desacordo item a item, não para tentar de novo**: se o gabarito
+  encoda uma convenção que a taxonomia não diz, o conserto é escrever a
+  convenção na seção CONVENÇÕES do prompt de despacho — é para isso que a
+  calibração existe. Aí o número passa a medir "aplicou a diretriz", e não mais
+  "concorda por conta própria" com o humano; são afirmações diferentes e o
+  dataset card tem de dizer qual delas está sendo feita.
 - Lote que falhou 2 vezes no Haiku (validação ou agreement): despache-o com
   `model: sonnet` e submeta com `--model sonnet`.
 - Lotes `failed` acumulados: pergunte ao usuário antes de

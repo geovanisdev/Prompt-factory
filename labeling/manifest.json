@@ -168,7 +168,7 @@
       "ed0e9767b657f8e4",
       "f800039195014b14"
     ],
-    "revised_at": "2026-08-12T13:48:04Z"
+    "revised_at": "2026-08-12T14:44:18Z"
   },
   "gold": {
     "13cae0699b8c11ea": {
@@ -196,7 +196,7 @@
       "nsfw": false
     },
     "42b972247b769891": {
-      "task_type": "matematica-raciocinio",
+      "task_type": "geracao-criativa",
       "domain": "educacao",
       "quality": 3,
       "nsfw": false
@@ -232,7 +232,7 @@
       "nsfw": false
     },
     "685f4eddd2fdaa36": {
-      "task_type": "outro",
+      "task_type": "qa-aberta",
       "domain": "tecnologia",
       "quality": 1,
       "nsfw": false
@@ -299,7 +299,7 @@
     },
     "be6ac38fb5e235ec": {
       "task_type": "geracao-criativa",
-      "domain": "jogos",
+      "domain": "artes-entretenimento",
       "quality": 2,
       "nsfw": false
     },
@@ -484,21 +484,21 @@
       "nsfw": false
     },
     "2b2988216454d7cb": {
-      "task_type": "roleplay-persona",
+      "task_type": "geracao-criativa",
       "domain": "tecnologia",
       "quality": 3,
       "nsfw": false
     },
     "381732efd2f77520": {
-      "task_type": "planejamento",
+      "task_type": "outro",
       "domain": "educacao",
-      "quality": 2,
+      "quality": 1,
       "nsfw": false
     },
     "3f3c098ab6702eff": {
       "task_type": "codigo",
       "domain": "tecnologia",
-      "quality": 2,
+      "quality": 3,
       "nsfw": false
     },
     "470ed7480c6c5a9f": {
@@ -508,7 +508,7 @@
       "nsfw": false
     },
     "5e0f422b042b3d06": {
-      "task_type": "roleplay-persona",
+      "task_type": "classificacao-extracao",
       "domain": "culinaria",
       "quality": 3,
       "nsfw": false
@@ -622,7 +622,7 @@
       "nsfw": false
     },
     "474b63e552b8c0a7": {
-      "task_type": "classificacao-extracao",
+      "task_type": "qa-contexto",
       "domain": "tecnologia",
       "quality": 3,
       "nsfw": false
@@ -634,7 +634,7 @@
       "nsfw": false
     },
     "9e13aaea276a75b2": {
-      "task_type": "qa-contexto",
+      "task_type": "resumo",
       "domain": "culinaria",
       "quality": 3,
       "nsfw": false
@@ -688,13 +688,13 @@
       "nsfw": false
     },
     "0d8fa41575c05b13": {
-      "task_type": "redacao-pratica",
+      "task_type": "qa-aberta",
       "domain": "culinaria",
       "quality": 3,
       "nsfw": false
     },
     "1d1b42256f00a3d6": {
-      "task_type": "brainstorm",
+      "task_type": "conselho-opiniao",
       "domain": "trabalho-negocios",
       "quality": 2,
       "nsfw": false
@@ -706,7 +706,7 @@
       "nsfw": false
     },
     "326b4485ed08c875": {
-      "task_type": "redacao-pratica",
+      "task_type": "qa-aberta",
       "domain": "culinaria",
       "quality": 3,
       "nsfw": false
@@ -730,7 +730,7 @@
       "nsfw": false
     },
     "1e8b5f2043801ca0": {
-      "task_type": "qa-aberta",
+      "task_type": "conselho-opiniao",
       "domain": "politica-sociedade",
       "quality": 2,
       "nsfw": false
@@ -774,7 +774,7 @@
   },
   "batches": {
     "batch_0001": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -782,12 +782,13 @@
         "5fe13646d391bc83",
         "ed0e9767b657f8e4"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T14:01:19Z",
+      "done_at": "2026-08-12T14:10:53Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0002": {
       "status": "pending",
@@ -799,14 +800,15 @@
         "9423207660413e81"
       ],
       "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
-      "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "done_at": "2026-08-12T14:27:42Z",
+      "agreement": 0.16666666666666666,
+      "tentativas": 1,
+      "agent_model": "haiku",
+      "motivo": "agreement 0.17 < 0.80",
+      "n_rotulos": 80
     },
     "batch_0003": {
-      "status": "pending",
+      "status": "claimed",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -814,7 +816,7 @@
         "b5e1b570e9ea1d5a",
         "7885ed126e017807"
       ],
-      "claimed_at": null,
+      "claimed_at": "2026-08-12T14:01:19Z",
       "done_at": null,
       "agreement": null,
       "tentativas": 0,
@@ -822,7 +824,7 @@
       "motivo": null
     },
     "batch_0004": {
-      "status": "pending",
+      "status": "claimed",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -830,7 +832,7 @@
         "ddece45f9ebd140e",
         "f800039195014b14"
       ],
-      "claimed_at": null,
+      "claimed_at": "2026-08-12T14:01:19Z",
       "done_at": null,
       "agreement": null,
       "tentativas": 0,
