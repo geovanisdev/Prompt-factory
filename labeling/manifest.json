@@ -1998,7 +1998,7 @@
       "n_rotulos": 80
     },
     "batch_0073": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -2006,15 +2006,16 @@
         "7885ed126e017807",
         "46544ae8500cbdc7"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T20:28:12Z",
+      "done_at": "2026-08-12T20:31:15Z",
+      "agreement": 0.8333333333333334,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0074": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -2022,15 +2023,16 @@
         "4615a7e771220ee9",
         "6fe5348436f4b4cf"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T20:28:12Z",
+      "done_at": "2026-08-12T20:33:16Z",
+      "agreement": 0.8333333333333334,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0075": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -2038,15 +2040,16 @@
         "685f4eddd2fdaa36",
         "a3857c9746bc9cbf"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
-      "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "claimed_at": "2026-08-12T20:31:22Z",
+      "done_at": "2026-08-12T20:33:50Z",
+      "agreement": 0.8333333333333334,
+      "tentativas": 1,
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0076": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -2054,12 +2057,13 @@
         "6fe5348436f4b4cf",
         "f874e95fa9ec0739"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T20:28:12Z",
+      "done_at": "2026-08-12T20:31:48Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0077": {
       "status": "pending",
