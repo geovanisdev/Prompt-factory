@@ -195,6 +195,11 @@ deixam em aberto. Onde uma convenção se aplicar, ela vence a sua intuição.**
   ChatGPT) tem domínio `tecnologia`** — a ferramenta de IA é o assunto do
   pedido, ainda que o conteúdo do prompt gerado seja artístico. Não use
   `artes-entretenimento` só porque a imagem pedida é criativa.
+- **Personagem/franquia usada como material cultural é `artes-entretenimento`,
+  não `jogos`** — "quantos titãs tem em Paradis", "horóscopo com pokémons como
+  símbolos" falam do UNIVERSO da obra (anime, franquia), não do ato de jogar.
+  `jogos` fica para jogar, projetar ou discutir o JOGO em si (mecânica,
+  gameplay, design de um jogo).
 - **Dinheiro citado não faz o domínio ser `financas`.** `financas` é a GESTÃO
   do próprio dinheiro (investir, orçar, dívida, imposto, cripto). Recomendação
   de produto com teto de preço é o domínio do produto ("melhor celular até

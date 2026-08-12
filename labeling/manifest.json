@@ -2134,7 +2134,7 @@
       "n_rotulos": 80
     },
     "batch_0081": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -2142,15 +2142,16 @@
         "2b2988216454d7cb",
         "5fe13646d391bc83"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T20:38:01Z",
+      "done_at": "2026-08-12T20:41:40Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0082": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -2158,12 +2159,13 @@
         "ddece45f9ebd140e",
         "9e13aaea276a75b2"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
-      "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "claimed_at": "2026-08-12T20:41:27Z",
+      "done_at": "2026-08-12T20:44:30Z",
+      "agreement": 0.8333333333333334,
+      "tentativas": 1,
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0083": {
       "status": "pending",
