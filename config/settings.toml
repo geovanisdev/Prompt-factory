@@ -141,8 +141,32 @@ max_attempts = 3
 mapping_warn = 0.30
 
 [classifier]
-conf_accept = 0.50     # >= aceita o rótulo
-conf_review = 0.35     # entre review e accept: aceita mas marca needs_review
+# s09/s10 (`pf train` / `pf apply`): regressão logística multinomial sobre os
+# embeddings do s05/s06 — os vetores já existem por linha, então treinar custa
+# minutos de CPU e "replayar" é rodar de novo com as mesmas chaves.
+#
+# As três faixas de confiança do s10: >= conf_accept grava o rótulo limpo;
+# entre conf_review e conf_accept grava com needs_review = 1; abaixo de
+# conf_review o eixo fica NULL (abstenção) — e a linha abstida em task_type
+# entra no teto de [loaddb] allow_unlabeled_pct do pré-voo do load-db.
+conf_accept = 0.50
+conf_review = 0.35
+# Grade de C (inverso da regularização) da busca por validação cruzada do
+# `pf train --folds`. Curta e CRESCENTE de propósito: em 384 dimensões densas o
+# efeito de C é suave, cada ponto custa `folds` ajustes por eixo, e o empate na
+# busca fica com o primeiro da grade — o mais regularizado.
+c_grid = [0.25, 1.0, 4.0, 16.0]
+# Fração dos rótulos manual+agent retida para o TESTE. O rótulo nativo nunca
+# entra no teste: um mapeamento que ninguém leu o texto para dar não mede nada
+# (o s08 marca mapeamentos com até 78% de discordância como suspeitos).
+test_frac = 0.2
+# As metas do M7 (plano): abaixo delas a recomendação é rotular mais lotes
+# antes de aplicar. O s09 imprime a comparação e sai 0 do mesmo jeito — o
+# portão é humano, não do processo.
+meta_f1_task = 0.65
+meta_f1_domain = 0.55
+# Linhas por bloco da aplicação (s10): 16.384 x 384 f32 = 24 MB por bloco.
+apply_block_rows = 16384
 
 [loaddb]
 # s11 (`pf load-db`). Teto de linhas SEM rótulo (task_type nulo) que a carga

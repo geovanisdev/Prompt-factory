@@ -18,7 +18,7 @@ Plano completo (fontes, decisões de engenharia, marcos M0–M10): `C:\Users\gig
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf serve         # interface local em http://127.0.0.1:8765
 ```
 
-Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat / P6 plataforma), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1) e `db-check --bench` (M8), `make-seed`/`labels`/`merge-labels` (M5), `load-db` (M8), `serve`/`export` (M9), busca semântica dentro do `serve` (M10), `annotate serve|seed|status` (P1/P3a), `annotate migrate` (P3a), `annotate gerar` (P4c) e `annotate export` (P5b). Ainda stub: `train` (M7) e `apply` (M7) — o comando imprime o aviso e sai com **código 2**, o que é esperado, não é bug.
+Subcomandos e em que marco cada um saiu do stub: `ingest` (M2 fontes pequenas / M3 WildChat / P6 plataforma), `run` s01–s06 (M4), `report raw` (M2) e `report universe`/`report dedup-sample` (M4), `db-check` (M1) e `db-check --bench` (M8), `make-seed`/`labels`/`merge-labels` (M5), `train`/`apply` (M7), `load-db` (M8), `serve`/`export` (M9), busca semântica dentro do `serve` (M10), `annotate serve|seed|status` (P1/P3a), `annotate migrate` (P3a), `annotate gerar` (P4c) e `annotate export` (P5b). Nenhum comando é mais stub.
 
 ```powershell
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf run                 # s01..s06 (= `all`)
@@ -38,6 +38,14 @@ pwsh -File scripts/run_pipeline.ps1                                  # pipeline 
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf labels submit --batch batch_0007 --file r.jsonl --model haiku
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf labels gold --file pregold.jsonl # importa a calibração revisada
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf merge-labels              # s08: final/seed_labels.parquet
+```
+
+```powershell
+# Classificador (M7). O s09 treina e MEDE; o portão de aplicar é humano.
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf train                     # s09: os 3 eixos + metrics no meta.json
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf train --axis domain       # um eixo só (exige mesmos insumos do meta)
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf apply                     # s10: universo inteiro -> final/labeled.parquet
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf apply --force             # aplica modelo treinado sobre seed_labels ANTIGO
 ```
 
 ```powershell
@@ -175,6 +183,29 @@ Pegadinhas deste bloco:
 - **`labeling/labels/` é VERSIONADO desde o M6-B** (junto com `taxonomy.json`, `mappings/*.json` e o `manifest.json`): os rótulos são o único artefato não regenerável da campanha e carregam só uid + 4 rótulos, zero texto. `seed/` e `batches/` continuam gitignorados — eles CARREGAM o texto do corpus e histórico de git não se apaga; o backup deles é cópia em `F:\backups\prompt-factory`. Todo fim de onda commita labels+manifest juntos e faz push (remoto: `geovanisdev/Prompt-factory`, privado).
 - **A campanha roda por rotulador HEADLESS, não por subagente** (M6-B): `rodar_lote.py` na pasta da skill compõe o despacho de `despacho.md` (a fonte única — convenção nova se escreve lá) e chama `claude -p` com cwd num diretório vazio e todas as ferramentas proibidas por flag. O texto dos lotes nunca entra no contexto do maestro (~40k tokens/lote poupados) e o gabarito do manifest fica inalcançável por construção. Diagnóstico de reprovação: `diag_lote.py`, mesma pasta.
 - **A saída de ferramenta do harness trunca em ~30k caracteres**, e um lote de 80 itens chega a ~120k. Por isso `pf labels next` tem `--out`/`--out-dir`: o fluxo real é sempre por arquivo.
+
+## Classificador (M7)
+
+`pf train` (s09) treina uma regressão logística multinomial POR EIXO sobre os embeddings que o s05/s06 já produziram (custa minutos de CPU porque os vetores já existem) e grava `data/models/classifier_<eixo>.npz` + `classifier_meta.json` com as métricas; `pf apply` (s10) pontua o universo inteiro e grava `final/labeled.parquet` nas 8 colunas que o s11 consome. Medido na primeira execução real (40 lotes, 3.180 rótulos manual+agent): treino 5,6 min, aplicação 1,8 s.
+
+| estágio | entrada → saída | o que decide |
+| --- | --- | --- |
+| s09 | `final/seed_labels.parquet` + `emb/universe.f16.npy` → `models/*.npz` + `meta.json` | C por validação cruzada, variante com/sem nativos, métricas por classe/idioma |
+| s10 | `models/*` + embeddings → `final/labeled.parquet` | as 3 faixas de confiança, `needs_review`, abstenção |
+
+Pegadinhas deste bloco:
+
+- **s09 e s10 estão em `STAGES` e FORA da `CADEIA`**, como s07/s08/s11: entre medir e aplicar existe a decisão humana de que a métrica basta. Um `pf run` de rotina que retreinasse reescreveria os rótulos do universo inteiro sem ninguém ter olhado o macro-F1.
+- **Primeira medição real (2026-08-12): task_type 0,5842 (meta 0,65 NÃO atingida), domain 0,6212 (meta 0,55 ATINGIDA), quality 0,5129 (diagnóstico).** A média do task_type é derrubada pelas classes raras e fronteiriças — `brainstorm` 0,36, `outro` 0,35, `resumo` 0,40 (9 itens de teste), `planejamento` 0,44 (8) — exatamente onde os lotes pendentes acrescentariam sinal. Por idioma o modelo é parelho (pt 0,5569 / en 0,5489): não há falha específica de língua.
+- **Os 19.551 rótulos nativos foram MEDIDOS e reprovados: 0,5842 sem eles contra 0,5320 com.** O s09 treina as duas variantes contra o MESMO teste retido (na CV da `com_nativos` os nativos entram em todo fold de ajuste e em nenhum de validação); empate ficaria com `sem_nativos`. Os "MAPEAMENTO SUSPEITO" do s08 não eram só suspeitos — degradam o modelo de verdade.
+- **O teste sai só de `manual`/`agent`** (estratificado, `[classifier] test_frac`): medir contra rótulo nativo mediria o mapeamento, não o modelo. Classe com 1 exemplo fica inteira no treino e aparece com suporte 0 na tabela — o macro-F1 é sobre as classes PRESENTES no teste, e o `meta.json` lista as não medidas em `classes_sem_teste`.
+- **A métrica descreve a receita; o artefato usa 100% dos rótulos** (mesmo C, mesma composição, refit total). `model_id = sha256(seed_labels_sha + emb_sha)[:16]` — determinístico como o `db_build_id`.
+- **`quality` é treinado e medido, mas NÃO aplicado; `nsfw` nem treinado** (18 positivos em 3.180). Um 1..3 plausível e errado entraria no filtro `quality_min` da interface sem nada denunciando; os dois saem NULL no `labeled.parquet`.
+- **Embeddings de outra build são fatais SEMPRE — `--force` não destrava de propósito.** O `.npz` é posicional contra o `.npy`, que é posicional contra o universo: aplicado a outra build, o classificador devolve rótulos plausíveis da linha errada (o pior-defeito-possível da busca semântica, com as mesmas guardas: sha dos insumos no meta + uids conferidos contra o universo). `--force` só destrava o caso legítimo: `seed_labels` mudou DEPOIS do treino e alguém decide aplicar o modelo antigo.
+- **As três faixas moram numa função pura (`s10.decidir`)** e o `>=` das fronteiras é contrato: `conf == conf_accept` aceita limpo, `conf == conf_review` ainda grava (com `needs_review`), abaixo o eixo fica NULL. Duas cópias da regra divergiriam em silêncio na fronteira.
+- **`label_confidence` é o MÍNIMO dos eixos** — é a coluna que ordena a fila de revisão, e uma média esconderia um domain de 0,36 atrás de um task_type de 0,95.
+- **Funil da primeira aplicação: 61,2% aceito limpo / 20,6% com `needs_review` / 18,3% abstido em task_type** (13,4% abstido em domain; mediana de `label_confidence` 0,469). O pré-voo do `pf load-db` recusa 18,27% > `[loaddb] allow_unlabeled_pct = 1` — publicar um banco com um quinto do corpus sem rótulo é ato explícito (`--allow-unlabeled-pct 19`), não default.
+- **`--axis` recusa atualizar um meta treinado sobre OUTROS insumos**: atualizar só um eixo deixaria os demais descrevendo dados que não existem mais.
 
 ## Carga do banco (M8)
 

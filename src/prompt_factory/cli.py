@@ -3,8 +3,8 @@
 Cada subcomando corresponde a um estágio da pipeline e vai saindo do stub no
 marco indicado em `_Cmd.milestone` (implementados: `db-check` no M1; `ingest` e
 `report raw` no M2; `run` s01-s06 e `report universe`/`dedup-sample` no M4;
-`make-seed`, `labels` e `merge-labels` no M5; `load-db` e `db-check --bench` no
-M8; `serve` e `export` no M9).
+`make-seed`, `labels` e `merge-labels` no M5; `train` e `apply` no M7; `load-db`
+e `db-check --bench` no M8; `serve` e `export` no M9).
 Enquanto é stub, o comando imprime em que marco chega e sai com código 2.
 `pf --help` e `pf <cmd> --help` funcionam e saem 0 — é isso que a DoD do M0
 exige.
@@ -319,6 +319,31 @@ def _merge_labels(args: argparse.Namespace) -> int:
 
     cfg = _stage_config(args, strict=bool(args.strict))
     return int(STAGES["s08"](cfg))  # type: ignore[arg-type]
+
+
+def _train(args: argparse.Namespace) -> int:
+    """``pf train`` (M7) — s09: regressão logística sobre os embeddings, por eixo.
+
+    O portão continua humano: o comando imprime o macro-F1 contra as metas do
+    ``[classifier]`` e sai 0 mesmo abaixo delas — quem decide se o número basta
+    (ou se a campanha rotula mais lotes) é quem lê o relatório.
+    """
+    from .stages import STAGES
+
+    cfg = _stage_config(args, axis=args.axis, folds=int(args.folds))
+    return int(STAGES["s09"](cfg))  # type: ignore[arg-type]
+
+
+def _apply(args: argparse.Namespace) -> int:
+    """``pf apply`` (M7) — s10: pontua o universo e grava ``final/labeled.parquet``.
+
+    ``--force`` só destrava seed_labels mudado depois do treino; embeddings de
+    outra build são fatais sempre (rótulo plausível da linha errada).
+    """
+    from .stages import STAGES
+
+    cfg = _stage_config(args, max_rows=args.max_rows, force=bool(args.force))
+    return int(STAGES["s10"](cfg))  # type: ignore[arg-type]
 
 
 def _load_db(args: argparse.Namespace) -> int:
@@ -1467,13 +1492,18 @@ COMMANDS: tuple[_Cmd, ...] = (
         [
             (("--axis",), {"choices": ["task_type", "domain", "quality"], "help": "treina só um eixo"}),
             (("--folds",), {"type": int, "default": 5, "metavar": "K", "help": "folds da busca de C"}),
+            _DATA_DIR,
         ],
+        implemented=True,
+        handler=_train,
     ),
     _Cmd(
         "apply",
         "M7",
         "s10: aplica o classificador ao universo, com limiares de confiança",
-        [_MAX_ROWS, _FORCE],
+        [_MAX_ROWS, _FORCE, _DATA_DIR],
+        implemented=True,
+        handler=_apply,
     ),
     _Cmd(
         "load-db",

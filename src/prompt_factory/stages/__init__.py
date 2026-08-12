@@ -54,6 +54,10 @@ UNIVERSE_EMB = "emb/universe.f16.npy"
 UNIVERSE_UIDS = "emb/universe_uids.txt"
 SEED_LABELS = "final/seed_labels.parquet"
 LABELED = "final/labeled.parquet"
+#: Artefatos do classificador (s09): as métricas/insumos num JSON único e um
+#: ``.npz`` de pesos por eixo (o ``{eixo}`` é preenchido com task_type/domain/…).
+MODELOS_META = "models/classifier_meta.json"
+MODELOS_NPZ = "models/classifier_{eixo}.npz"
 DB_SQLITE = "db/prompts.sqlite"
 DB_BUILD_SQLITE = "db/prompts.build.sqlite"
 
@@ -76,8 +80,9 @@ BATCH_LEITURA = 16_384
 class StageConfig:
     """Parâmetros que a CLI passa para qualquer estágio.
 
-    ``max_rows`` é aplicado **só pelo s01**, e por fonte: os estágios seguintes
-    processam tudo o que receberem, senão o funil deixaria de fechar.
+    ``max_rows`` é aplicado pelo **s01** (por fonte) e pelo **s10** (ensaio de
+    aplicação parcial): os demais estágios processam tudo o que receberem,
+    senão o funil deixaria de fechar.
 
     ``labeling_dir`` é o par de ``data_dir`` para o s07/s08: redirecionado, a
     campanha inteira (semente, lotes, manifest, rótulos) roda dentro de um
@@ -87,12 +92,19 @@ class StageConfig:
     data_dir: Path = paths.DATA
     max_rows: int | None = None
     labeling_dir: Path = paths.LABELING
-    #: Só o s07 lê: reescrever a semente APAGA uma campanha em andamento, e isso
-    #: nunca pode acontecer por descuido de quem repetiu um comando.
+    #: O s07 lê (reescrever a semente APAGA uma campanha em andamento, e isso
+    #: nunca pode acontecer por descuido de quem repetiu um comando) e o s10
+    #: também: aplicar um modelo treinado sobre um ``seed_labels`` que mudou
+    #: depois do treino exige o ato explícito.
     force: bool = False
     #: Só o s08 lê (``pf merge-labels --strict``): falha em vez de avisar quando
     #: um lote está done sem arquivo de rótulos.
     strict: bool = False
+    #: --- só o s09 lê (``pf train``) ----------------------------------------
+    #: Treina um eixo só (``task_type``/``domain``/``quality``); None = todos.
+    axis: str | None = None
+    #: K da validação cruzada que escolhe o C da regressão.
+    folds: int = 5
     #: --- só o s11 lê (``pf load-db``) -------------------------------------
     #: Teto de linhas sem ``task_type`` (em %). ``None`` = o de
     #: ``[loaddb] allow_unlabeled_pct``.
@@ -291,6 +303,8 @@ STAGES: dict[str, Callable[[StageConfig], int]] = {
     "s06": _despacho("s06_dedup_near"),
     "s07": _despacho("s07_seed_sample"),
     "s08": _despacho("s08_merge_labels"),
+    "s09": _despacho("s09_train"),
+    "s10": _despacho("s10_apply"),
     "s11": _despacho("s11_load_db"),
 }
 
@@ -301,6 +315,11 @@ STAGES: dict[str, Callable[[StageConfig], int]] = {
 #: calibração no meio. Se ``all`` os incluísse, um ``pf run`` de rotina
 #: regeraria a semente e apagaria o manifest de uma campanha em andamento — sem
 #: perguntar nada. Cada um tem comando próprio: `pf make-seed` e `pf merge-labels`.
+#:
+#: O s09 e o s10 idem (`pf train` / `pf apply`): entre o s08 e eles existe a
+#: decisão HUMANA de que a métrica do treino basta — um ``pf run`` de rotina que
+#: retreinasse e reaplicasse reescreveria os rótulos do universo inteiro sem
+#: ninguém ter olhado o macro-F1.
 #:
 #: O s11 fica fora pelo mesmo motivo, agravado: ele é o único estágio cuja saída
 #: alguém está LENDO enquanto a pipeline roda (``pf serve``), e a última coisa
@@ -320,6 +339,8 @@ DESCRICOES: dict[str, str] = {
     "s06": "dedup próximo par a par + recheck de idioma -> final/universe.parquet",
     "s07": "amostra-semente estratificada + lotes de rotulagem (fora da cadeia)",
     "s08": "funde rótulos de agente + nativos -> final/seed_labels.parquet (fora da cadeia)",
+    "s09": "treina o classificador (LogReg sobre embeddings) -> data/models/ (fora da cadeia)",
+    "s10": "aplica o classificador ao universo -> final/labeled.parquet (fora da cadeia)",
     "s11": "carga bulk no SQLite + rebuild do FTS + swap de arquivo (fora da cadeia)",
 }
 
@@ -339,6 +360,8 @@ __all__ = [
     "LANG",
     "MAPA_EXATO",
     "MAPA_PROXIMO",
+    "MODELOS_META",
+    "MODELOS_NPZ",
     "NORMALIZED",
     "SCRUBBED",
     "SEED_LABELS",
