@@ -152,6 +152,11 @@ deixam em aberto. Onde uma convenção se aplicar, ela vence a sua intuição.**
   prompt for this sentence"): o produto pedido é um texto criativo (a cena, a
   legenda, o prompt de imagem), não `redacao-pratica` nem `codigo`. O domínio
   desse pedido é `tecnologia` (ver a seção de domínio).
+- **Reescrever, expandir ou detalhar um texto FORNECIDO é `reescrita-edicao`**,
+  não `redacao-pratica` — mesmo quando a reescrita deve melhorar ou ampliar o
+  conteúdo ("rewrite this statement more detailed"): o produto é a
+  transformação do texto dado, e a moldura ("you are very good at math") não
+  muda isso. `redacao-pratica` fica para texto funcional escrito DO ZERO.
 - **"Descreva X" / "Write a description of X" / "qual a melhor receita de X"
   é `redacao-pratica`**, não `qa-aberta`, mesmo com conteúdo factual: o que
   se pede é um TEXTO para ser redigido. `qa-aberta` é pergunta que se
