@@ -147,6 +147,11 @@ deixam em aberto. Onde uma convenção se aplicar, ela vence a sua intuição.**
   "aja como um gerador de prompts do Midjourney" é `geracao-criativa`.
   `roleplay-persona` fica só para quando interagir NO personagem é o pedido —
   não basta o prompt abrir definindo uma persona.
+- **Escrever o prompt/descrição PARA um gerador de imagem ou de texto é
+  `geracao-criativa`** — vale também sem moldura de persona ("image generate
+  prompt for this sentence"): o produto pedido é um texto criativo (a cena, a
+  legenda, o prompt de imagem), não `redacao-pratica` nem `codigo`. O domínio
+  desse pedido é `tecnologia` (ver a seção de domínio).
 - **"Descreva X" / "Write a description of X" / "qual a melhor receita de X"
   é `redacao-pratica`**, não `qa-aberta`, mesmo com conteúdo factual: o que
   se pede é um TEXTO para ser redigido. `qa-aberta` é pergunta que se
