@@ -13,6 +13,7 @@ Este arquivo é uma FOTOGRAFIA do commit ``599d083`` (P2). Ele nunca deve ser
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 #: A versão que este DDL representa.
 VERSAO_V1 = 1
@@ -182,11 +183,44 @@ __all__ = [
 #:
 #: Chaveado pela versão de ORIGEM que se quer simular. Uma entrada nova a cada
 #: marco que acrescente tabela ou coluna.
-FALTAVA_NA_VERSAO: dict[int, dict[str, tuple[str, ...]]] = {
-    2: {"tabelas": ("briefs",), "colunas_anotacoes": ("gabarito_avaliacao_json", "versao_brief")},
-    3: {"tabelas": ("briefs",), "colunas_anotacoes": ("versao_brief",)},
-    4: {"tabelas": ("briefs", "turnos_conversa"), "colunas_anotacoes": ("versao_brief",)},
-    5: {"tabelas": ("briefs",), "colunas_anotacoes": ("versao_brief",)},
+#:
+#: ``colunas`` é ``{tabela: (colunas)}`` e não uma lista solta de colunas de
+#: ``anotacoes``: até a v6 só ``anotacoes`` ganhava coluna, e a chave chamada
+#: ``colunas_anotacoes`` escondia essa premissa em vez de declará-la. A v7
+#: acrescenta coluna em ``criacoes``, e uma premissa escondida quebra calada.
+FALTAVA_NA_VERSAO: dict[int, dict[str, Any]] = {
+    2: {
+        "tabelas": ("briefs", "pedidos"),
+        "colunas": {
+            "anotacoes": ("gabarito_avaliacao_json", "versao_brief"),
+            "criacoes": ("pedido_id", "material_json"),
+        },
+    },
+    3: {
+        "tabelas": ("briefs", "pedidos"),
+        "colunas": {
+            "anotacoes": ("versao_brief",),
+            "criacoes": ("pedido_id", "material_json"),
+        },
+    },
+    4: {
+        "tabelas": ("briefs", "turnos_conversa", "pedidos"),
+        "colunas": {
+            "anotacoes": ("versao_brief",),
+            "criacoes": ("pedido_id", "material_json"),
+        },
+    },
+    5: {
+        "tabelas": ("briefs", "pedidos"),
+        "colunas": {
+            "anotacoes": ("versao_brief",),
+            "criacoes": ("pedido_id", "material_json"),
+        },
+    },
+    6: {
+        "tabelas": ("pedidos",),
+        "colunas": {"criacoes": ("pedido_id", "material_json")},
+    },
 }
 
 
@@ -196,12 +230,26 @@ def rebaixar(conn: sqlite3.Connection, para: int) -> None:
     Não carimba de propósito: quem chama costuma querer contar linhas depois do
     rebaixamento e antes do carimbo, e um carimbo escondido aqui faria a ordem
     dessas três coisas virar detalhe implícito.
+
+    **As colunas saem ANTES das tabelas**, e a ordem é obrigatória a partir da
+    v7: ``criacoes.pedido_id`` referencia ``pedidos``, e derrubar a tabela
+    primeiro deixaria ``criacoes`` apontando para uma tabela inexistente — o
+    próximo INSERT nela morreria com ``no such table``, com ``foreign_keys=ON``
+    (que ``db.connect`` liga sempre).
+
+    Restrição do SQLite que decide o desenho de quem acrescentar coluna daqui
+    para a frente, **medida** (3.49.1) e não suposta: ``ALTER TABLE ... DROP
+    COLUMN`` funciona sobre uma coluna com ``REFERENCES``, mas **não** sobre uma
+    coluna que tenha ÍNDICE (``error in index ... after drop column``). Uma
+    coluna nova indexada em tabela existente não pode ser rebaixada aqui sem que
+    o plano derrube o índice junto.
     """
     if para not in FALTAVA_NA_VERSAO:
         raise ValueError(f"não sei rebaixar para a v{para}")
     plano = FALTAVA_NA_VERSAO[para]
-    for coluna in plano["colunas_anotacoes"]:
-        conn.execute(f"ALTER TABLE anotacoes DROP COLUMN {coluna}")
+    for tabela, colunas in plano["colunas"].items():
+        for coluna in colunas:
+            conn.execute(f"ALTER TABLE {tabela} DROP COLUMN {coluna}")
     for tabela in plano["tabelas"]:
         conn.execute(f"DROP TABLE IF EXISTS {tabela}")
 

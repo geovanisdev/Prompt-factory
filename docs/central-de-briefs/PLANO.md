@@ -131,6 +131,14 @@ CREATE TABLE IF NOT EXISTS pedidos (
   habilidades_json TEXT NOT NULL DEFAULT '[]',
   -- papel de quem escreve o prompt. CHECK fechado: é mecânica da plataforma.
   papel            TEXT NOT NULL CHECK (papel IN ('professor','aluno')),
+  -- os dois eixos da resposta à pergunta 4. Baratos aqui (tabela nova), caros
+  -- depois (v8). Série é o que mais muda um prompt pedagógico; dificuldade é o
+  -- que permite equilibrar a fila em vez de descobrir tarde que a campanha
+  -- inteira saiu no mesmo nível.
+  serie            TEXT NOT NULL DEFAULT 'indefinido'
+                     CHECK (serie IN ('1','2','3','indefinido')),
+  dificuldade      TEXT NOT NULL DEFAULT 'intermediaria'
+                     CHECK (dificuldade IN ('basica','intermediaria','avancada')),
   -- derivadas do nome do arquivo no import (facetas da UI; denormalizar aqui
   -- poupa parse de nome de arquivo em toda listagem).
   disciplina       TEXT NOT NULL DEFAULT '',
@@ -147,9 +155,14 @@ CREATE TABLE IF NOT EXISTS pedidos (
   -- olhar antes de ser usado.
   avisos_json      TEXT NOT NULL DEFAULT '[]',
   lote_id          TEXT NOT NULL,
+  -- sha256(arquivo_fonte + recorte normalizado): a chave natural que torna o
+  -- import idempotente. Vira coluna UNIQUE em vez de uma consulta antes do
+  -- INSERT — a corrida entre a consulta e a escrita é o que o UNIQUE resolve.
+  chave            TEXT NOT NULL UNIQUE,
   criado_em        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_pedidos_fila ON pedidos(status, papel, task_type, id);
+CREATE INDEX IF NOT EXISTS idx_pedidos_disciplina ON pedidos(disciplina, status);
 ```
 
 Decisões e alternativas recusadas:
@@ -454,6 +467,14 @@ parafrasear o recorte de perto (obra derivada — mesma proibição).
   engano que a v4 documenta.
 - **`bool` é subclasse de `int`** (quinta aparição): todo campo numérico dos
   modelos novos (`offset_inicio`, ids, mínimos) valida com `mode="before"`.
+- **Coluna nova INDEXADA em tabela existente não se rebaixa nos testes.** Medido
+  no F1 (SQLite 3.49.1): `ALTER TABLE ... DROP COLUMN` funciona sobre coluna com
+  `REFERENCES`, mas falha sobre coluna com ÍNDICE (`error in index … after drop
+  column`) — e é isso que `tests/fixtures_annotate_v1.rebaixar` precisa fazer
+  para simular um banco da versão anterior. `criacoes.pedido_id` ficou **sem
+  índice** (a decisão é por volume: dezenas de criações, e a consulta do revisor
+  é criação→pedido pela chave primária); quem indexar uma coluna nova daqui para
+  a frente tem de derrubar o índice no plano de rebaixamento.
 - **Escrita de dados sempre de dentro do Python, UTF-8** — lotes e manifest
   por `labeling_io.escrever_json_atomico`; nunca redirecionamento de
   PowerShell (UTF-16/BOM quebra acentuação, e este material é acentuação em
@@ -487,12 +508,19 @@ parafrasear o recorte de perto (obra derivada — mesma proibição).
 
 ## 8. Marcos, cada um com DoD binária
 
-**F1 — Schema v7 + tabela `pedidos`.**
+**F1 — Schema v7 + tabela `pedidos`. FEITO (2026-08-12).**
 `annotate/db.py` (tabela, tuplas novas, `TABELAS`), `migracao._da_v6`,
-`ORIGENS_RUBRICA + 'criacao'`.
+`ORIGENS_RUBRICA + 'criacao'`, `tests/test_central_pedidos.py` (21 testes).
 DoD: `pf annotate migrate` sobe um banco v6 real para v7 preservando as
 anotações (contagens iguais); `sqlite_master` de banco novo == migrado;
 `pf annotate status` lista `pedidos` com 0; suíte verde.
+
+**Medido** sobre uma CÓPIA do `annotate.sqlite` real (o original não foi tocado:
+a campanha M6 roda no checkout principal): v6 → v7 com **31 anotações, 87
+rubricas, 15 turnos de conversa, 4 briefs, 3 avaliações e 78 tarefas preservados
+linha a linha**, `pedidos` nascendo com 0, `.v6.bak` ao lado. No banco migrado,
+`rubricas` passou a aceitar `origem='criacao'` e a recusar a inventada — o CHECK
+que nenhuma contagem pegaria. Suíte: **1.296 passando**, ruff limpo.
 
 **F2 — `destilacao.py` + CLI.**
 Manifest/estados/TTL, `preparar` (janelas + cursor por arquivo), `importar`
@@ -535,29 +563,48 @@ DoD: export com 1 criação-de-pedido aprovada contém a tríade e NÃO contém 
 recorte (teste varre o arquivo por uma senha plantada no recorte, não pela
 chave — o padrão do alvo escondido).
 
-## 9. Perguntas abertas ao dono (as que mudam o desenho)
+## 9. As perguntas abertas — RESPONDIDAS pelo dono em 2026-08-12
 
-1. **Escopo de `task_type` na v1**: as classes que exigem material colado
-   (`qa-contexto`, `resumo`, `reescrita-edicao`) entram já — com a regra "o
-   anotador escreve o próprio texto-base, junto com o prompt" — ou ficam fora
-   até o fluxo rodar? (Muda a validação da campanha, a instrução do agente e
-   o formulário.)
-2. **A gold descritiva deve aparecer para revisores de futuras tarefas
-   `avaliar_rubrica` sobre esse prompt** (materializada junto da rubrica) ou
-   fica só na criação e na entrega? (Muda a materialização do F5 e a tela da
-   rubrica.)
-3. **Língua da rubrica e do gold neste projeto**: inglês (a convenção de
-   metadado da casa, cliente estrangeiro lê) ou pt-BR (portfólio pedagógico
-   nacional, o "cliente" é professor brasileiro)? A resposta vira o brief do
-   projeto novo — e decide se `rubricas` deste fluxo levam sidecar `*_i18n`.
-4. **Os eixos do pedido bastam?** Papel {professor, aluno} + disciplina +
-   task_type + tema + meta + BNCC. Se série/ano ou nível de dificuldade
-   importam, é AGORA que custam uma coluna barata — depois custam a v8.
-5. **Confirmação da política de licença** (§6): CC0 mantido, recorte nunca
-   reproduzido, anti-cópia no servidor — e, em consequência, pedido cujo
-   recorte só serve reproduzido é descartado na destilação. (É a decisão que
-   sustenta o módulo inteiro; se o dono discordar, o desenho muda de raiz.)
-6. **Volume-alvo da primeira campanha**: quantos pedidos por disciplina valem
-   a pena antes de o gargalo virar a escrita humana? (Decide as cotas do
-   `preparar` e se a v1 precisa de amostragem estratificada por
-   arquivo/disciplina ou um cursor simples basta.)
+Ficam registradas com a resposta E o motivo: uma decisão sem o porquê é
+relitigada na primeira dúvida, e três delas já estão gravadas no schema.
+
+**1. Escopo de `task_type` na v1: `qa-contexto`, `resumo` e `reescrita-edicao`
+ficam FORA.** Com recorte da editora, essas três só funcionam reproduzindo o
+texto — exatamente o que a §6 proíbe. A alternativa (anotador redige o próprio
+texto-base) é um SEGUNDO produto, com proveniência própria a validar, e dobraria
+o formulário antes de o fluxo básico rodar uma vez. *Consequência*: o import as
+recusa e o despacho do agente (F3) as exclui da lista que viaja no lote.
+
+**2. A gold fica só na criação e na entrega.** Materializá-la dentro de
+`rubricas.criterios_json` criaria uma segunda cópia da mesma verdade, e no dia
+em que divergissem um revisor estaria julgando por uma referência que a criação
+já não diz mais. *Consequência*: o F5 materializa **só a rubrica**; materializar
+o gold depois é aditivo e barato — o caminho inverso não é.
+
+**3. Inglês, como o resto da casa.** Rubrica, gold e todo metadado em inglês; só
+o PROMPT segue pt-BR (é o dado sendo produzido). É a convenção já declarada em
+`export.IDIOMA_DOS_ARTEFATOS` e no P3i, e é o que mantém o agreement do P5a
+comparando instrumentos que falam a mesma língua. *Consequência*: as rubricas
+deste fluxo **não** levam sidecar `*_i18n`, e o brief do projeto novo declara a
+regra.
+
+**4. Os seis eixos não bastavam: `serie` e `dificuldade` entraram no F1.**
+Vocabulário fechado (`'1','2','3','indefinido'`; `'basica','intermediaria',
+'avancada'`). Série é o eixo que mais muda um prompt pedagógico — a mesma meta
+em 1º e em 3º ano são prompts diferentes; dificuldade é o que permite equilibrar
+a fila em vez de descobrir tarde que a campanha inteira saiu no mesmo nível.
+*Consequência*: eram grátis no F1 (tabela nova) e custariam a v8 depois. Já
+estão no banco.
+
+**5. Política de licença confirmada: opção (c), com as três garantias
+mecânicas.** CC0 mantido, recorte nunca reproduzido, anti-cópia no servidor — e
+pedido cujo recorte só serve reproduzido é descartado na destilação.
+*Consequência*: é a decisão que sustenta o módulo inteiro, e o F1 já a inscreveu
+no comentário da tabela `pedidos` (a tabela não entra em perfil de entrega
+nenhum).
+
+**6. ~30 pedidos por disciplina, 1–2 disciplinas na primeira rodada, cursor
+simples.** O gargalo é a escrita humana, não a destilação. *Consequência*: a v1
+dispensa amostragem estratificada; a estratificação entra quando o funil do
+admin mostrar `disponivel` acumulando — que é o sinal de PARAR de destilar, não
+de acelerar.
