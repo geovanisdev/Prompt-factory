@@ -42,6 +42,7 @@ from ..labeling_io import (
     LabelingPaths,
     carregar_manifest,
     painel,
+    texto_agreement,
 )
 from ..schema import DOMAINS, TASK_TYPES, load_taxonomy
 from . import (
@@ -411,12 +412,10 @@ def run(cfg: StageConfig) -> int:
         )
 
     p = painel(lp, manifest)
-    medio = p["agreement_medio"]
     print(
         f"[{ESTAGIO}] campanha: {p['contagem'].get(DONE, 0)}/{p['n_lotes']} lotes done, "
-        f"agreement médio "
-        + (f"{medio:.2f}" if medio is not None else "não medido (sem ouro)")
-        + f", {len(p['lotes_baixos'])} lote(s) abaixo de {p['agreement_min']:.2f}"
+        f"agreement médio {texto_agreement(p, casas=2)}, "
+        f"{len(p['lotes_baixos'])} lote(s) abaixo de {p['agreement_min']:.2f}"
     )
     print(f"[{ESTAGIO}] {len(final)} rótulos -> {rel(destino)}")
     relogio.fim()

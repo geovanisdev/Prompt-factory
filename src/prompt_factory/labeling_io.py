@@ -848,6 +848,44 @@ def importar_ouro(
 # ---------------------------------------------------------------------------
 
 
+def motivo_sem_agreement(
+    manifest: Mapping[str, Any], batch_id: str | None = None, *, n_done: int = 0
+) -> str:
+    """POR QUE não há agreement — a causa, nunca um genérico.
+
+    ``None`` de agreement tem três causas independentes, e o painel dizia
+    "sem ouro" para todas. É a mesma classe de defeito que o projeto persegue
+    em outros lugares: uma mensagem que nomeia a causa errada custa mais que
+    mensagem nenhuma. O caso concreto que a expôs: no dia em que o ouro foi
+    importado, com 0 lotes concluídos, o painel continuou dizendo "sem ouro" —
+    e quem lesse aquilo concluiria que a importação de 100 itens revisados à
+    mão tinha falhado.
+
+    ``batch_id`` responde sobre UM lote (depois do submit); sem ele, a resposta
+    é sobre a média da campanha.
+    """
+    calibracao = manifest.get("calibration", {})
+    if str(calibracao.get("status", GOLD_PENDING)) != GOLD:
+        return "sem ouro importado"
+    if batch_id is not None:
+        return "este lote não tem item de calibração"
+    if not n_done:
+        return "nenhum lote concluído ainda"
+    return "nenhum lote concluído tinha item de calibração"
+
+
+def texto_agreement(painel: Mapping[str, Any], casas: int = 3) -> str:
+    """O agreement médio formatado, ou "não medido" **com o motivo**.
+
+    Ponto único: o ``pf labels status`` e o s08 imprimem a mesma frase, e duas
+    cópias divergiriam justamente na parte que explica.
+    """
+    medio = painel.get("agreement_medio")
+    if medio is not None:
+        return f"{float(medio):.{casas}f}"
+    return f"não medido ({painel.get('agreement_motivo') or 'sem ouro importado'})"
+
+
 def painel(lp: LabelingPaths | None = None, manifest: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Números da campanha, para o ``pf labels status`` e para o s08."""
     lp = lp or LabelingPaths()
@@ -888,6 +926,11 @@ def painel(lp: LabelingPaths | None = None, manifest: Mapping[str, Any] | None =
         "contagem": contagem,
         "orfaos": orfaos,
         "agreement_medio": (sum(agreements) / len(agreements)) if agreements else None,
+        "agreement_motivo": (
+            None
+            if agreements
+            else motivo_sem_agreement(manifest, n_done=contagem.get(DONE, 0))
+        ),
         "agreement_min": minimo,
         "lotes_baixos": baixos,
         "n_rotulos": rotulos,
@@ -931,10 +974,12 @@ __all__ = [
     "falhar",
     "importar_ouro",
     "montar_lotes",
+    "motivo_sem_agreement",
     "painel",
     "parse_jsonl",
     "reenfileirar",
     "salvar_manifest",
+    "texto_agreement",
     "truncar",
     "uids_do_lote",
     "uids_para_retry",

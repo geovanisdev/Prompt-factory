@@ -371,7 +371,6 @@ def _labels(args: argparse.Namespace) -> int:
             print(json.dumps(p, ensure_ascii=False, indent=2))
             return 0
         c = p["contagem"]
-        medio = p["agreement_medio"]
         imprimir_funil(
             "labels",
             ("item", "valor"),
@@ -386,10 +385,7 @@ def _labels(args: argparse.Namespace) -> int:
                 ["lotes concluídos", c.get(lio.DONE, 0)],
                 ["lotes falhados", c.get(lio.FAILED, 0)],
                 ["claims órfãos (voltam no próximo claim)", len(p["orfaos"])],
-                [
-                    "agreement médio",
-                    f"{medio:.3f}" if medio is not None else "não medido (sem ouro)",
-                ],
+                ["agreement médio", lio.texto_agreement(p)],
                 [
                     f"lotes abaixo de {p['agreement_min']:.2f}",
                     len(p["lotes_baixos"]),
@@ -497,7 +493,11 @@ def _labels(args: argparse.Namespace) -> int:
             )
             return 1
         lio.salvar_manifest(manifest, lp)
-        medida = f"{valor:.2f}" if valor is not None else "não medido (sem ouro)"
+        medida = (
+            f"{valor:.2f}"
+            if valor is not None
+            else f"não medido ({lio.motivo_sem_agreement(manifest, args.batch)})"
+        )
         print(f"[labels] {args.batch}: {len(linhas)} rótulos, agreement {medida} -> done")
         return 0
 

@@ -529,6 +529,48 @@ def test_painel_ignora_agreement_de_lote_reenfileirado(campanha: StageConfig) ->
     assert lio.carregar_manifest(lp)["batches"]["batch_0001"]["agreement"] == 0.0
 
 
+def test_o_motivo_de_nao_haver_agreement_nomeia_a_CAUSA(campanha: StageConfig) -> None:
+    """São três causas independentes, e dizer a errada é pior que não dizer.
+
+    O caso real que expôs isto: no dia em que o ouro foi importado, com 0 lotes
+    concluídos, o painel continuou dizendo "sem ouro" — e quem lesse aquilo
+    concluiria que a importação de 100 itens revisados à mão tinha falhado.
+    """
+    lp = _lp(campanha)
+
+    # 1. Antes do ouro: a causa é o ouro mesmo.
+    p = lio.painel(lp)
+    assert p["agreement_motivo"] == "sem ouro importado"
+    assert lio.texto_agreement(p) == "não medido (sem ouro importado)"
+
+    # 2. Com ouro e nenhum lote concluído: a causa mudou, e a frase também.
+    _importar_ouro(campanha)
+    p = lio.painel(lp)
+    assert p["agreement_motivo"] == "nenhum lote concluído ainda"
+    assert "sem ouro" not in lio.texto_agreement(p)
+
+    # 3. Com lote concluído E medido: motivo nenhum, e o número aparece.
+    lio.claim("batch_0001", lp=lp)
+    uids = lio.uids_do_lote("batch_0001", lp)
+    _, linhas, _ = lio.validar_resposta("batch_0001", _resposta(uids), lp)
+    lio.concluir("batch_0001", linhas, lp=lp)
+    p = lio.painel(lp)
+    assert p["agreement_motivo"] is None
+    assert lio.texto_agreement(p, casas=2) == f"{p['agreement_medio']:.2f}"
+
+
+def test_motivo_de_UM_lote_e_diferente_do_motivo_da_campanha(campanha: StageConfig) -> None:
+    """Depois do submit a pergunta é sobre o lote, não sobre a média."""
+    lp = _lp(campanha)
+    _importar_ouro(campanha)
+    manifest = lio.carregar_manifest(lp)
+    assert (
+        lio.motivo_sem_agreement(manifest, "batch_0001")
+        == "este lote não tem item de calibração"
+    )
+    assert lio.motivo_sem_agreement(manifest) == "nenhum lote concluído ainda"
+
+
 def test_painel_resume_a_campanha(campanha: StageConfig) -> None:
     lp = _lp(campanha)
     lio.claim("batch_0001", lp=lp)

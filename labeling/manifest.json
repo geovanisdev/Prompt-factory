@@ -64,7 +64,7 @@
   },
   "calibration": {
     "batch_id": "batch_0000",
-    "status": "gold_pending",
+    "status": "gold",
     "n_items": 100,
     "uids": [
       "13cae0699b8c11ea",
@@ -168,9 +168,610 @@
       "ed0e9767b657f8e4",
       "f800039195014b14"
     ],
-    "revised_at": null
+    "revised_at": "2026-08-12T13:48:04Z"
   },
-  "gold": null,
+  "gold": {
+    "13cae0699b8c11ea": {
+      "task_type": "qa-aberta",
+      "domain": "artes-entretenimento",
+      "quality": 2,
+      "nsfw": false
+    },
+    "308bd8b45109a7ee": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "36f5ec252e8aef29": {
+      "task_type": "classificacao-extracao",
+      "domain": "jogos",
+      "quality": 2,
+      "nsfw": false
+    },
+    "3b655c99a52ce8ad": {
+      "task_type": "qa-aberta",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "42b972247b769891": {
+      "task_type": "matematica-raciocinio",
+      "domain": "educacao",
+      "quality": 3,
+      "nsfw": false
+    },
+    "435871e782155bae": {
+      "task_type": "qa-aberta",
+      "domain": "trabalho-negocios",
+      "quality": 2,
+      "nsfw": false
+    },
+    "4615a7e771220ee9": {
+      "task_type": "outro",
+      "domain": "geral",
+      "quality": 1,
+      "nsfw": false
+    },
+    "5c59752dadf29bf7": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "6658e98306e608a6": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "66c8edaa09f739c0": {
+      "task_type": "planejamento",
+      "domain": "esportes",
+      "quality": 3,
+      "nsfw": false
+    },
+    "685f4eddd2fdaa36": {
+      "task_type": "outro",
+      "domain": "tecnologia",
+      "quality": 1,
+      "nsfw": false
+    },
+    "6d279daaf577595d": {
+      "task_type": "outro",
+      "domain": "geral",
+      "quality": 1,
+      "nsfw": false
+    },
+    "6fe5348436f4b4cf": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "78a33c87ae613642": {
+      "task_type": "qa-aberta",
+      "domain": "esportes",
+      "quality": 2,
+      "nsfw": false
+    },
+    "7e0379ee78e03866": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "85f0381eeec15f00": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "9be0e2b1d98a44ca": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "aa4397a21225cc97": {
+      "task_type": "redacao-pratica",
+      "domain": "educacao",
+      "quality": 1,
+      "nsfw": false
+    },
+    "b31a727a2c29e494": {
+      "task_type": "qa-aberta",
+      "domain": "educacao",
+      "quality": 2,
+      "nsfw": false
+    },
+    "b3da51c39097d89e": {
+      "task_type": "geracao-criativa",
+      "domain": "linguagem-idiomas",
+      "quality": 2,
+      "nsfw": false
+    },
+    "bdbf08a8487d6a56": {
+      "task_type": "qa-aberta",
+      "domain": "geral",
+      "quality": 2,
+      "nsfw": false
+    },
+    "be6ac38fb5e235ec": {
+      "task_type": "geracao-criativa",
+      "domain": "jogos",
+      "quality": 2,
+      "nsfw": false
+    },
+    "be96d32fcac45fc5": {
+      "task_type": "planejamento",
+      "domain": "educacao",
+      "quality": 3,
+      "nsfw": false
+    },
+    "c6cf289245d0bcc7": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "ce9f3a7ea2c0111a": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 2,
+      "nsfw": false
+    },
+    "d88d5a7c61d201d3": {
+      "task_type": "codigo",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "ddece45f9ebd140e": {
+      "task_type": "roleplay-persona",
+      "domain": "tecnologia",
+      "quality": 1,
+      "nsfw": false
+    },
+    "de7494e2c8a11892": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "e76d45449e17655a": {
+      "task_type": "resumo",
+      "domain": "trabalho-negocios",
+      "quality": 2,
+      "nsfw": false
+    },
+    "f0f70316ad9e9b0c": {
+      "task_type": "classificacao-extracao",
+      "domain": "direito",
+      "quality": 3,
+      "nsfw": false
+    },
+    "f77efd40859435ae": {
+      "task_type": "roleplay-persona",
+      "domain": "tecnologia",
+      "quality": 1,
+      "nsfw": false
+    },
+    "fe4dfc3bdede6ee2": {
+      "task_type": "matematica-raciocinio",
+      "domain": "ciencia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "113cea01a07eed9e": {
+      "task_type": "qa-contexto",
+      "domain": "linguagem-idiomas",
+      "quality": 3,
+      "nsfw": false
+    },
+    "1cb9e0d152167326": {
+      "task_type": "qa-aberta",
+      "domain": "artes-entretenimento",
+      "quality": 3,
+      "nsfw": false
+    },
+    "206311e4ea4687ce": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "208f1c310e7296d0": {
+      "task_type": "qa-aberta",
+      "domain": "ciencia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "3dcf3f14c0485b7d": {
+      "task_type": "redacao-pratica",
+      "domain": "politica-sociedade",
+      "quality": 2,
+      "nsfw": false
+    },
+    "45bd1b746274d442": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "46544ae8500cbdc7": {
+      "task_type": "qa-aberta",
+      "domain": "linguagem-idiomas",
+      "quality": 2,
+      "nsfw": false
+    },
+    "69be18068768160b": {
+      "task_type": "qa-contexto",
+      "domain": "esportes",
+      "quality": 3,
+      "nsfw": false
+    },
+    "9423207660413e81": {
+      "task_type": "redacao-pratica",
+      "domain": "geral",
+      "quality": 2,
+      "nsfw": false
+    },
+    "a58710332772b1c9": {
+      "task_type": "qa-contexto",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "ef8333a2abbda4c8": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "6bfebbb5d5feee4c": {
+      "task_type": "redacao-pratica",
+      "domain": "educacao",
+      "quality": 3,
+      "nsfw": false
+    },
+    "6e267b73ba230fd7": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 2,
+      "nsfw": false
+    },
+    "00c98cd008ce41dd": {
+      "task_type": "conversa-social",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "3c94dcaff6acf1bd": {
+      "task_type": "matematica-raciocinio",
+      "domain": "educacao",
+      "quality": 3,
+      "nsfw": false
+    },
+    "4cacd86aef03144d": {
+      "task_type": "conselho-opiniao",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "78f50d9edf47c5c1": {
+      "task_type": "qa-aberta",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "7e98295f1df91cb1": {
+      "task_type": "conselho-opiniao",
+      "domain": "politica-sociedade",
+      "quality": 2,
+      "nsfw": false
+    },
+    "00f32530b29ac57f": {
+      "task_type": "traducao",
+      "domain": "linguagem-idiomas",
+      "quality": 2,
+      "nsfw": false
+    },
+    "27c0962979106a96": {
+      "task_type": "qa-aberta",
+      "domain": "ciencia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "2b2988216454d7cb": {
+      "task_type": "roleplay-persona",
+      "domain": "tecnologia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "381732efd2f77520": {
+      "task_type": "planejamento",
+      "domain": "educacao",
+      "quality": 2,
+      "nsfw": false
+    },
+    "3f3c098ab6702eff": {
+      "task_type": "codigo",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "470ed7480c6c5a9f": {
+      "task_type": "redacao-pratica",
+      "domain": "jogos",
+      "quality": 3,
+      "nsfw": false
+    },
+    "5e0f422b042b3d06": {
+      "task_type": "roleplay-persona",
+      "domain": "culinaria",
+      "quality": 3,
+      "nsfw": false
+    },
+    "5ecc6725ffa30ec6": {
+      "task_type": "qa-contexto",
+      "domain": "trabalho-negocios",
+      "quality": 2,
+      "nsfw": false
+    },
+    "5fe13646d391bc83": {
+      "task_type": "codigo",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "69c9663fec60c697": {
+      "task_type": "outro",
+      "domain": "artes-entretenimento",
+      "quality": 1,
+      "nsfw": false
+    },
+    "7885ed126e017807": {
+      "task_type": "qa-aberta",
+      "domain": "artes-entretenimento",
+      "quality": 3,
+      "nsfw": false
+    },
+    "7bb1fddd55b25521": {
+      "task_type": "traducao",
+      "domain": "linguagem-idiomas",
+      "quality": 2,
+      "nsfw": false
+    },
+    "810b6f96857c671b": {
+      "task_type": "qa-aberta",
+      "domain": "trabalho-negocios",
+      "quality": 3,
+      "nsfw": false
+    },
+    "8e2490fbc1eacb71": {
+      "task_type": "roleplay-persona",
+      "domain": "educacao",
+      "quality": 3,
+      "nsfw": false
+    },
+    "9013d9beb2d16f08": {
+      "task_type": "qa-aberta",
+      "domain": "financas",
+      "quality": 2,
+      "nsfw": false
+    },
+    "9c4aa113ccceaf59": {
+      "task_type": "traducao",
+      "domain": "linguagem-idiomas",
+      "quality": 2,
+      "nsfw": false
+    },
+    "a0bd662469f33899": {
+      "task_type": "roleplay-persona",
+      "domain": "geral",
+      "quality": 1,
+      "nsfw": false
+    },
+    "a3565e3ce3732b7b": {
+      "task_type": "redacao-pratica",
+      "domain": "trabalho-negocios",
+      "quality": 3,
+      "nsfw": false
+    },
+    "a3857c9746bc9cbf": {
+      "task_type": "geracao-criativa",
+      "domain": "tecnologia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "a92abdbd533b1f6a": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "b3667997acfbfd9f": {
+      "task_type": "brainstorm",
+      "domain": "jogos",
+      "quality": 3,
+      "nsfw": false
+    },
+    "b5e1b570e9ea1d5a": {
+      "task_type": "qa-contexto",
+      "domain": "linguagem-idiomas",
+      "quality": 3,
+      "nsfw": false
+    },
+    "c1de88d02aefb92b": {
+      "task_type": "geracao-criativa",
+      "domain": "tecnologia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "f0b6dd94f0bc465d": {
+      "task_type": "conversa-social",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "fae01f39dd111812": {
+      "task_type": "traducao",
+      "domain": "linguagem-idiomas",
+      "quality": 3,
+      "nsfw": false
+    },
+    "474b63e552b8c0a7": {
+      "task_type": "classificacao-extracao",
+      "domain": "tecnologia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "82f91a38258b224e": {
+      "task_type": "brainstorm",
+      "domain": "viagens",
+      "quality": 3,
+      "nsfw": false
+    },
+    "9e13aaea276a75b2": {
+      "task_type": "qa-contexto",
+      "domain": "culinaria",
+      "quality": 3,
+      "nsfw": false
+    },
+    "c9ce52d09acd3b3a": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "dee4c1a572439468": {
+      "task_type": "conversa-social",
+      "domain": "geral",
+      "quality": 1,
+      "nsfw": false
+    },
+    "853118b54f80d0a0": {
+      "task_type": "qa-aberta",
+      "domain": "ciencia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "9a0d8470779e81f0": {
+      "task_type": "classificacao-extracao",
+      "domain": "ciencia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "c1bb876479e005a9": {
+      "task_type": "conselho-opiniao",
+      "domain": "tecnologia",
+      "quality": 2,
+      "nsfw": false
+    },
+    "d220148c6f06d8d4": {
+      "task_type": "qa-aberta",
+      "domain": "artes-entretenimento",
+      "quality": 3,
+      "nsfw": false
+    },
+    "f874e95fa9ec0739": {
+      "task_type": "classificacao-extracao",
+      "domain": "ciencia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "065ff5868d559897": {
+      "task_type": "resumo",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "0d8fa41575c05b13": {
+      "task_type": "redacao-pratica",
+      "domain": "culinaria",
+      "quality": 3,
+      "nsfw": false
+    },
+    "1d1b42256f00a3d6": {
+      "task_type": "brainstorm",
+      "domain": "trabalho-negocios",
+      "quality": 2,
+      "nsfw": false
+    },
+    "2c75c33340782c60": {
+      "task_type": "resumo",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "326b4485ed08c875": {
+      "task_type": "redacao-pratica",
+      "domain": "culinaria",
+      "quality": 3,
+      "nsfw": false
+    },
+    "61f46a39c54fa7ba": {
+      "task_type": "conselho-opiniao",
+      "domain": "saude",
+      "quality": 3,
+      "nsfw": false
+    },
+    "e1b93eae839e2575": {
+      "task_type": "qa-aberta",
+      "domain": "saude",
+      "quality": 3,
+      "nsfw": false
+    },
+    "e93a285778d1c92d": {
+      "task_type": "conselho-opiniao",
+      "domain": "geral",
+      "quality": 2,
+      "nsfw": false
+    },
+    "1e8b5f2043801ca0": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 2,
+      "nsfw": false
+    },
+    "20ef6e9680d72e42": {
+      "task_type": "conselho-opiniao",
+      "domain": "politica-sociedade",
+      "quality": 2,
+      "nsfw": false
+    },
+    "4bc793eb843ea3a3": {
+      "task_type": "conselho-opiniao",
+      "domain": "trabalho-negocios",
+      "quality": 3,
+      "nsfw": false
+    },
+    "7a0ad07343d50234": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 2,
+      "nsfw": false
+    },
+    "da3f9e031cf88eb2": {
+      "task_type": "qa-aberta",
+      "domain": "ciencia",
+      "quality": 3,
+      "nsfw": false
+    },
+    "ed0e9767b657f8e4": {
+      "task_type": "qa-aberta",
+      "domain": "politica-sociedade",
+      "quality": 3,
+      "nsfw": false
+    },
+    "f800039195014b14": {
+      "task_type": "redacao-pratica",
+      "domain": "culinaria",
+      "quality": 3,
+      "nsfw": false
+    }
+  },
   "batches": {
     "batch_0001": {
       "status": "pending",
