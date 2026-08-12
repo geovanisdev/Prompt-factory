@@ -52,7 +52,7 @@
 {"uid":"27c0962979106a96","task_type":"qa-aberta","domain":"ciencia","quality":3,"nsfw":false}
 {"uid":"2b2988216454d7cb","task_type":"geracao-criativa","domain":"tecnologia","quality":3,"nsfw":false}
 {"uid":"381732efd2f77520","task_type":"outro","domain":"educacao","quality":1,"nsfw":false}
-{"uid":"3f3c098ab6702eff","task_type":"codigo","domain":"tecnologia","quality":3,"nsfw":false}
+{"uid":"3f3c098ab6702eff","task_type":"geracao-criativa","domain":"tecnologia","quality":3,"nsfw":false}
 {"uid":"470ed7480c6c5a9f","task_type":"redacao-pratica","domain":"jogos","quality":3,"nsfw":false}
 {"uid":"5e0f422b042b3d06","task_type":"classificacao-extracao","domain":"culinaria","quality":3,"nsfw":false}
 {"uid":"5ecc6725ffa30ec6","task_type":"qa-contexto","domain":"trabalho-negocios","quality":2,"nsfw":false}
@@ -61,7 +61,7 @@
 {"uid":"7885ed126e017807","task_type":"qa-aberta","domain":"artes-entretenimento","quality":3,"nsfw":false}
 {"uid":"7bb1fddd55b25521","task_type":"traducao","domain":"linguagem-idiomas","quality":2,"nsfw":false}
 {"uid":"810b6f96857c671b","task_type":"qa-aberta","domain":"trabalho-negocios","quality":3,"nsfw":false}
-{"uid":"8e2490fbc1eacb71","task_type":"roleplay-persona","domain":"educacao","quality":3,"nsfw":false}
+{"uid":"8e2490fbc1eacb71","task_type":"reescrita-edicao","domain":"educacao","quality":3,"nsfw":false}
 {"uid":"9013d9beb2d16f08","task_type":"qa-aberta","domain":"financas","quality":2,"nsfw":false}
 {"uid":"9c4aa113ccceaf59","task_type":"traducao","domain":"linguagem-idiomas","quality":2,"nsfw":false}
 {"uid":"a0bd662469f33899","task_type":"roleplay-persona","domain":"geral","quality":1,"nsfw":false}

@@ -168,7 +168,7 @@
       "ed0e9767b657f8e4",
       "f800039195014b14"
     ],
-    "revised_at": "2026-08-12T14:44:18Z"
+    "revised_at": "2026-08-12T18:06:36Z"
   },
   "gold": {
     "13cae0699b8c11ea": {
@@ -496,7 +496,7 @@
       "nsfw": false
     },
     "3f3c098ab6702eff": {
-      "task_type": "codigo",
+      "task_type": "geracao-criativa",
       "domain": "tecnologia",
       "quality": 3,
       "nsfw": false
@@ -550,7 +550,7 @@
       "nsfw": false
     },
     "8e2490fbc1eacb71": {
-      "task_type": "roleplay-persona",
+      "task_type": "reescrita-edicao",
       "domain": "educacao",
       "quality": 3,
       "nsfw": false
@@ -1080,7 +1080,7 @@
       "n_rotulos": 80
     },
     "batch_0019": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1088,15 +1088,16 @@
         "308bd8b45109a7ee",
         "6fe5348436f4b4cf"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T17:53:37Z",
+      "done_at": "2026-08-12T17:57:39Z",
+      "agreement": 0.8333333333333334,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0020": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1104,15 +1105,16 @@
         "61f46a39c54fa7ba",
         "78a33c87ae613642"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T17:53:37Z",
+      "done_at": "2026-08-12T17:57:53Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0021": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1120,15 +1122,16 @@
         "6d279daaf577595d",
         "9c4aa113ccceaf59"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T17:53:37Z",
+      "done_at": "2026-08-12T17:57:18Z",
+      "agreement": 0.8333333333333334,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0022": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1136,15 +1139,16 @@
         "78a33c87ae613642",
         "8e2490fbc1eacb71"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
-      "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "claimed_at": "2026-08-12T18:04:50Z",
+      "done_at": "2026-08-12T18:06:48Z",
+      "agreement": 0.8333333333333334,
+      "tentativas": 3,
+      "agent_model": "sonnet",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0023": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1152,15 +1156,16 @@
         "aa4397a21225cc97",
         "46544ae8500cbdc7"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T17:59:48Z",
+      "done_at": "2026-08-12T18:01:55Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0024": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1168,15 +1173,16 @@
         "a0bd662469f33899",
         "7e98295f1df91cb1"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
-      "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "claimed_at": "2026-08-12T18:02:39Z",
+      "done_at": "2026-08-12T18:06:36Z",
+      "agreement": 0.8333333333333334,
+      "tentativas": 1,
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0025": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1184,15 +1190,16 @@
         "3c94dcaff6acf1bd",
         "42b972247b769891"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T17:59:48Z",
+      "done_at": "2026-08-12T18:02:49Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0026": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1200,15 +1207,16 @@
         "3c94dcaff6acf1bd",
         "470ed7480c6c5a9f"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T18:04:50Z",
+      "done_at": "2026-08-12T18:08:07Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0027": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1216,15 +1224,16 @@
         "aa4397a21225cc97",
         "a3857c9746bc9cbf"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T18:04:50Z",
+      "done_at": "2026-08-12T18:07:33Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0028": {
-      "status": "pending",
+      "status": "done",
       "n_items": 80,
       "n_novos": 77,
       "gold_uids": [
@@ -1232,12 +1241,13 @@
         "d220148c6f06d8d4",
         "78a33c87ae613642"
       ],
-      "claimed_at": null,
-      "done_at": null,
-      "agreement": null,
+      "claimed_at": "2026-08-12T18:04:50Z",
+      "done_at": "2026-08-12T18:07:44Z",
+      "agreement": 1.0,
       "tentativas": 0,
-      "agent_model": null,
-      "motivo": null
+      "agent_model": "haiku",
+      "motivo": null,
+      "n_rotulos": 80
     },
     "batch_0029": {
       "status": "pending",

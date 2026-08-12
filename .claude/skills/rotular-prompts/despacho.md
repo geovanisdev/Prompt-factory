@@ -181,6 +181,10 @@ deixam em aberto. Onde uma convenção se aplicar, ela vence a sua intuição.**
   `trabalho-negocios` · símbolos nacionais (bandeiras, hinos) → `geral` ·
   exercício de gramática ou de tradução → `linguagem-idiomas` · portaria, ato
   e diário oficial → `direito`.
+- **Escrever prompt PARA uma IA generativa (Midjourney, gerador de imagem,
+  ChatGPT) tem domínio `tecnologia`** — a ferramenta de IA é o assunto do
+  pedido, ainda que o conteúdo do prompt gerado seja artístico. Não use
+  `artes-entretenimento` só porque a imagem pedida é criativa.
 - **Dinheiro citado não faz o domínio ser `financas`.** `financas` é a GESTÃO
   do próprio dinheiro (investir, orçar, dívida, imposto, cripto). Recomendação
   de produto com teto de preço é o domínio do produto ("melhor celular até
