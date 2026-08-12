@@ -262,6 +262,12 @@ despachar.
 >   "complete os parênteses do APÊNDICE A"). Extrair informação em PROSA
 >   também é `qa-contexto`; só vira `classificacao-extracao` quando o usuário
 >   declara a ESTRUTURA de saída (JSON, tabela, campos).
+> - **Material colado manda mais que o tom da pergunta.** Um texto longo
+>   colado acima — narrativa, parábola, notícia, ensaio — faz do item
+>   `qa-contexto` ainda que a pergunta soe geral, filosófica ou opinativa;
+>   `qa-aberta` é para quando NÃO há material nenhum na tela. Este é o erro que
+>   mais custou agreement até aqui: o agente lê a pergunta, esquece as duas mil
+>   palavras acima dela e responde pela classe do tom.
 > - **Recomendação e veredito são `conselho-opiniao`, ainda que a resposta
 >   saia em lista**: "que lojas se parecem com a X", "melhor celular até 1800",
 >   "A é melhor que B?", "como durmo melhor?", "o que você acha de X".
