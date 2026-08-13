@@ -543,3 +543,91 @@ max_criterios_material = 5
 # projeto já provou que texto técnico e documento bilíngue enganam detector, e
 # um falso positivo aqui joga fora o trabalho de um lote inteiro.
 lang_confianca_min = 0.50
+
+[pedidos]
+# CENTRAL DE BRIEFS PEDAGÓGICOS — a campanha que destila PEDIDOS de prompt de
+# material didático. Seção própria e não `[geracao]`: são campanhas irmãs mas
+# independentes, e um TTL ajustado aqui não pode mexer no ciclo da outra.
+
+# ONDE ESTÁ O MATERIAL BRUTO. Fora do repositório, sempre: são 52,8 MB de
+# apostilas de três editoras comerciais, com copyright integral. O que vai para
+# a coluna `pedidos.arquivo_fonte` é só o NOME do arquivo — a pasta pode mudar
+# de disco, e o nome é a identidade.
+#
+# É também o parafuso que permite apontar a campanha para material de autoria
+# própria um dia; é nesse caso, e só nele, que embutir o recorte seria
+# discutível (§6 do plano, opção (a)).
+material_dir = "G:/Github/Ensino Medio_txt"
+
+# A JANELA que o agente lê de cada vez. 12.000 caracteres é grande o bastante
+# para conter um capítulo com o boxe e as atividades dele, e pequeno o bastante
+# para caber com folga no contexto de um lote de várias janelas.
+janela_chars = 12000
+# A SOBREPOSIÇÃO existe para um trecho bom não morrer cortado na fronteira: sem
+# ela, o parágrafo que começa 300 caracteres antes do fim de uma janela aparece
+# pela metade em duas e não serve de recorte em nenhuma. O cursor anda pelo
+# PASSO (janela - overlap), nunca pela janela inteira.
+janela_overlap = 1000
+
+# OS CAPS DO RECORTE. Abaixo de 200 não há material de trabalho — não dá para
+# derivar tema, nível e vocabulário de duas linhas. Acima de 2.000 é página
+# inteira, não recorte, e quem for escrever o prompt lê em vez de trabalhar.
+recorte_min_chars = 200
+recorte_max_chars = 2000
+# Teto de pedidos por janela. ZERO é resposta legítima e esperada (créditos,
+# sumário, gabarito); o teto existe contra o agente que "acha" três pedidos em
+# toda janela para parecer produtivo.
+max_pedidos_por_janela = 3
+
+# Pisos dos dois campos que quem escreve o prompt de fato lê. O tema é um
+# rótulo curto; a meta pedagógica é a instrução, e é ela que a pessoa persegue.
+min_chars_tema = 8
+min_chars_meta = 30
+
+# Quando avisar que um recorte está hifenizado demais, em quebras por MIL
+# caracteres. Por densidade e não por presença — e o número é medido.
+#
+# A primeira versão avisava a partir de UMA quebra e disparou em 92% dos 42
+# recortes da primeira rodada real: o aviso passou a dizer "este livro veio de
+# um PDF" (verdade sobre o material inteiro) em vez de "este recorte é difícil
+# de ler". Aviso que dispara em quase tudo é ruído com cara de sinal.
+#
+# Distribuição medida (recortes de 678 caracteres na mediana): mediana 3,0
+# quebras/mil, p80 5,6, p90 8,1. Na mediana é uma quebra a cada quatro linhas, e
+# isso se lê sem esforço. 6,0 fica logo acima do p80 e avisa ~19% — o suficiente
+# para o aviso significar "este é pior que o típico".
+hifenizacao_por_mil = 6.0
+
+# AS CLASSES FORA DO ESCOPO DA v1, e o porquê está na §6 do plano: `qa-contexto`,
+# `resumo` e `reescrita-edicao` só funcionam com o texto-base DENTRO do prompt —
+# e o texto aqui é da editora. O prompt referencia o conteúdo, nunca o reproduz.
+#
+# Fica em configuração, e não como constante de código, porque o dia em que
+# `material_dir` apontar para material de autoria própria é o mesmo dia em que
+# estas três voltam a ser possíveis.
+task_types_excluidos = ["qa-contexto", "resumo", "reescrita-edicao"]
+
+# Mesmas duas engrenagens de `[geracao]`, e pelos mesmos motivos: falha de
+# validação não muda o estado do lote (só a contagem), e um claim órfão de uma
+# sessão que morreu volta sozinho para `pending` depois do TTL.
+max_tentativas = 3
+claim_ttl_horas = 6
+
+# --- a fila de pedidos e a tríade (F4) ---------------------------------------
+# Minutos de uma reserva sem submissão. Escrever prompt + rubrica + gold é
+# trabalho de quase uma hora, mas a reserva aqui é FROUXA: ninguém está na fila
+# esperando por ESTE recorte, e o custo de uma expiração cedo demais é um clique
+# para reservar de novo.
+reserva_ttl_min = 180
+# Teto de critérios da rubrica que acompanha a criação. Menor que o da
+# plataforma (8) pela razão do `[geracao] max_criterios_material`: esta rubrica
+# vai ser aplicada por outra pessoa, e 5 é o limite prático de quantas escalas
+# alguém compara sem perder o fio. O piso é o `[annotate] min_criterios_rubrica`.
+max_criterios_rubrica = 5
+# Os pisos da resposta-gold DESCRITIVA. Ela é a régua, não a resposta: dois
+# pontos que a resposta precisa apresentar e um erro que a desqualifica são o
+# mínimo para o revisor conferir item a item. Um item de menos de 15 caracteres
+# não diz o que conferir.
+gold_min_deve_conter = 2
+gold_min_nao_pode = 1
+gold_min_chars_item = 15

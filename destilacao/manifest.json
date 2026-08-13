@@ -1,0 +1,64 @@
+{
+  "contrato": "destilacao@1",
+  "criado_em": "2026-08-12T22:27:48Z",
+  "lotes": {
+    "ped_0001": {
+      "arquivo": "DOSEUJEITO_PNLD26_Filosofia_VU_MP.txt",
+      "status": "done",
+      "n_janelas": 8,
+      "offset_inicio": 0,
+      "offset_fim": 89000,
+      "claimed_at": "2026-08-12T22:27:48Z",
+      "done_at": "2026-08-12T22:29:45Z",
+      "tentativas": 0,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "pedidos": 5,
+        "ja_existiam": 0
+      },
+      "colecao": "Do Seu Jeito",
+      "disciplina": "Filosofia"
+    },
+    "ped_0002": {
+      "arquivo": "CIENCIA VIVA_PNLD26_BIOLOGIA_VU_PR.txt",
+      "status": "done",
+      "n_janelas": 8,
+      "offset_inicio": 0,
+      "offset_fim": 89000,
+      "claimed_at": "2026-08-12T22:30:04Z",
+      "done_at": "2026-08-12T22:39:47Z",
+      "tentativas": 2,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "pedidos": 19,
+        "ja_existiam": 0
+      },
+      "colecao": "Ciência Viva",
+      "disciplina": "Biologia"
+    },
+    "ped_0003": {
+      "arquivo": "CIENCIA VIVA_PNLD26_BIOLOGIA_VU_PR.txt",
+      "status": "done",
+      "n_janelas": 8,
+      "offset_inicio": 88000,
+      "offset_fim": 177000,
+      "claimed_at": "2026-08-12T22:30:04Z",
+      "done_at": "2026-08-12T22:40:40Z",
+      "tentativas": 1,
+      "modelo": "sonnet",
+      "motivo": null,
+      "resultado": {
+        "pedidos": 18,
+        "ja_existiam": 0
+      },
+      "colecao": "Ciência Viva",
+      "disciplina": "Biologia"
+    }
+  },
+  "cursores": {
+    "DOSEUJEITO_PNLD26_Filosofia_VU_MP.txt": 88000,
+    "CIENCIA VIVA_PNLD26_BIOLOGIA_VU_PR.txt": 176000
+  }
+}

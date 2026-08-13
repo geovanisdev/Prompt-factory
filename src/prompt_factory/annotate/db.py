@@ -90,7 +90,22 @@ from typing import Any
 #: justificativa apertar?" volta a não ter resposta. Nenhuma linha existente é
 #: transformada: ``versao_brief`` fica NULL no trabalho anterior ao brief, que é
 #: a verdade — não havia brief publicado.
-SCHEMA_VERSION_ANOTACAO = 6
+#:
+#: **v7 (Central de Briefs Pedagógicos, F1)**: o PEDIDO de prompt. A tabela
+#: ``pedidos`` nasceria de graça (``CREATE TABLE IF NOT EXISTS`` a cria num banco
+#: existente), e de novo não é ela que cobra a migração: são **duas colunas novas
+#: em ``criacoes``** (``pedido_id`` e ``material_json``) mais **um valor a mais no
+#: CHECK de ``rubricas.origem``** (``'criacao'``). É a v6 e a v4 somadas, e as
+#: duas lições valem inteiras — ``IF NOT EXISTS`` não acrescenta coluna nem
+#: reescreve CHECK numa tabela que já existe. Sem migrar, este banco recusaria a
+#: rubrica materializada de uma criação com uma regra que nenhum arquivo do
+#: repositório mostra mais, e a criação vinda de pedido não teria onde gravar a
+#: tríade que ela existe para produzir.
+#:
+#: Nenhuma linha existente é transformada: ``pedido_id`` e ``material_json``
+#: ficam NULL na criação livre, que é a verdade — ela não veio de pedido nenhum,
+#: e o modo criar do P4 continua funcionando exatamente como está.
+SCHEMA_VERSION_ANOTACAO = 7
 
 #: Chave de ``app_meta`` onde a versão acima mora.
 CHAVE_VERSAO = "schema_version_anotacao"
@@ -300,7 +315,16 @@ STATUS_QUALIFICACAO: tuple[str, ...] = ("pendente", "aprovada", "reprovada")
 #: duplicação. ``importada`` entrou em ``rubricas`` porque a campanha escreve o
 #: PAR — a rubrica e as duas respostas nascem do mesmo lote e não podem contar
 #: histórias diferentes sobre a própria procedência.
-ORIGENS_RUBRICA: tuple[str, ...] = ("fixture", "anotacao", "importada")
+#:
+#: ``criacao`` (v7) é a rubrica que veio junto com um prompt escrito no modo
+#: criar, materializada na aprovação e apontando para o ``uid_previsto``. Ela
+#: **não** cabe em nenhuma das três anteriores, e reusar qualquer uma contaria
+#: uma história errada numa coluna de PROVENIÊNCIA — que é exatamente o que este
+#: projeto existe para não fazer. ``anotacao`` diria que saiu da aba
+#: escrever-rubrica (saiu do formulário de criação, junto do texto que ela
+#: mede); ``importada`` diria que um lote gerado a escreveu sobre um prompt que
+#: já estava no corpus (este prompt ainda nem chegou lá).
+ORIGENS_RUBRICA: tuple[str, ...] = ("fixture", "anotacao", "importada", "criacao")
 ORIGENS_RESPOSTA: tuple[str, ...] = ("fixture", "importada")
 
 #: Rótulos cegos do A/B. Cegos de propósito: "modelo-a"/"modelo-b" na tela, o
@@ -310,6 +334,33 @@ ROTULOS_MODELO: tuple[str, ...] = ("modelo-a", "modelo-b")
 #: Funil do modo criar. ``exportada`` é carimbada pelo ``pf ingest plataforma``
 #: (P6) DEPOIS de a linha entrar em ``data/raw/`` — antes disso, aprovada.
 STATUS_CRIACAO: tuple[str, ...] = ("submetida", "aprovada", "rejeitada", "exportada")
+
+#: CENTRAL DE BRIEFS PEDAGÓGICOS (v7) — quem escreve o prompt que o pedido pede.
+#: ``professor`` monta exercício, avaliação ou plano sobre o trecho; ``aluno``
+#: pede ajuda para entender ou estudar o trecho. Fechado, e não texto livre,
+#: porque é MECÂNICA da plataforma: o papel muda a fila, o formulário e a
+#: instrução do agente destilador — não é um rótulo descritivo.
+PAPEIS_PEDIDO: tuple[str, ...] = ("professor", "aluno")
+
+#: Funil do pedido. ``disponivel`` → ``reservado`` (alguém puxou da fila) →
+#: ``usado`` (a criação foi submetida). ``arquivado`` é o descarte editorial
+#: (pedido ruim, recorte sujo) e pode vir de qualquer estado — corrigir um pedido
+#: é arquivá-lo e redestilar, nunca editá-lo, porque um pedido editado deixa de
+#: casar com o recorte que o justifica.
+STATUS_PEDIDO: tuple[str, ...] = ("disponivel", "reservado", "usado", "arquivado")
+
+#: A série do Ensino Médio a que o pedido se dirige. É o eixo que mais muda um
+#: prompt pedagógico — a mesma meta em 1º e em 3º ano são prompts diferentes — e
+#: por isso é coluna com CHECK, não prosa dentro de ``tema``: só assim vira
+#: faceta e filtro da fila. ``indefinido`` é resposta legítima e frequente: o
+#: material didático raramente amarra um trecho a uma série.
+SERIES_PEDIDO: tuple[str, ...] = ("1", "2", "3", "indefinido")
+
+#: E o nível esperado do trabalho. Existe para EQUILIBRAR a fila: sem ele, uma
+#: campanha inteira pode sair no mesmo nível e ninguém percebe até a escrita
+#: humana começar. Fechado em três posições de propósito — uma escala mais fina
+#: pediria uma âncora por posição, e o pedido não é um instrumento de medida.
+DIFICULDADES_PEDIDO: tuple[str, ...] = ("basica", "intermediaria", "avancada")
 
 #: Prefixo do uid dos prompts do pacote de demonstração. É o que o resolvedor lê
 #: para decidir se busca o texto no corpus read-only ou em ``prompts_demo`` — por
@@ -790,6 +841,80 @@ CREATE TABLE IF NOT EXISTS respostas_modelo (
 CREATE INDEX IF NOT EXISTS idx_respostas_prompt ON respostas_modelo(prompt_uid, rotulo_modelo);
 
 -- ---------------------------------------------------------------------------
+-- CENTRAL DE BRIEFS PEDAGÓGICOS  (o PEDIDO de prompt que alguém vai escrever)
+-- ---------------------------------------------------------------------------
+-- Um pedido é um RECORTE de material didático mais o que se quer que seja
+-- escrito a partir dele. Ele é INSUMO da vista criar — a analogia certa é o
+-- painel de brief do P9, não a fila de tarefas.
+--
+-- E é por isso que pedido NÃO é `tarefas`: acrescentar um 7º valor a
+-- TIPOS_TAREFA o arrastaria para a máquina de atribuições/anotações/triagem/
+-- Rate and Review, e o P4 já decidiu que criação tem UMA passagem de revisão,
+-- sem edição, porque o produto é um texto cuja proveniência não pode ser
+-- "corrigida". Bônus de não ser tarefa: nenhum CHECK existente é alargado.
+--
+-- O RECORTE NUNCA SAI DESTA MÁQUINA. O material é de três editoras comerciais,
+-- integralmente protegido e sem concessão de licença nenhuma; o prompt escrito
+-- a partir dele é expressão do ANOTADOR (e por isso CC0-dedicável por ele), mas
+-- o recorte é insumo de leitura local. Esta tabela não entra em perfil de
+-- entrega nenhum, e o `meta_json` do `pf ingest plataforma` já não carrega texto
+-- livre — duas camadas para a mesma regra.
+CREATE TABLE IF NOT EXISTS pedidos (
+  id               INTEGER PRIMARY KEY,
+  -- Proveniência do recorte, auditável. O nome EXATO do arquivo-fonte e o
+  -- offset de caractere onde o recorte começa. O caminho da PASTA fica no
+  -- settings.toml ([pedidos] material_dir) e não na linha: a pasta pode mudar de
+  -- disco, o nome do arquivo é a identidade.
+  arquivo_fonte    TEXT NOT NULL,
+  offset_inicio    INTEGER NOT NULL CHECK (offset_inicio >= 0),
+  recorte          TEXT NOT NULL,
+  -- Id da taxonomia do corpus (labeling/taxonomy.json). SEM CHECK, pela mesma
+  -- razão do `task_type` do corpus: a taxonomia evolui e não se migra um banco
+  -- que guarda trabalho humano por causa de uma classe nova. Quem valida é o
+  -- import, contra a taxonomia carregada — a mesma projeção
+  -- (`tarefas._vocabulario_taxonomia`) que o modo criar já usa nas sugestões.
+  task_type        TEXT NOT NULL,
+  tema             TEXT NOT NULL,
+  meta_pedagogica  TEXT NOT NULL,
+  -- Lista JSON de códigos BNCC ("EM13CHS101"), possivelmente vazia. O material
+  -- os carrega verbatim por capítulo; quando a janela os contém, eles viajam.
+  habilidades_json TEXT NOT NULL DEFAULT '[]',
+  papel            TEXT NOT NULL CHECK (papel IN ({_lista(PAPEIS_PEDIDO)})),
+  serie            TEXT NOT NULL DEFAULT 'indefinido'
+                     CHECK (serie IN ({_lista(SERIES_PEDIDO)})),
+  dificuldade      TEXT NOT NULL DEFAULT 'intermediaria'
+                     CHECK (dificuldade IN ({_lista(DIFICULDADES_PEDIDO)})),
+  -- Derivadas do NOME do arquivo no import. Denormalizadas aqui de propósito:
+  -- são as facetas da fila, e reparsear nome de arquivo a cada listagem faria a
+  -- UI depender de uma convenção de nomenclatura que ninguém garante.
+  disciplina       TEXT NOT NULL DEFAULT '',
+  colecao          TEXT NOT NULL DEFAULT '',
+  status           TEXT NOT NULL DEFAULT 'disponivel'
+                     CHECK (status IN ({_lista(STATUS_PEDIDO)})),
+  reservado_por    INTEGER REFERENCES anotadores(id),
+  -- Carimbo da reserva, no formato de SQL_AGORA. A expiração é preguiçosa (um
+  -- UPDATE antes de cada listagem/claim), como em `atribuicoes`, e compara
+  -- STRINGS — o formato é load-bearing, ver SQL_AGORA.
+  reservado_em     TEXT,
+  -- Avisos da validação do import (JSON, lista de strings). GRAVADOS, e não
+  -- despejados no terminal: o material é sujo por natureza (gabarito
+  -- intercalado, mojibake de extração, crédito de imagem no meio do fluxo) e o
+  -- juiz certo é o humano na tela. Um aviso que só existiu no terminal é um
+  -- aviso que nunca existiu.
+  avisos_json      TEXT NOT NULL DEFAULT '[]',
+  lote_id          TEXT NOT NULL,
+  -- sha256(arquivo_fonte + recorte normalizado): a chave natural que torna o
+  -- import idempotente, como em `geracao.gravar_material`. Reimportar um lote
+  -- não duplica o banco de pedidos.
+  chave            TEXT NOT NULL UNIQUE,
+  criado_em        TEXT NOT NULL DEFAULT ({_agora()})
+);
+-- O índice da FILA, na ordem em que "puxar próximo pedido" procura.
+CREATE INDEX IF NOT EXISTS idx_pedidos_fila ON pedidos(status, papel, task_type, id);
+-- E o do funil do admin, que agrupa por disciplina dentro de cada estado.
+CREATE INDEX IF NOT EXISTS idx_pedidos_disciplina ON pedidos(disciplina, status);
+
+-- ---------------------------------------------------------------------------
 -- MODO CRIAR  (o anotador escreve o prompt, e ele entra no corpus de verdade)
 -- ---------------------------------------------------------------------------
 -- É aqui que a Trilha B fecha o objetivo do projeto: o texto atravessa revisão,
@@ -809,6 +934,29 @@ CREATE TABLE IF NOT EXISTS criacoes (
   task_type_sugerido TEXT,
   domain_sugerido    TEXT,
   brief              TEXT,
+  -- DE ONDE VEIO O PEDIDO (v7). NULL na criação livre, que é a verdade: ela não
+  -- veio de pedido nenhum. Não confundir com a coluna `brief` acima, que é o
+  -- contexto livre escrito pelo PRÓPRIO autor ("por que escrevi isto") — nem com
+  -- o brief de PROJETO do P9. São três coisas com nomes parecidos e donos
+  -- diferentes.
+  --
+  -- Sem índice, e a decisão é por volume medido no que existe: são dezenas de
+  -- criações, a consulta do revisor é criação→pedido pela chave primária, e o
+  -- funil do admin agrupa `pedidos`, não `criacoes`. (Efeito colateral que
+  -- importa a quem mexer nisto: um índice aqui quebraria o `ALTER TABLE DROP
+  -- COLUMN` que o rebaixamento dos testes de migração faz — ver
+  -- `tests/fixtures_annotate_v1.rebaixar`.)
+  pedido_id          INTEGER REFERENCES pedidos(id),
+  -- A TRÍADE: rubrica + resposta-gold descritiva, no contrato
+  -- `material_criacao@1`. O contrato viaja DENTRO do blob (como
+  -- `briefs.texto_json` carrega "briefs@1" e os lotes carregam "geracao@1"),
+  -- porque `criacoes` não tem coluna de schema e criar uma agora afirmaria que
+  -- toda criação tem material — a livre não tem.
+  --
+  -- NULL na criação livre; obrigatório quando há `pedido_id`. A regra é de ROTA
+  -- e não CHECK: ela depende de outra coluna e do contrato do blob, e um CHECK
+  -- que só soubesse dizer "não é NULL" daria a impressão de validar a forma.
+  material_json      TEXT,
   hash_norm          TEXT NOT NULL,
   duplicata_corpus   INTEGER NOT NULL DEFAULT 0 CHECK (duplicata_corpus IN (0,1)),
   status             TEXT NOT NULL DEFAULT 'submetida'
@@ -872,6 +1020,7 @@ TABELAS: tuple[str, ...] = (
     "eventos",
     "rubricas",
     "respostas_modelo",
+    "pedidos",
     "criacoes",
     "pool",
     "app_meta",
@@ -998,21 +1147,25 @@ __all__ = [
     "DECISOES_ADMIN",
     "DESFECHO_AVALIACAO",
     "DESFECHO_DECISAO",
+    "DIFICULDADES_PEDIDO",
     "ESCALA_TURNO",
     "MOTIVOS_ABANDONO",
     "ORIGENS_RESPOSTA",
     "ORIGENS_RUBRICA",
     "ORIGENS_TAREFA",
     "PAPEIS",
+    "PAPEIS_PEDIDO",
     "PAPEIS_TURNO",
     "PREFIXO_DEMO",
     "ROTULOS_DUELO",
     "ROTULOS_MODELO",
     "SCHEMA_VERSION_ANOTACAO",
+    "SERIES_PEDIDO",
     "SQL_AGORA",
     "STATUS_ANOTACAO",
     "STATUS_ATRIBUICAO",
     "STATUS_CRIACAO",
+    "STATUS_PEDIDO",
     "STATUS_PROJETO",
     "STATUS_QUALIFICACAO",
     "STATUS_TAREFA",

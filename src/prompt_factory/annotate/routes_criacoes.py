@@ -25,10 +25,11 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException, Query
 
 from . import criacoes as crimod
+from . import pedidos as pedmod
 from . import solo as solomod
 from . import tarefas as tmod
 from .deps import ConAnotacao, ConCorpus, exigir_anotador, exigir_papel
-from .models import CriacaoIn, RevisarCriacaoIn
+from .models import CriacaoIn, DevolverPedidoIn, ProximoPedidoIn, RevisarCriacaoIn
 
 router = APIRouter(tags=["criações"])
 
@@ -84,6 +85,18 @@ def criar(corpo: CriacaoIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str, A
     """
     exigir_anotador(anot, corpo.autor_id)
     _conferir_sugestoes(corpo)
+    if corpo.pedido_id is not None:
+        # A MESMA função que a tela consulta para saber se ainda pode enviar.
+        # Duas implementações da regra dariam um botão habilitado que devolve
+        # erro — o defeito que `catalogo.material_faltando` já evitou uma vez.
+        try:
+            pedmod.conferir_para_criacao(anot, corpo.pedido_id, anotador_id=corpo.autor_id)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
     return crimod.criar(
         anot,
         corpus,
@@ -93,7 +106,70 @@ def criar(corpo: CriacaoIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str, A
         task_type_sugerido=corpo.task_type_sugerido,
         domain_sugerido=corpo.domain_sugerido,
         brief=corpo.brief,
+        pedido_id=corpo.pedido_id,
+        material=None if corpo.material is None else corpo.material.model_dump(),
     )
+
+
+# ---------------------------------------------------------------------------
+# A FILA DE PEDIDOS (Central de Briefs) — o insumo da vista criar
+# ---------------------------------------------------------------------------
+#
+# Rotas no mesmo router do modo criar, e não num arquivo próprio: o pedido não é
+# um produto ao lado da criação, é o INSUMO dela. Separá-los sugeriria uma vista
+# de pedidos que não existe — corrigir um pedido é arquivá-lo e redestilar.
+
+
+@router.get("/api/pedidos", summary="A fila de pedidos: o meu e o que há disponível")
+def pedidos_fila(
+    anot: ConAnotacao, anotador_id: Annotated[int, Query(ge=1)]
+) -> dict[str, Any]:
+    """O pedido reservado por esta pessoa (ou ``null``) e as facetas do filtro.
+
+    Uma rota e não duas porque a tela precisa das duas coisas no mesmo paint: o
+    painel do pedido e o seletor de disciplina aparecem juntos, e duas
+    requisições dariam um instante em que o filtro promete disciplinas que a
+    fila já não tem.
+    """
+    return {
+        "meu": pedmod.meu(anot, anotador_id),
+        "facetas": pedmod.facetas(anot),
+        "reserva_ttl_min": pedmod.reserva_ttl_min(),
+    }
+
+
+@router.post("/api/pedidos/proximo", summary="Reservar o próximo pedido da fila")
+def pedidos_proximo(corpo: ProximoPedidoIn, anot: ConAnotacao) -> dict[str, Any]:
+    """Reserva e devolve o pedido. Fila vazia é **200 com ``pedido: null``**.
+
+    A mesma decisão do claim de tarefa: fila vazia é o estado mais comum de uma
+    plataforma bem servida, e um 404 faria o cliente tratar o caminho normal
+    como falha. O ``motivo_chave`` é o que a tela traduz; o ``motivo`` em
+    português é para o ``/docs``.
+    """
+    exigir_anotador(anot, corpo.anotador_id)
+    return pedmod.proximo(
+        anot,
+        anotador_id=corpo.anotador_id,
+        disciplina=corpo.disciplina,
+        papel=corpo.papel,
+    )
+
+
+@router.post("/api/pedidos/{pedido_id}/devolver", summary="Devolver o pedido à fila")
+def pedidos_devolver(
+    pedido_id: int, corpo: DevolverPedidoIn, anot: ConAnotacao
+) -> dict[str, Any]:
+    """Desfaz a reserva. Não penaliza e não arquiva — o pedido volta como estava."""
+    exigir_anotador(anot, corpo.anotador_id)
+    try:
+        return pedmod.devolver(anot, pedido_id, anotador_id=corpo.anotador_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/api/criacoes", summary="As criações — as minhas ou a fila de revisão")

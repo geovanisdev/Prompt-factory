@@ -94,6 +94,30 @@ E ``turnos_conversa`` entra pela primeira vez numa lista de cópia: ela existe
 desde a v5, então uma migração v5→v6 que a esquecesse apagaria conversas inteiras
 — o único trabalho humano deste schema produzido ANTES de existir uma linha em
 ``anotacoes``.
+
+O QUE MUDA NOS DADOS, VINDO DA v6 (Central de Briefs Pedagógicos)
+=================================================================
+Nada é transformado, e mesmo assim esta é a migração com mais superfície desde a
+v2 — ela junta os dois modos de falha que as anteriores ensinaram, um de cada
+vez:
+
+* **coluna nova em tabela existente** (a lição da v6): ``criacoes.pedido_id`` e
+  ``criacoes.material_json``. Nascem NULL em toda criação anterior, e NULL é a
+  verdade — aquelas criações não vieram de pedido nenhum. Elas simplesmente não
+  aparecem na ``COPIA_V6_ANTES``, que é a segunda vez que a cópia explícita
+  coluna a coluna paga o incômodo dela.
+* **CHECK alargado em tabela existente** (a lição da v4): ``rubricas.origem``
+  ganha ``'criacao'``. Sem migrar, o banco continuaria recusando a rubrica
+  materializada de uma criação com uma regra que nenhum arquivo do repositório
+  mostra mais — e um CHECK velho não parece quebrado, parece um bug do código
+  que está tentando escrever.
+
+A tabela ``pedidos`` nasce vazia (``SEM_ORIGEM``), como ``briefs`` nasceu na v6:
+um banco v6 nunca teve pedido. Ela também **não** é populada aqui — quem destila
+pedidos é a campanha (``pf annotate pedidos``), e destilar no meio de uma
+migração misturaria "preservar o que existe" com "produzir material novo", que é
+a mesma fronteira que manteve o seed das diretrizes do P4d e do brief do P9 fora
+das migrações que as precederam.
 """
 
 from __future__ import annotations
@@ -375,9 +399,63 @@ COPIA_V5_ANTES: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: O que depende de ``anotacoes``. Ver a nota de ``COPIA_V2_DEPOIS``.
 COPIA_V5_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = COPIA_V2_DEPOIS
 
+#: A cópia vinda da **v6**. ``anotacoes`` finalmente entra completa (a v6 já tem
+#: ``versao_brief``) e ``briefs`` entra pela primeira vez em lista de cópia — ela
+#: existe desde a v6, e uma migração v6→v7 que a esquecesse apagaria o
+#: enquadramento sob o qual todo o trabalho recente foi feito, deixando as
+#: ``anotacoes.versao_brief`` apontando para versões que não existem mais.
+#:
+#: Quem DIVERGE aqui é ``criacoes``: as duas colunas da v7 (``pedido_id`` e
+#: ``material_json``) não aparecem, porque um banco v6 não as tem. Elas nascem
+#: NULL, que é a verdade sobre uma criação livre.
+#:
+#: ``pedidos`` não aparece pela razão oposta — ela não existe na v6 e nasce vazia
+#: do ``db.DDL``. Ver ``SEM_ORIGEM``.
+COPIA_V6_ANTES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("projetos", ("id", "nome", "cliente", "descricao", "status", "criado_em")),
+    ("diretrizes", ("id", "tipo", "versao", "texto_json", "criada_em")),
+    ("briefs", ("id", "projeto_id", "versao", "texto_json", "criado_em")),
+    ("anotadores", ("id", "nome", "papel", "ativo", "qualificacoes_json", "criado_em")),
+    ("prompts_demo", ("uid", "text", "lang", "criado_em")),
+    (
+        "tarefas",
+        ("id", "tipo", "prompt_uid", "origem", "projeto_id", "payload_json", "gabarito_json",
+         "n_anotacoes_alvo", "prioridade", "status", "db_build_id", "criado_em"),
+    ),
+    (
+        "atribuicoes",
+        ("id", "tarefa_id", "anotador_id", "status", "iniciada_em", "expira_em", "terminada_em"),
+    ),
+    (
+        "anotacoes",
+        ("id", "atribuicao_id", "versao", "payload_schema", "versao_diretriz", "versao_brief",
+         "payload_json", "gabarito_avaliacao_json", "tempo_ativo_ms", "iniciada_em",
+         "submetida_em", "status"),
+    ),
+    (
+        "turnos_conversa",
+        ("id", "atribuicao_id", "ordem", "papel", "rotulo", "texto", "raciocinio", "truncado",
+         "modelo", "digest", "escolhida", "justificativa", "duracao_ms", "criado_em"),
+    ),
+    (
+        "respostas_modelo",
+        ("id", "prompt_uid", "rotulo_modelo", "texto", "origem", "meta_json", "criada_em"),
+    ),
+    (
+        "criacoes",
+        ("id", "autor_id", "texto", "lang", "task_type_sugerido", "domain_sugerido", "brief",
+         "hash_norm", "duplicata_corpus", "status", "revisor_id", "comentario_revisao",
+         "revisada_em", "uid_previsto", "exportada_em", "criada_em"),
+    ),
+    ("pool", ("uid", "ordem")),
+)
+
+#: O que depende de ``anotacoes``. Ver a nota de ``COPIA_V2_DEPOIS``.
+COPIA_V6_DEPOIS: tuple[tuple[str, tuple[str, ...]], ...] = COPIA_V2_DEPOIS
+
 #: As versões de origem que este módulo sabe ler. Uma lista, e não um ``if``
 #: solto: acrescentar uma versão é acrescentar uma função e uma chave.
-ORIGENS_CONHECIDAS: tuple[int, ...] = (1, 2, 3, 4, 5)
+ORIGENS_CONHECIDAS: tuple[int, ...] = (1, 2, 3, 4, 5, 6)
 
 #: As tabelas que a própria migração faz crescer, e que por isso são conferidas
 #: por "nunca menos" em vez de "exatamente igual": ``app_meta`` ganha chaves e
@@ -396,11 +474,14 @@ TABELAS_QUE_CRESCEM: frozenset[str] = frozenset({"app_meta", "eventos"})
 SEM_ORIGEM: dict[int, frozenset[str]] = {
     # `turnos_conversa` nasce na v5 (P4d): um banco v1..v4 nunca teve conversa.
     # `briefs` nasce na v6 (P9): nenhum banco anterior teve brief de projeto.
-    1: frozenset({"turnos_conversa", "briefs"}),
-    2: frozenset({"turnos_conversa", "briefs"}),
-    3: frozenset({"turnos_conversa", "briefs"}),
-    4: frozenset({"turnos_conversa", "briefs"}),
-    5: frozenset({"briefs"}),
+    # `pedidos` nasce na v7 (Central de Briefs Pedagógicos): idem, e ela também
+    # não é POPULADA pela migração — quem destila pedidos é a campanha.
+    1: frozenset({"turnos_conversa", "briefs", "pedidos"}),
+    2: frozenset({"turnos_conversa", "briefs", "pedidos"}),
+    3: frozenset({"turnos_conversa", "briefs", "pedidos"}),
+    4: frozenset({"turnos_conversa", "briefs", "pedidos"}),
+    5: frozenset({"briefs", "pedidos"}),
+    6: frozenset({"pedidos"}),
 }
 
 
@@ -852,8 +933,77 @@ def _da_v5(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any
     return relatorio
 
 
+def _da_v6(velho: sqlite3.Connection, novo: sqlite3.Connection) -> dict[str, Any]:
+    """Copia a v6 no arquivo já inicializado no schema de HOJE.
+
+    A v7 (Central de Briefs Pedagógicos) junta os dois modos de falha que as
+    migrações anteriores ensinaram separados, e é por isso que ela não é
+    dispensável:
+
+    * ``criacoes`` ganha ``pedido_id`` e ``material_json`` — **coluna nova em
+      tabela existente**, a lição da v6. Elas não são listadas na cópia e nascem
+      NULL, que é a verdade sobre uma criação livre.
+    * ``rubricas.origem`` ganha ``'criacao'`` — **CHECK alargado em tabela
+      existente**, a lição da v4. Nada aqui a exercita, e é justamente esse o
+      perigo: o banco pareceria bem até a primeira aprovação de uma criação
+      vinda de pedido, e o erro apareceria como um bug do código que escreve.
+
+    ``briefs`` entra pela primeira vez numa lista de cópia — mesma situação de
+    ``turnos_conversa`` na v5→v6. Esquecê-la apagaria o enquadramento sob o qual
+    o trabalho recente foi feito e deixaria ``anotacoes.versao_brief`` apontando
+    para versões que já não existem: a trilha continuaria parecendo íntegra e
+    responderia errado.
+
+    ``pedidos`` nasce vazia e **não** é populada aqui: destilar no meio de uma
+    migração misturaria preservar com produzir.
+    """
+    relatorio: dict[str, Any] = {"copiadas": {}, "avisos": []}
+
+    for tabela, colunas in COPIA_V6_ANTES:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+    for tabela, colunas in COPIA_V6_DEPOIS:
+        relatorio["copiadas"][tabela] = _copiar(velho, novo, tabela, colunas)
+
+    for linha in velho.execute("SELECT key, value FROM app_meta ORDER BY key"):
+        if str(linha["key"]) == adb.CHAVE_VERSAO:
+            continue
+        adb.set_meta(novo, str(linha["key"]), linha["value"])
+
+    projetos = novo.execute("SELECT id, nome FROM projetos ORDER BY id").fetchall()
+    relatorio["projetos"] = {str(p["nome"]): int(p["id"]) for p in projetos}
+    relatorio["alocacao"] = {
+        str(p["nome"]): int(
+            novo.execute(
+                "SELECT count(*) AS n FROM tarefas WHERE projeto_id = ?", (int(p["id"]),)
+            ).fetchone()["n"]
+        )
+        for p in projetos
+    }
+    relatorio["diretrizes"] = relatorio["copiadas"].get("diretrizes", 0)
+    relatorio["status_backfill"] = {}
+    relatorio["avisos"].append(
+        "a tabela `pedidos` nasceu vazia: nenhum pedido é destilado por uma "
+        "migração — rode `pf annotate pedidos preparar` para começar a campanha"
+    )
+
+    evmod.registrar(
+        novo,
+        acao="banco_migrado",
+        entidade="banco",
+        de=6,
+        para=adb.SCHEMA_VERSION_ANOTACAO,
+        anotacoes_preservadas=relatorio["copiadas"]["anotacoes"],
+        briefs_preservados=relatorio["copiadas"].get("briefs", 0),
+        criacoes_preservadas=relatorio["copiadas"].get("criacoes", 0),
+        avaliacoes_preservadas=relatorio["copiadas"]["avaliacoes"],
+        projetos=relatorio["projetos"],
+        alocacao=relatorio["alocacao"],
+    )
+    return relatorio
+
+
 #: versão de origem → a função que sabe lê-la. Ver ``ORIGENS_CONHECIDAS``.
-PASSOS = {1: _da_v1, 2: _da_v2, 3: _da_v3, 4: _da_v4, 5: _da_v5}
+PASSOS = {1: _da_v1, 2: _da_v2, 3: _da_v3, 4: _da_v4, 5: _da_v5, 6: _da_v6}
 
 
 def precisa_migrar(caminho: Path) -> int | None:
@@ -990,6 +1140,10 @@ __all__ = [
     "COPIA_V3_DEPOIS",
     "COPIA_V4_ANTES",
     "COPIA_V4_DEPOIS",
+    "COPIA_V5_ANTES",
+    "COPIA_V5_DEPOIS",
+    "COPIA_V6_ANTES",
+    "COPIA_V6_DEPOIS",
     "MAPA_STATUS",
     "MAPA_VEREDITO",
     "ORIGENS_CONHECIDAS",

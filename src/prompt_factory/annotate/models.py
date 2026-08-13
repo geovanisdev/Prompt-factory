@@ -25,6 +25,7 @@ from .db import (
     DECISOES_ADMIN,
     MOTIVOS_ABANDONO,
     PAPEIS,
+    PAPEIS_PEDIDO,
     ROTULOS_DUELO,
     TIPOS_TAREFA,
     VEREDITOS,
@@ -606,6 +607,221 @@ MAX_TEXTO_CRIACAO = 2_000
 MAX_BRIEF_CRIACAO = 1_000
 
 
+class ProximoPedidoIn(BaseModel):
+    """``POST /api/pedidos/proximo`` — reservar o próximo pedido da fila.
+
+    Os dois filtros são OPCIONAIS e estreitos de propósito: disciplina e papel
+    são os eixos por que alguém escolhe o que escrever hoje. Filtrar por
+    ``task_type`` ou por série faria a fila prometer um recorte específico, e a
+    Central existe justamente para tirar de quem escreve a decisão de "sobre o
+    quê" — a página em branco é o problema que ela resolve.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    anotador_id: Annotated[int, Field(ge=1)]
+    disciplina: Annotated[str | None, Field(max_length=60)] = None
+    papel: str | None = None
+
+    @field_validator("anotador_id", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("este campo não é booleano")
+        return v
+
+    @field_validator("disciplina", mode="before")
+    @classmethod
+    def _limpa(cls, v: Any) -> Any:
+        return (v.strip() or None) if isinstance(v, str) else v
+
+    @field_validator("papel")
+    @classmethod
+    def _papel_conhecido(cls, v: str | None) -> str | None:
+        # A tupla de `db.py`, que é de onde o CHECK do DDL sai. Um papel
+        # inventado aqui devolveria fila vazia em silêncio, que é indistinguível
+        # de "acabaram os pedidos".
+        if v is not None and v not in PAPEIS_PEDIDO:
+            raise ValueError(f"papel inválido: {v!r} (aceitos: {', '.join(PAPEIS_PEDIDO)})")
+        return v
+
+
+class DevolverPedidoIn(BaseModel):
+    """``POST /api/pedidos/{id}/devolver``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    anotador_id: Annotated[int, Field(ge=1)]
+
+    @field_validator("anotador_id", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        if isinstance(v, bool):
+            raise ValueError("este campo não é booleano")
+        return v
+
+
+#: O contrato do blob de ``criacoes.material_json``. Viaja DENTRO do objeto,
+#: como ``briefs.texto_json`` carrega ``briefs@1`` e os lotes carregam
+#: ``geracao@1``: ``criacoes`` não tem coluna de schema, e criar uma agora
+#: afirmaria que toda criação tem material — a livre não tem.
+SCHEMA_MATERIAL_CRIACAO = "material_criacao@1"
+
+
+class EscalaCriacaoIn(BaseModel):
+    """A escala ancorada de um critério, no formato de ``rubrica@3``.
+
+    É o formato do INSTRUMENTO montado (``escala.min/max/ancoras``), e não o
+    ``escrever_rubrica@1`` do formulário do anotador (``escala_min``/
+    ``rotulo_min``). Os dois existem e são diferentes de propósito, e gerar no
+    errado daria uma rubrica que a tela abre **sem âncora nenhuma** —
+    funcionando, e medindo outra coisa. É o defeito do ``routes_revisao:243``,
+    que fez uma rubrica de 1 a 5 aceitar nota 9 no servidor.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    min: int
+    max: int
+    ancoras: list[dict[str, Any]]
+
+    @field_validator("min", "max", mode="before")
+    @classmethod
+    def _nao_e_bool(cls, v: Any) -> Any:
+        # `bool` é subclasse de `int`, sétima aparição: `true` viraria escala 1.
+        if isinstance(v, bool):
+            raise ValueError("este campo não é booleano")
+        return v
+
+    @model_validator(mode="after")
+    def _cabe_e_tem_pontas(self) -> EscalaCriacaoIn:
+        if not (1 <= self.min < self.max <= 9) or self.max - self.min < 2:
+            raise ValueError(
+                f"escala {self.min}..{self.max} inválida — precisa caber em 1..9 e ter "
+                "ao menos 3 posições"
+            )
+        valores: set[int] = set()
+        for a in self.ancoras:
+            if not isinstance(a, dict):
+                raise ValueError("cada âncora precisa ser um objeto {valor, rotulo}")
+            valor, rotulo = a.get("valor"), a.get("rotulo")
+            if isinstance(valor, bool) or not isinstance(valor, int):
+                raise ValueError("âncora sem 'valor' inteiro")
+            if not isinstance(rotulo, str) or len(rotulo.strip()) < 3:
+                raise ValueError(f"a âncora {valor} está sem rótulo legível")
+            if not self.min <= valor <= self.max:
+                raise ValueError(f"âncora {valor} fora da escala {self.min}..{self.max}")
+            valores.add(valor)
+        # As PONTAS são o que faz uma escala ancorada ser ancorada: sem elas,
+        # "clareza de 1 a 5" significa cinco coisas para cinco anotadores.
+        if self.min not in valores or self.max not in valores:
+            raise ValueError(
+                f"as duas PONTAS ({self.min} e {self.max}) precisam estar ancoradas"
+            )
+        return self
+
+
+class CriterioCriacaoIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nome: Annotated[str, Field(min_length=3, max_length=120)]
+    descricao: Annotated[str, Field(min_length=10, max_length=600)]
+    escala: EscalaCriacaoIn
+
+
+class RubricaCriacaoIn(BaseModel):
+    """A rubrica que vem junto do prompt criado, na forma de ``rubrica@3``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    titulo: Annotated[str, Field(min_length=5, max_length=160)]
+    criterios: list[CriterioCriacaoIn]
+
+    @model_validator(mode="after")
+    def _quantidade_e_nomes(self) -> RubricaCriacaoIn:
+        piso = int(_cfg("annotate", "min_criterios_rubrica", default=3))
+        teto = int(_cfg("pedidos", "max_criterios_rubrica", default=5))
+        if not (piso <= len(self.criterios) <= teto):
+            raise ValueError(
+                f"a rubrica precisa de {piso} a {teto} critérios (vieram "
+                f"{len(self.criterios)})"
+            )
+        nomes = [c.nome.strip().casefold() for c in self.criterios]
+        if len(set(nomes)) != len(nomes):
+            raise ValueError("dois critérios com o mesmo nome")
+        return self
+
+
+class GoldCriacaoIn(BaseModel):
+    """A resposta-gold DESCRITIVA: o que uma resposta precisaria conter.
+
+    Em listas, e não em prosa corrida, pelo mesmo argumento do checklist do SFT:
+    o revisor confere item a item. Prosa livre cabe em ``observacoes``, que é
+    opcional — e é opcional para que ela não vire o campo onde tudo acaba.
+
+    NÃO é a resposta ideal redigida. Escrever a resposta seria produzir o dado
+    de SFT, que é outro trabalho, com outro contrato e outro custo; aqui o que se
+    quer é a RÉGUA, e ela é mais barata de escrever e mais útil de revisar.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    deve_conter: list[str]
+    nao_pode: list[str]
+    armadilhas: list[str] = []
+    observacoes: Annotated[str | None, Field(max_length=1200)] = None
+
+    @field_validator("deve_conter", "nao_pode", "armadilhas", mode="before")
+    @classmethod
+    def _itens_limpos(cls, v: Any) -> Any:
+        if isinstance(v, list):
+            return [x.strip() if isinstance(x, str) else x for x in v if x is not None]
+        return v
+
+    @field_validator("observacoes", mode="before")
+    @classmethod
+    def _obs_limpa(cls, v: Any) -> Any:
+        return (v.strip() or None) if isinstance(v, str) else v
+
+    @model_validator(mode="after")
+    def _pisos(self) -> GoldCriacaoIn:
+        minimo = int(_cfg("pedidos", "gold_min_chars_item", default=15))
+        exigidos = {
+            "deve_conter": int(_cfg("pedidos", "gold_min_deve_conter", default=2)),
+            "nao_pode": int(_cfg("pedidos", "gold_min_nao_pode", default=1)),
+        }
+        for campo, piso in exigidos.items():
+            itens = getattr(self, campo)
+            if len(itens) < piso:
+                raise ValueError(f"'{campo}' precisa de ao menos {piso} item(ns)")
+        for campo in ("deve_conter", "nao_pode", "armadilhas"):
+            for i, item in enumerate(getattr(self, campo)):
+                if not isinstance(item, str) or len(item) < minimo:
+                    raise ValueError(
+                        f"'{campo}[{i}]' precisa de ao menos {minimo} caracteres — um "
+                        "item que não diz o que conferir não é conferível"
+                    )
+        return self
+
+
+class MaterialCriacaoIn(BaseModel):
+    """A TRÍADE que acompanha um prompt escrito a partir de um pedido.
+
+    O prompt é o produto; a rubrica é como avaliá-lo; a gold é a referência de
+    revisão. Os três juntos são o que datasets de instruction-following pedem, e
+    é a razão de a Central existir — um prompt solto qualquer pessoa escreve.
+
+    ``schema`` é aceito e ignorado se vier: quem carimba é o servidor
+    (``SCHEMA_MATERIAL_CRIACAO``), porque um cliente que declarasse o contrato
+    poderia declarar um que ele não cumpre.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rubrica: RubricaCriacaoIn
+    gold: GoldCriacaoIn
+
+
 class CriacaoIn(BaseModel):
     """``POST /api/criacoes`` — o modo criar.
 
@@ -629,13 +845,36 @@ class CriacaoIn(BaseModel):
     task_type_sugerido: Annotated[str | None, Field(max_length=60)] = None
     domain_sugerido: Annotated[str | None, Field(max_length=60)] = None
     brief: Annotated[str | None, Field(max_length=MAX_BRIEF_CRIACAO)] = None
+    #: O pedido que originou este prompt (Central de Briefs). NULL na criação
+    #: livre, que continua existindo exatamente como estava — o P4 não sabe que
+    #: a v7 existe, e é assim que tem de continuar.
+    pedido_id: Annotated[int | None, Field(ge=1)] = None
+    material: MaterialCriacaoIn | None = None
 
-    @field_validator("autor_id", mode="before")
+    @field_validator("autor_id", "pedido_id", mode="before")
     @classmethod
     def _nao_e_bool(cls, v: Any) -> Any:
         if isinstance(v, bool):
             raise ValueError("este campo não é booleano")
         return v
+
+    @model_validator(mode="after")
+    def _pedido_e_material_andam_juntos(self) -> CriacaoIn:
+        """A regra que o CHECK não pode expressar: ela depende de outra coluna.
+
+        Os dois sentidos são erros diferentes. Pedido sem material entregaria
+        metade do que a Central existe para produzir — e o pedido ficaria
+        ``usado`` sem ter rendido a tríade. Material sem pedido é alguém
+        mandando rubrica e gold por uma vista que não os coleta: aceitar
+        gravaria um blob que nenhuma tela mostra e nenhum export lê.
+        """
+        if self.pedido_id is not None and self.material is None:
+            raise ValueError(
+                "uma criação vinda de pedido precisa da tríade: prompt, rubrica e gold"
+            )
+        if self.material is not None and self.pedido_id is None:
+            raise ValueError("'material' só faz sentido junto de um 'pedido_id'")
+        return self
 
     @field_validator("texto", "brief", "task_type_sugerido", "domain_sugerido", mode="before")
     @classmethod

@@ -881,15 +881,245 @@ def _annotate(args: argparse.Namespace) -> int:
     if acao == "gerar":
         return _annotate_gerar(args, banco, corpus)
 
+    if acao == "pedidos":
+        return _annotate_pedidos(args, banco)
+
     if acao == "export":
         return _annotate_export(args, banco, corpus)
 
     print(
         f"[pf] ação desconhecida: {acao!r} "
-        "(use serve | seed | status | migrate | gerar | export)",
+        "(use serve | seed | status | migrate | gerar | pedidos | export)",
         file=sys.stderr,
     )
     return 2
+
+
+def _annotate_pedidos(args: argparse.Namespace, banco: Path) -> int:
+    """``pf annotate pedidos`` — a campanha de DESTILAÇÃO (Central de Briefs).
+
+    Mesmo desenho do ``gerar`` e da rotulagem: o agente destilador é puro
+    cômputo (recebe as janelas do material dentro do arquivo do lote, devolve
+    JSON como texto) e **só este fio grava**, com validação estrita antes de
+    encostar no banco.
+
+    A DIFERENÇA que vale registrar: este comando **não abre o corpus**. O insumo
+    são arquivos de texto fora do repositório e o destino é o ``annotate.sqlite``
+    — é a única das três campanhas que roda sem ``prompts.sqlite`` existir.
+    """
+    from . import db as dbmod
+    from .annotate import db as adb
+    from .annotate import destilacao as dmod
+    from .stages import imprimir_funil
+
+    dp = dmod.DestilacaoPaths(
+        Path(args.destilacao_dir).resolve() if args.destilacao_dir else None
+    )
+    sub = args.subacao or "status"
+
+    if sub == "status":
+        p = dmod.painel(dp)
+        estado = None
+        if banco.is_file():
+            conn = dbmod.connect(banco)
+            try:
+                estado = dmod.funil(conn)
+            finally:
+                conn.close()
+        if args.json:
+            import json as _json
+
+            print(_json.dumps({"campanha": p, "banco": estado}, ensure_ascii=False, indent=2))
+            return 0
+
+        linhas = [
+            ["contrato", p["contrato"]],
+            ["lotes", p["n_lotes"]],
+            [
+                "por estado",
+                f"{p['por_estado'][dmod.DONE]} done · {p['por_estado'][dmod.CLAIMED]} claimed · "
+                f"{p['por_estado'][dmod.PENDING]} pending · {p['por_estado'][dmod.FAILED]} failed",
+            ],
+            ["janelas preparadas", p["janelas"]],
+            ["claims órfãos (TTL)", f"{len(p['orfaos'])} (ttl {p['ttl_horas']:g} h)"],
+        ]
+        imprimir_funil("pedidos", ("item", "valor"), linhas)
+
+        if p["cursores"]:
+            imprimir_funil(
+                "pedidos",
+                ("arquivo", "cursor (caractere)"),
+                [[a, o] for a, o in p["cursores"].items()],
+            )
+        if p["lotes"]:
+            imprimir_funil(
+                "pedidos",
+                ("lote", "arquivo", "status", "janelas", "tent.", "motivo"),
+                [
+                    [
+                        lid,
+                        (r["arquivo"] or "")[:28],
+                        r["status"],
+                        r["n_janelas"],
+                        r["tentativas"],
+                        (r["motivo"] or "")[:40],
+                    ]
+                    for lid, r in p["lotes"].items()
+                ],
+            )
+        else:
+            # Campanha nova: em vez de uma tabela vazia, o que se pode destilar.
+            # É a única hora em que a lista de 35 arquivos é útil e não é ruído.
+            try:
+                material = dmod.listar_material()
+            except ValueError as exc:
+                print(f"[pedidos] {exc}", file=sys.stderr)
+                return 1
+            imprimir_funil(
+                "pedidos",
+                ("arquivo", "MB", "coleção", "disciplina"),
+                [
+                    [m["arquivo"][:44], f"{m['bytes'] / 1e6:.1f}", m["colecao"], m["disciplina"]]
+                    for m in material
+                ],
+            )
+            print(f"[pedidos] {len(material)} arquivo(s) em {dmod.material_dir()}")
+
+        print(f"[pedidos] fora do escopo desta campanha: {', '.join(p['excluidos'])}")
+        print(
+            "[pedidos] o recorte é insumo de LEITURA — ele não entra no prompt, no "
+            "corpus, no git nem em export nenhum"
+        )
+        if estado is not None:
+            imprimir_funil(
+                "pedidos",
+                ("dimensão", "distribuição"),
+                [
+                    ["total", estado["total"]],
+                    ["com aviso", estado["com_aviso"]],
+                    *[
+                        [dim.replace("por_", ""), ", ".join(f"{k or '?'} {v}" for k, v in val.items())]
+                        for dim, val in estado.items()
+                        if dim.startswith("por_") and val
+                    ],
+                ],
+            )
+            disponiveis = estado["por_status"].get("disponivel", 0)
+            if disponiveis:
+                print(
+                    f"[pedidos] {disponiveis} disponível(is) — número alto aqui é sinal de "
+                    "PARAR de destilar: o gargalo é a escrita humana, não a destilação"
+                )
+        return 0
+
+    banco.parent.mkdir(parents=True, exist_ok=True)
+    conn = dbmod.connect(banco)
+    try:
+        try:
+            adb.init_db(conn)
+        except adb.SchemaDivergente as exc:
+            print(f"[pf] {banco}: {exc}", file=sys.stderr)
+            print("[pf] o conserto é `pf annotate migrate` — este banco guarda trabalho humano")
+            return 3
+
+        if sub == "preparar":
+            if args.lote:
+                # Retomada: o lote já existe no disco. Regerá-lo pegaria janelas
+                # diferentes (o cursor já andou) e a resposta que o agente
+                # produziu deixaria de casar com o arquivo.
+                try:
+                    rel = dmod.reemitir(args.lote, dp)
+                except ValueError as exc:
+                    print(f"[pedidos] {exc}", file=sys.stderr)
+                    return 1
+                destino = _copiar_lote(rel["arquivo"], args.out_dir)
+                print(f"[pedidos] {rel['lote_id']} reivindicado de novo -> {destino}")
+                return 0
+            if not args.arquivo:
+                print(
+                    "[pf] 'pedidos preparar' exige --arquivo <nome.txt> "
+                    "(ou --lote para retomar um lote existente)",
+                    file=sys.stderr,
+                )
+                print("[pf] `pf annotate pedidos status` lista o material disponível")
+                return 2
+            try:
+                rel = dmod.preparar(arquivo=args.arquivo, n=int(args.count or 6), dp=dp)
+            except ValueError as exc:
+                print(f"[pedidos] {exc}", file=sys.stderr)
+                return 1
+            if rel["lote_id"] is None:
+                print(f"[pedidos] nada a preparar: {rel['motivo']}")
+                return 0
+            destino = _copiar_lote(rel["arquivo"], args.out_dir)
+            print(
+                f"[pedidos] {rel['lote_id']}: {rel['n']} janela(s) de {rel['fonte']} -> {destino}"
+            )
+            print(
+                f"[pedidos] {rel['colecao'] or '(coleção não identificada pelo nome)'} · "
+                f"{rel['disciplina'] or '(disciplina não identificada pelo nome)'}"
+            )
+            print(
+                f"[pedidos] cursor deste arquivo: {rel['cursor']} de {rel['total_chars']} "
+                f"caracteres ({rel['cursor'] / max(1, rel['total_chars']):.1%})"
+            )
+            print(
+                "[pedidos] o agente LÊ este arquivo e devolve JSON; a skill "
+                "`destilar-pedidos` tem o protocolo inteiro"
+            )
+            print(
+                f"[pedidos] importe com: pf annotate pedidos importar --lote {rel['lote_id']} "
+                "--file <resposta.json>"
+            )
+            return 0
+
+        if sub == "importar":
+            if not args.lote or not args.file:
+                print("[pf] 'pedidos importar' exige --lote e --file", file=sys.stderr)
+                return 2
+            texto = Path(args.file).read_text(encoding="utf-8")
+            try:
+                rel = dmod.importar(conn, args.lote, texto, dp=dp, modelo=args.model)
+            except ValueError as exc:
+                print(f"[pedidos] {exc}", file=sys.stderr)
+                return 1
+            for aviso in rel.get("avisos", []):
+                print(f"[pedidos] aviso: {aviso}")
+            if not rel["ok"]:
+                for erro in rel["erros"]:
+                    print(f"[pedidos] {erro}", file=sys.stderr)
+                print(
+                    f"[pedidos] {rel['lote_id']}: tentativa {rel['tentativas']} de "
+                    f"{rel['max_tentativas']}, lote em {rel['status']!r}",
+                    file=sys.stderr,
+                )
+                if rel["status"] == dmod.CLAIMED:
+                    print(
+                        "[pedidos] o lote SEGUE reivindicado — corrija o arquivo e "
+                        "importe de novo",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "[pedidos] tentativas esgotadas — reviva com "
+                        f"`pf annotate pedidos preparar --lote {rel['lote_id']}`",
+                        file=sys.stderr,
+                    )
+                return 1
+            gravado = ", ".join(f"{n} {t}" for t, n in rel["gravado"].items() if n)
+            print(
+                f"[pedidos] {rel['lote_id']}: {rel['n_pedidos']} pedido(s) validado(s); "
+                f"gravado: {gravado or 'nada novo'}"
+            )
+            return 0
+
+        print(
+            f"[pf] subação desconhecida: {sub!r} (use preparar | importar | status)",
+            file=sys.stderr,
+        )
+        return 2
+    finally:
+        conn.close()
 
 
 def _annotate_export(args: argparse.Namespace, banco: Path, corpus: Path) -> int:
@@ -1595,11 +1825,20 @@ COMMANDS: tuple[_Cmd, ...] = (
                 ("action",),
                 {
                     "nargs": "?",
-                    "choices": ["serve", "seed", "status", "migrate", "gerar", "export"],
+                    "choices": [
+                        "serve",
+                        "seed",
+                        "status",
+                        "migrate",
+                        "gerar",
+                        "pedidos",
+                        "export",
+                    ],
                     "help": (
                         "serve (padrão) | seed (personas + fixtures + tarefas) | "
                         "status | migrate (sobe o schema preservando as anotações) | "
                         "gerar (campanha de material e de anotações sintéticas) | "
+                        "pedidos (destila pedidos de prompt do material didático) | "
                         "export (os artefatos de entrega)"
                     ),
                 },
@@ -1609,7 +1848,7 @@ COMMANDS: tuple[_Cmd, ...] = (
                 {
                     "nargs": "?",
                     "choices": ["preparar", "importar", "status"],
-                    "help": "só de `gerar`: preparar | importar | status (padrão)",
+                    "help": "de `gerar` e `pedidos`: preparar | importar | status (padrão)",
                 },
             ),
             (("--host",), {"metavar": "HOST", "help": "padrão: [annotate] host do settings.toml"}),
@@ -1638,7 +1877,24 @@ COMMANDS: tuple[_Cmd, ...] = (
             ),
             (
                 ("-n", "--count"),
-                {"type": int, "metavar": "N", "help": "gerar preparar: itens no lote (padrão 8)"},
+                {
+                    "type": int,
+                    "metavar": "N",
+                    "help": (
+                        "gerar preparar: itens no lote (padrão 8); "
+                        "pedidos preparar: janelas no lote (padrão 6)"
+                    ),
+                },
+            ),
+            (
+                ("--arquivo",),
+                {
+                    "metavar": "NOME",
+                    "help": (
+                        "pedidos preparar: o .txt do material (só o NOME; a pasta vem de "
+                        "[pedidos] material_dir)"
+                    ),
+                },
             ),
             (
                 ("--lang",),
@@ -1649,16 +1905,22 @@ COMMANDS: tuple[_Cmd, ...] = (
             ),
             (
                 ("--lote",),
-                {"metavar": "ID", "help": "gerar: o lote (ex.: mat_0001); em preparar, retoma"},
+                {
+                    "metavar": "ID",
+                    "help": "gerar/pedidos: o lote (mat_0001, ped_0001); em preparar, retoma",
+                },
             ),
-            (("--file",), {"metavar": "PATH", "help": "gerar importar: o JSON que o agente devolveu"}),
+            (
+                ("--file",),
+                {"metavar": "PATH", "help": "gerar/pedidos importar: o JSON que o agente devolveu"},
+            ),
             (
                 ("--out-dir",),
                 {
                     "metavar": "DIR",
                     "help": (
-                        "gerar preparar: copia o lote para cá (a saída do agente trunca ~30k); "
-                        "export: onde gravar os artefatos (padrão: data/exports/annotate)"
+                        "gerar/pedidos preparar: copia o lote para cá (a saída do agente "
+                        "trunca ~30k); export: onde gravar (padrão: data/exports/annotate)"
                     ),
                 },
             ),
@@ -1674,7 +1936,14 @@ COMMANDS: tuple[_Cmd, ...] = (
                 ("--geracao-dir",),
                 {"metavar": "DIR", "help": "raiz da campanha (padrão: geracao/)"},
             ),
-            (("--json",), {"action": "store_true", "help": "gerar status em JSON, para script"}),
+            (
+                ("--destilacao-dir",),
+                {"metavar": "DIR", "help": "raiz da campanha de pedidos (padrão: destilacao/)"},
+            ),
+            (
+                ("--json",),
+                {"action": "store_true", "help": "gerar/pedidos status em JSON, para script"},
+            ),
             (
                 ("--perfil",),
                 {
