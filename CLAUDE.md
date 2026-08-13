@@ -834,4 +834,30 @@ Pegadinhas deste bloco:
 - **O runner NÃO re-serializa a saída do modelo**, ao contrário do da rotulagem (onde `json.dumps` normalizava espaçamento sem risco). Aqui um dos campos é a cópia verbatim que a validação confere caractere a caractere: qualquer passe de normalização poderia ser a diferença entre conferir e não conferir.
 - **Lote vazio sai com código 2, não 0.** Zero pedidos PODE ser legítimo (capa, créditos, sumário — e as primeiras janelas de todo livro são isso), mas é também como uma falha silenciosa do modelo se parece. O maestro precisa olhar.
 - **Teste do despacho: nenhum `<<PLACEHOLDER>>` sobra.** A prova é sobre um lote REAL (uma lista de nomes escrita à mão poderia estar certa com o preenchimento errado). Um placeholder não substituído viaja literalmente para o modelo, que responde assim mesmo — sem vocabulário nenhum.
-- **Medido na rodada** (2026-08-12; 3 lotes × 8 janelas de 12.000 caracteres, Filosofia/Do Seu Jeito e Biologia/Ciência Viva): **42 pedidos**, 7 `task_type` (`redacao-pratica` 16, `qa-aberta` 13, `classificacao-extracao` 4, `brainstorm` 3, `planejamento` 3, `matematica-raciocinio` 2, `conselho-opiniao` 1), 24 professor / 18 aluno, 14 com aviso. `serie` saiu `indefinido` em **42 de 42** — os três arquivos são de volume único e o ano não está no texto; nas coleções de 3 volumes ele está no NOME do arquivo, onde o destilador não enxerga (proposta registrada no PLANO §8). Suíte: 1.390 passando.
+- **Medido na rodada F3** (2026-08-12; 3 lotes × 8 janelas de 12.000 caracteres, Filosofia/Do Seu Jeito e Biologia/Ciência Viva): **42 pedidos**, 7 `task_type` (`redacao-pratica` 16, `qa-aberta` 13, `classificacao-extracao` 4, `brainstorm` 3, `planejamento` 3, `matematica-raciocinio` 2, `conselho-opiniao` 1), 24 professor / 18 aluno, 14 com aviso. `serie` saiu `indefinido` em **42 de 42** — os três arquivos são de volume único e o ano não está no texto; nas coleções de 3 volumes ele está no NOME do arquivo, onde o destilador não enxerga (proposta registrada no PLANO §8). Suíte: 1.390 passando.
+
+### Central de Briefs (F4-1) — a fila de pedidos e a tríade
+
+`annotate/pedidos.py` (reserva, devolução, expiração preguiçosa, facetas) · `models.MaterialCriacaoIn`/`ProximoPedidoIn`/`DevolverPedidoIn` · `criacoes.criar` com `pedido_id`+`material` · `routes_criacoes.py` (as três rotas novas, no MESMO router do modo criar) · `tests/test_central_criacao.py`.
+
+| rota nova | o que decide |
+| --- | --- |
+| `GET /api/pedidos?anotador_id=` | o pedido reservado por esta pessoa + as facetas do filtro + o TTL |
+| `POST /api/pedidos/proximo` | reserva o próximo `disponivel`, sob `BEGIN IMMEDIATE` |
+| `POST /api/pedidos/{id}/devolver` | desfaz a reserva (só quem reservou) |
+
+Pegadinhas deste bloco:
+
+- **O pedido é INSUMO, não tarefa, e isso decide o módulo inteiro.** Ele é para a vista criar o que o brief do P9 é para as telas de anotação. Por isso não há atribuição, versão, triagem nem Rate and Review — há uma reserva, que é bem menos, e ela é frouxa de propósito: expira sozinha, devolve-se com um clique, não guarda histórico. Ninguém está na fila esperando por AQUELE recorte.
+- **Fila vazia é 200 com `pedido: null`**, como o claim de tarefa. E o `motivo_chave` separa `vazio` de `vazio_filtrado`: "acabaram os pedidos" e "nenhum com esses filtros" mandam a pessoa fazer coisas diferentes. A frase em português é para o `/docs`; a TELA usa a chave (P3i).
+- **Uma reserva por pessoa.** Quem já tem um pedido recebe o MESMO de volta (`motivo_chave: "ja_reservado"`), nunca um segundo: a vista criar tem um formulário só, e dois recortes abertos produziriam dois rascunhos concorrentes.
+- **`marcar_usado` não abre transação — ela é chamada de DENTRO da de `criacoes.criar`.** Fora dela existiria um instante, e num crash um estado permanente, em que a criação aponta para um pedido que a fila ainda oferece a outra pessoa. Mesma disciplina do evento gravado na transação da mudança que ele registra.
+- **As facetas contam só o que está `disponivel`.** Contar a tabela inteira ofereceria "Filosofia (3)" numa fila em que os três já viraram criação — um filtro que devolve vazio depois de prometer três. A contagem e a fila respondem à mesma pergunta ou não servem.
+- **`pedido_id` e `material` andam juntos, e os dois sentidos são erros diferentes.** Pedido sem material entrega metade do que a Central existe para produzir — e queima o pedido, que fica `usado`. Material sem pedido é alguém mandando a tríade por uma vista que não a coleta: gravaria um blob que nenhuma tela mostra e nenhum export lê. A regra é de ROTA e não CHECK porque depende de outra coluna.
+- **Reserva expirada no meio da escrita é 409 com o conserto na frase** ("puxe-o de novo antes de enviar"). É o desfecho mais provável de todos — alguém abre o pedido, escreve por três horas e envia — e uma recusa seca ali perderia a tríade inteira sem dizer o que fazer.
+- **A rubrica da tríade é `rubrica@3` (`escala.min/max/ancoras`), NUNCA `escrever_rubrica@1`.** Os dois existem e são diferentes de propósito: um é o formulário que a pessoa preenche, o outro é o instrumento montado. Gerar no errado daria uma rubrica que a tela abre **sem âncora nenhuma** — funcionando, e medindo outra coisa. É o defeito do `routes_revisao:243`.
+- **A gold é a RÉGUA, não a resposta.** Listas conferíveis item a item (`deve_conter`, `nao_pode`, `armadilhas`) + `observacoes` opcional — o argumento do checklist do SFT. Escrever a resposta ideal seria produzir o dado de SFT, que é outro trabalho, com outro contrato e outro custo.
+- **O rótulo do contrato é carimbado pelo SERVIDOR** (`SCHEMA_MATERIAL_CRIACAO`), e `MaterialCriacaoIn` nem aceita o campo: um cliente que declarasse o próprio contrato poderia declarar um que ele não cumpre.
+- **`criacoes.listar` traz o `pedido` ao lado**, por consulta por linha e não por JOIN: quem sabe desserializar as listas do blob é `pedidos.apresentar`, e duas formas para a mesma linha divergiriam. É o que permite ao revisor julgar originalidade sem sair da tela.
+- **A criação LIVRE continua idêntica.** O P4 não sabe que a v7 existe — `pedido_id` e `material` nascem NULL, que é a verdade. Há teste cobrando isso.
+- **Medido**: 34 testes, todos verdes na primeira execução; suíte 1.424.
