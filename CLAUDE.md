@@ -411,7 +411,7 @@ Produto **novo e separado**, em `src/prompt_factory/annotate/`, com nome de tela
 
 ```powershell
 # Artefatos de ENTREGA (P5b). Um manifesto ao lado de cada arquivo.
-& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate export                       # os 5 perfis coletivos
+& "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate export                       # os 6 perfis coletivos (F6: + triads)
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate export --perfil sft          # só os pares de SFT
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate export --perfil audit --anotacao 7
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf annotate export --projeto "Portfólio" --tipo comparar_ab
@@ -920,3 +920,13 @@ Pegadinhas deste bloco:
 - **A tríade do revisor é LEITURA, sem input nenhum** (`blocoTriadeLeitura`): desenhar com campos convidaria a corrigir, e a decisão do P4 é uma passagem SEM edição — proveniência não se conserta.
 - **O smoke do P6 varre o parquet pela SENHA plantada no recorte**, nunca pela chave: conferir a chave passaria hoje e falharia em silêncio no dia em que alguém a renomeasse. O ingester não sabe que a v7 existe e o recorte não aparece em byte nenhum do arquivo.
 - **Medido no navegador** (2026-08-13, banco real): colado → 422 com "o prompt reproduz 165 caracteres literais do recorte (limite: 60)" e rascunho intacto; reescrito → 201; a sub-aba do revisor com recorte serifado, "24 caractere(s) — limite de recusa: 60" (trecho no tooltip: `ferramentas para pensar` — citação natural do conceito, bem abaixo do limiar) e a tríade inteira; aprovação → **1 rubrica** `origem='criacao'` com `prompt_uid = 5801998e0b2c1b01`, o MESMO uid que o P4 mediu para a criação id 1. Único log de console: o 422 provocado de propósito; zero erro de JS. Suíte: **1.461**, ruff limpo. Dados de verificação apagados; as personas de teste ficam (apagar anotador é recusado por desenho).
+
+### Central de Briefs (F6) — a tríade na entrega
+
+`annotate/entrega.py` (`STATUS_TRIADE` + perfil `triads` + `registros_triades` + `resumo_central` + a seção do dataset card + as 8 chaves novas do GLOSSARIO) · `cli._annotate_export` (o `all` vira seis coletivos) · `tests/test_central_revisao.py` §6 (5 testes).
+
+- **`triads` é o quarto perfil de DADO** (uma linha por criação-de-pedido em `aprovada|exportada` com material): prompt CC0, `rubrica`/`gold` nas chaves pt-BR do contrato gravado (`material_criacao@1` — renomear na saída faria o arquivo divergir do schema que declara; o GLOSSARIO explica), o bloco `request` em inglês (tema, meta, papel, série, dificuldade, disciplina, BNCC), e `anti_copy` como **número + régua**. A `exportada` entra porque o carimbo do P6 não muda o conteúdo — excluí-la faria a tríade sumir da entrega no dia em que a ingestão rodasse.
+- **O registro é montado CAMPO A CAMPO, e isso é a regra do gabarito, terceira aplicação**: `criacoes.listar` devolve o pedido com o RECORTE dentro e o `anticopia` com o TRECHO literal — texto do material de editora, que não sai nem sob outro nome. Um `{**item}` passaria no teste de hoje e vazaria na primeira chave nova; o teste da DoD varre o arquivo pela SENHA plantada no recorte, nunca pela chave.
+- **O `statuses` do manifesto descreve o que o ARQUIVO contém**: para o `triads` são os estados da criação — dizer `avaliada` afirmaria uma passagem 2 que o modo criar não tem (decisão do P4). `NOTE_MATERIAL` declara a política do recorte; `requests_referenced` conta os pedidos.
+- **A seção do dataset card só existe quando há tríade.** Diferente da regra da interface (desabilitar, nunca esconder — que vale para grupos de CONTROLE): num artefato descritivo, uma seção sobre recorte vazio prometeria um `triads.jsonl` que o `all` entrega vazio. As âncoras de teste são o que o texto tem de continuar DIZENDO ("elicited by pedagogical briefs", "without reproducing the material") — a redação é livre, a lição das âncoras do brief v2.
+- **Medido**: suíte **1.466**; smoke real da CLI com `--perfil all` entregando os seis coletivos (0 linhas no banco limpo da worktree, que é a verdade dele), saída em tmp e apagada.

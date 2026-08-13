@@ -699,12 +699,31 @@ colado sugerem que 60 separa bem os dois mundos, mas dois pontos não são uma
 distribuição. Dados de verificação apagados ao fim (precedente do P4); as duas
 personas de teste ficam (apagar anotador é recusado por desenho).
 
-**F6 — Entrega.**
+**F6 — Entrega. FEITO (2026-08-13).**
 O gold e a referência ao pedido (tema/meta/papel — nunca o recorte) saindo no
 perfil de entrega adequado do P5b; dataset card dizendo a frase da §6.
 DoD: export com 1 criação-de-pedido aprovada contém a tríade e NÃO contém o
 recorte (teste varre o arquivo por uma senha plantada no recorte, não pela
 chave — o padrão do alvo escondido).
+
+**Medido** (2026-08-13; `entrega.py` §triads, 5 testes novos em
+`tests/test_central_revisao.py`; suíte **1.466**): o P5b ganhou o **sétimo
+perfil**, `triads` (o quarto de dado) — uma linha por criação-de-pedido em
+`aprovada|exportada` com prompt, `rubrica`/`gold` nas chaves pt-BR do contrato
+`material_criacao@1` (o schema gravado não se renomeia na saída; o GLOSSARIO
+ganhou as 8 chaves da tríade), o bloco `request` em inglês (tema, meta, papel,
+série, dificuldade, disciplina, BNCC — **nunca** recorte nem arquivo_fonte) e
+`anti_copy` como NÚMERO + régua (o trecho literal é texto do material e não
+atravessa). O registro é montado campo a campo porque `criacoes.listar` devolve
+o pedido com o recorte dentro — um `{**item}` vazaria na primeira chave nova. O
+`statuses` do manifesto diz os estados da CRIAÇÃO (dizer `avaliada` afirmaria
+uma passagem 2 que o modo criar não tem), e `NOTE_MATERIAL` declara a política.
+O dataset card ganhou a seção "Created prompts (Central de Briefs)" com a frase
+da §6 (âncoras de teste: "elicited by pedagogical briefs", "without reproducing
+the material"), só quando há tríade — num artefato descritivo, seção sobre
+recorte vazio prometeria um `triads.jsonl` que o `all` entrega vazio. O teste
+da DoD varre o arquivo E o card pela SENHA plantada no recorte. `--perfil all`
+passou a entregar seis coletivos (smoke real na CLI, saída em tmp).
 
 ## 9. As perguntas abertas — RESPONDIDAS pelo dono em 2026-08-12
 

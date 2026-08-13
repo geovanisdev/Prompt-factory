@@ -32,6 +32,7 @@ from prompt_factory import config
 from prompt_factory import db as dbmod
 from prompt_factory.annotate import criacoes as crimod
 from prompt_factory.annotate import db as adb
+from prompt_factory.annotate import entrega
 from prompt_factory.annotate import seed as seedmod
 from prompt_factory.annotate import tarefas as tmod
 from prompt_factory.annotate.main import criar_app
@@ -315,3 +316,107 @@ def test_ingest_plataforma_leva_a_criacao_de_pedido_SEM_o_recorte(
     assert crimod.uid_previsto(int(fim["id"]), minha["text_raw"]) == fim["uid_previsto"]
     meta = json.loads(minha["meta_json"])
     assert "material" not in meta and "recorte" not in meta
+
+
+# ---------------------------------------------------------------------------
+# 6. a ENTREGA (F6): o perfil `triads` e o dataset card
+# ---------------------------------------------------------------------------
+
+
+def _exportar(
+    semeado: Path, corpus: Path, chave: str, destino: Path
+) -> entrega.Resultado:
+    conn = dbmod.connect(semeado)
+    corpo = dbmod.connect(corpus, readonly=True)
+    try:
+        return entrega.executar(conn, corpo, chave, destino_dir=destino)
+    finally:
+        conn.close()
+        corpo.close()
+
+
+def test_o_perfil_triads_entrega_a_triade_SEM_o_recorte(
+    cliente: TestClient, semeado: Path, corpus: Path, tmp_path: Path
+) -> None:
+    """A DoD do F6. A linha carrega prompt + rubrica + gold + a referência ao
+    pedido (tema/meta/papel) e o NÚMERO do anti-cópia — e a SENHA plantada no
+    recorte não aparece em byte nenhum do arquivo. Varre-se o ARQUIVO pela
+    senha, nunca uma chave: conferir a chave passaria hoje e falharia em
+    silêncio no dia em que alguém a renomeasse (o padrão do alvo escondido)."""
+    fim = _criar_e_revisar(cliente, semeado, aprovar=True)
+    res = _exportar(semeado, corpus, "triads", tmp_path / "out")
+    assert res.row_count == 1
+
+    bruto = res.arquivo.read_bytes()
+    assert b"XYZZY-SENHA-DO-RECORTE-F5" not in bruto
+
+    linha = json.loads(res.arquivo.read_text(encoding="utf-8").splitlines()[0])
+    assert linha["uid"] == fim["uid_previsto"]
+    assert linha["license"] == crimod.LICENCA
+    assert linha["material_schema"] == "material_criacao@1"
+    assert len(linha["rubrica"]["criterios"]) == 3
+    assert len(linha["gold"]["deve_conter"]) == 2
+    pedido_ref = linha["request"]
+    assert pedido_ref["role"] == "professor"
+    assert pedido_ref["theme"] and pedido_ref["teaching_goal"]
+    assert "recorte" not in pedido_ref and "arquivo_fonte" not in pedido_ref
+    # O anti-cópia sai como NÚMERO + régua; o trecho é texto do material e não
+    # atravessa — nem sob outro nome, que é o que a varredura da senha prova.
+    assert set(linha["anti_copy"]) == {"overlap_chars", "threshold"}
+    assert linha["anti_copy"]["threshold"] == crimod.limiar_anticopia()
+
+
+def test_criacao_livre_e_nao_revisada_ficam_fora_do_triads(
+    cliente: TestClient, semeado: Path, corpus: Path, tmp_path: Path
+) -> None:
+    """A livre aprovada não tem tríade; a de pedido ainda `submetida` não passou
+    pela (única) passagem de revisão. Nenhuma das duas é entregável."""
+    _criar_e_revisar(cliente, semeado, aprovar=True, pedido=False)
+    papeis = _papeis(cliente)
+    autor = papeis["anotador"][0]
+    semear_pedidos(semeado, 1, recorte=RECORTE_LONGO)
+    pid = _reservar(cliente, autor)
+    assert cliente.post("/api/criacoes", json=corpo_criacao(autor, pid)).status_code == 201
+    res = _exportar(semeado, corpus, "triads", tmp_path / "out")
+    assert res.row_count == 0
+
+
+def test_o_manifesto_do_triads_declara_os_estados_da_CRIACAO(
+    cliente: TestClient, semeado: Path, corpus: Path, tmp_path: Path
+) -> None:
+    """`statuses` descreve o que o arquivo contém: os estados da criação, nunca
+    `avaliada` — dizer o terminal da anotação afirmaria uma passagem 2 que o
+    modo criar não tem (decisão do P4)."""
+    _criar_e_revisar(cliente, semeado, aprovar=True)
+    res = _exportar(semeado, corpus, "triads", tmp_path / "out")
+    assert res.manifest["statuses"] == list(entrega.STATUS_TRIADE)
+    assert res.manifest["requests_referenced"] == 1
+    assert "excerpt" in res.manifest["NOTE_MATERIAL"]
+
+
+def test_o_dataset_card_declara_a_central_e_nao_vaza_o_recorte(
+    cliente: TestClient, semeado: Path, corpus: Path, tmp_path: Path
+) -> None:
+    """A frase da §6 do plano, publicada: briefs pedagógicos derivados de
+    material comercial, SEM reprodução do material. As âncoras são o que o
+    texto tem de continuar DIZENDO, não a redação exata — a lição das âncoras
+    do brief v2."""
+    fim = _criar_e_revisar(cliente, semeado, aprovar=True)
+    assert fim["uid_previsto"]
+    res = _exportar(semeado, corpus, "dataset-card", tmp_path / "out")
+    texto = res.arquivo.read_text(encoding="utf-8")
+    assert "elicited by pedagogical briefs" in texto
+    assert "without reproducing the material" in texto
+    assert "triads.jsonl" in texto
+    assert "XYZZY-SENHA-DO-RECORTE-F5" not in texto
+
+
+def test_sem_triade_o_card_nao_inventa_a_secao(
+    semeado: Path, corpus: Path, tmp_path: Path
+) -> None:
+    """Zero tríades = seção ausente. Num artefato DESCRITIVO, descrever um
+    recorte vazio seria prometer um `triads.jsonl` que o `all` entrega vazio —
+    diferente da regra da interface (desabilitar, nunca esconder), que vale
+    para grupos de controle, não para prosa de entrega."""
+    res = _exportar(semeado, corpus, "dataset-card", tmp_path / "out")
+    assert "Central de Briefs" not in res.arquivo.read_text(encoding="utf-8")
