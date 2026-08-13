@@ -12,8 +12,9 @@ pull in torch or sentence-transformers.
 | file | what it measures |
 | --- | --- |
 | `01_annotation_qc.ipynb` | The Bancada annotation platform: deliverable set vs operational ledger, human/synthetic composition, reviewer calibration against hidden targets, the triage-leak metric, the second-pass edit trail, active time per task type, and one item walked end to end. |
-| `02_labeling_campaign_qc.ipynb` | The seed-labeling campaign (stage s07): quota allocation with deficit redistribution, gold-slot reuse, batch state machine, seed composition; and the near-duplicate validation of stage s06, checked as an exact invariant against `dedup_near_map.parquet`. |
+| `02_labeling_campaign_qc.ipynb` | The seed-labeling campaign (stage s07): quota allocation with deficit redistribution, gold-slot reuse, batch state machine, seed composition, per-batch agreement against the 0.80 gate and the label distribution the campaign produced; and the near-duplicate validation of stage s06, checked as an exact invariant against `dedup_near_map.parquet`. |
 | `*.html` | The same notebooks, executed and rendered. Committed so a reader gets the numbers without a Python environment. |
+| `check_disclosure.py` | Verifies that the two rendered pages honour the policy below. Run it after every re-render — see *Verifying the render*. |
 
 ## Running them
 
@@ -51,25 +52,24 @@ parquet prints what is absent and the command that builds it, and execution cont
 notebook that raised on a missing input would produce a half-written HTML, which is worse
 than a page that honestly says what it could not read.
 
-## Two panels currently say "not measured"
+## One panel still says "not measured"
 
-Neither is a zero. Both are absences, and the distinction is the point — reporting `0.0`
-where nothing was measured would read as a reviewer who gets everything wrong, or a campaign
-that fails its gate. Two levers, both the owner's:
+It is not a zero. It is an absence, and the distinction is the point — reporting `0.0`
+where nothing was measured would read as a reviewer who gets everything wrong.
 
-**1. Reviewer calibration (notebook 01).** Four synthetic annotations are queued, each
-carrying a hidden target rating and a planted defect family, none reviewed yet. Open the
+**Reviewer calibration (notebook 01).** Synthetic annotations are queued, each carrying a
+hidden target rating and a planted defect family, and none has been reviewed yet. Open the
 Bancada (`pf annotate`, http://127.0.0.1:8766), triage them blind like any other item, then
 rate them in Rate and Review. Re-render notebook 01: the "not measured" panel is replaced by
 a confusion matrix of reviewer-vs-target, plus exact agreement, within-one agreement and
-mean absolute error on the ordinal scale.
+mean absolute error on the ordinal scale. The lever is the owner's, and that is deliberate —
+the reviewer being calibrated is whoever reads this repository.
 
-**2. Campaign agreement and the label distribution (notebook 02).** All 155 batches are
-`pending`, `manifest.gold` is `null`, and `data/final/seed_labels.parquet` does not exist.
-Run `pf labels gold --file <hand-revised calibration>.jsonl`, then the campaign itself (the
-`rotular-prompts` skill, or `pf labels next` / `pf labels submit`), then `pf merge-labels`.
-Re-render notebook 02: per-batch agreement appears against the 0.80 gate, and the taxonomy
-class distribution replaces the all-zero placeholder.
+The campaign panel of notebook 02 **has** been measured since: the gold was imported and
+part of the batches have run, so per-batch agreement is drawn against the 0.80 gate and the
+label distribution replaces the earlier all-zero placeholder. The batches still `pending`
+were left so on purpose — doubling the labels moved the classifier's macro-F1 on `task_type`
+by about a hundredth, so what remains buys a complete seed rather than a better model.
 
 ## Licence and disclosure policy of the rendered HTML
 
@@ -93,11 +93,43 @@ awaiting review — publishing the multiset of pending targets would let a revie
 ratings by elimination. Those breakdowns are printed only over items that have already been
 rated, which is the same rule the platform's own audit artifact follows.
 
-Both properties are verified against the rendered HTML, not assumed: the check greps the
-pages for literal sentences taken from `labeling/batches/batch_0001.json`, from
-`seed.parquet`, from the corpus and from the demo pack, and for the planted defect-family
-names and hidden-target notes of every unreviewed synthetic item — with a per-page canary
-string to prove the search itself works.
+**No gold labels.** `manifest.gold` holds the hand-revised answer key that every batch is
+scored against. Notebook 02 reports it as a **count** and never prints its contents: the key
+is 100 uids with their labels, and publishing it into a committed page would let a reader
+recover a batch's agreement by elimination. This is the same rule as the hidden target
+above, applied to the labeling campaign instead of the annotation platform — and it is a
+real trap rather than a hypothetical one, because the line that prints it was written when
+`gold` was `null` and printed nothing at all.
+
+These properties are verified against the rendered HTML, not assumed. See below.
+
+## Verifying the render
+
+`check_disclosure.py` builds probes from the actual sources — prompt bodies sampled across
+`labeling/batches/batch_0001.json`, `labeling/seed/seed.parquet`, the corpus and the
+demonstration pack, plus every gold uid and the planted defect family of each unreviewed
+synthetic item — and asserts that none of them appears in either page:
+
+```powershell
+& "$env:USERPROFILE\.local\bin\uv.exe" run python analysis\check_disclosure.py
+```
+
+Three properties make it worth trusting:
+
+* **A canary per page.** Each page also carries a probe that *must* be found. A broken
+  normaliser would make every negative probe pass and the result would look perfect; if the
+  canary goes missing the verdict is failure, not success.
+* **Sampling with a constant step, never the first N.** The seed is written ordered by size
+  band and the universe grouped by source, so a head-slice returns the shortest, most
+  homogeneous corner of the file. The first version of this script sliced the seed's first
+  40 rows, got texts of 16 to 36 characters, discarded them all for being too short, and
+  printed "ok" without ever having looked at the seed.
+* **A present-but-sterile source is a failure.** If a text source exists on disk and yields
+  no probe, the page was not checked against it — and saying "ok" there would claim a
+  verification that did not happen.
+
+Run it from a checkout that has the data. Missing inputs are reported as **partial
+coverage**, which is not the same as approval.
 
 ## Language
 
