@@ -602,7 +602,35 @@ enxerga. A correção seria derivar `serie` em `metadados_do_nome` e mandá-la a
 lote como sugestão (o agente ainda decide por janela) — mas ela depende da
 premissa "volume 1 = 1º ano", que é decisão de quem conhece o PNLD, não minha.
 
-**F4 — UI da vista criar + reserva.**
+**F4 — UI da vista criar + reserva.** Em DUAS passadas, como o P9 foi feito: o
+`index.html` tem 10.903 linhas e o backend tem invariantes próprias que merecem
+teste antes de existir tela.
+
+**F4-1 — o backend da fila e da tríade. FEITO (2026-08-12).**
+`annotate/pedidos.py` (reserva, devolução, expiração preguiçosa, facetas),
+`models.MaterialCriacaoIn`/`ProximoPedidoIn`/`DevolverPedidoIn`, `criacoes.criar`
+gravando `pedido_id` + `material_json`, três rotas novas,
+`tests/test_central_criacao.py` (34 testes). Suíte: **1.424 passando**.
+
+Decisões que a implementação fechou:
+
+- **fila vazia é 200 com `pedido: null`**, e o `motivo_chave` distingue "acabaram
+  os pedidos" de "nenhum com esses filtros" — mandam a pessoa fazer coisas
+  diferentes;
+- **uma reserva por pessoa**: quem já tem um pedido recebe o MESMO de volta, com
+  `motivo_chave: "ja_reservado"`. A vista tem um formulário só, e dois recortes
+  abertos produziriam dois rascunhos concorrentes;
+- **a marca `usado` do pedido entra na MESMA transação da criação** — fora dela
+  existiria um instante, e num crash um estado permanente, em que a criação
+  aponta para um pedido que a fila ainda oferece;
+- **as facetas contam só o DISPONÍVEL**: contar a tabela inteira ofereceria
+  "Filosofia (3)" numa fila em que os três já foram usados;
+- **`pedido_id` e `material` andam juntos**, e os dois sentidos são erros
+  diferentes (metade da tríade × blob que nenhuma tela mostra);
+- **a reserva expirada no meio da escrita é 409 com o conserto na frase** ("puxe-o
+  de novo antes de enviar") — é o caso que mais vai acontecer.
+
+**F4-2 — a tela.**
 Painel do pedido, fila "puxar próximo", devolução, blocos de rubrica/gold no
 formulário, envio gravando `pedido_id` + `material_json`; i18n completo
 (`data-t`, tabelas de chave literal).

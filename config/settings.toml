@@ -588,3 +588,22 @@ task_types_excluidos = ["qa-contexto", "resumo", "reescrita-edicao"]
 # sessão que morreu volta sozinho para `pending` depois do TTL.
 max_tentativas = 3
 claim_ttl_horas = 6
+
+# --- a fila de pedidos e a tríade (F4) ---------------------------------------
+# Minutos de uma reserva sem submissão. Escrever prompt + rubrica + gold é
+# trabalho de quase uma hora, mas a reserva aqui é FROUXA: ninguém está na fila
+# esperando por ESTE recorte, e o custo de uma expiração cedo demais é um clique
+# para reservar de novo.
+reserva_ttl_min = 180
+# Teto de critérios da rubrica que acompanha a criação. Menor que o da
+# plataforma (8) pela razão do `[geracao] max_criterios_material`: esta rubrica
+# vai ser aplicada por outra pessoa, e 5 é o limite prático de quantas escalas
+# alguém compara sem perder o fio. O piso é o `[annotate] min_criterios_rubrica`.
+max_criterios_rubrica = 5
+# Os pisos da resposta-gold DESCRITIVA. Ela é a régua, não a resposta: dois
+# pontos que a resposta precisa apresentar e um erro que a desqualifica são o
+# mínimo para o revisor conferir item a item. Um item de menos de 15 caracteres
+# não diz o que conferir.
+gold_min_deve_conter = 2
+gold_min_nao_pode = 1
+gold_min_chars_item = 15

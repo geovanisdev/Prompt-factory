@@ -50,12 +50,14 @@ existir faria o painel do admin prometer uma ingestão que ninguém rodou.
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 from typing import Any
 
 from .. import schema, textnorm
 from . import db as adb
 from . import eventos as evmod
+from . import pedidos as pedmod
 
 #: O nome da fonte no ``sources.toml`` (P6) e o primeiro ingrediente do uid.
 #: Uma constante porque ela precisa ser **a mesma string** aqui e no ingester:
@@ -71,7 +73,8 @@ LICENCA = "cc0-1.0"
 COLUNAS = (
     "c.id, c.autor_id, c.texto, c.lang, c.task_type_sugerido, c.domain_sugerido, "
     "c.brief, c.hash_norm, c.duplicata_corpus, c.status, c.revisor_id, "
-    "c.comentario_revisao, c.revisada_em, c.uid_previsto, c.exportada_em, c.criada_em"
+    "c.comentario_revisao, c.revisada_em, c.uid_previsto, c.exportada_em, c.criada_em, "
+    "c.pedido_id, c.material_json"
 )
 
 
@@ -162,7 +165,33 @@ def _linha(linha: sqlite3.Row, autor: str | None = None, revisor: str | None = N
         # Preenchido por `listar` quando há conexão com o corpus. `None` é
         # "não conferido" — um shape estável poupa o front de `in`-checks.
         "chegou_ao_corpus": None,
+        "pedido_id": linha["pedido_id"],
+        # A TRÍADE já desserializada. A coluna guarda a string JSON; a tela
+        # escreve `c.material.rubrica.criterios.length` e precisa que isso
+        # signifique o que parece — a mesma regra do `duplicata_corpus` booleano
+        # logo acima.
+        "material": _material(linha["material_json"]),
+        # Preenchido por `listar`: o pedido ao LADO da criação, que é o que
+        # permite ao revisor julgar originalidade sem sair da tela.
+        "pedido": None,
     }
+
+
+def _material(bruto: Any) -> dict[str, Any] | None:
+    """O blob da tríade como objeto, ou ``None`` na criação livre.
+
+    Blob ilegível vira ``None`` em vez de levantar: ele é gravado por nós e a
+    desserialização nunca deveria falhar, mas uma exceção AQUI derrubaria a
+    listagem inteira por causa de uma linha — e a listagem é o caminho por onde
+    o revisor chega a todas as outras.
+    """
+    if not bruto:
+        return None
+    try:
+        valor = json.loads(str(bruto))
+    except (TypeError, ValueError):  # pragma: no cover - escrito por nós
+        return None
+    return valor if isinstance(valor, dict) else None
 
 
 def criar(
@@ -175,6 +204,8 @@ def criar(
     task_type_sugerido: str | None = None,
     domain_sugerido: str | None = None,
     brief: str | None = None,
+    pedido_id: int | None = None,
+    material: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Grava a criação e devolve a linha **com o aviso de duplicata resolvido**.
 
@@ -183,16 +214,33 @@ def criar(
     app. Quem revisa depois recebe uma checagem AO VIVO por cima (ver
     ``listar``), e as duas juntas contam a história inteira — inclusive o caso
     em que o texto virou duplicata porque o corpus foi recarregado no meio.
+
+    Com ``pedido_id``, o pedido é marcado ``usado`` **na mesma transação**. Fora
+    dela, existiria um instante — e, num crash, um estado permanente — em que a
+    criação aponta para um pedido que a fila ainda oferece a outra pessoa.
+
+    O rótulo do contrato (``material_criacao@1``) é carimbado AQUI, pelo
+    servidor: um cliente que declarasse o próprio contrato poderia declarar um
+    que ele não cumpre.
     """
     display, hash_norm = chave(texto)
     dup = duplicata_no_corpus(conn_corpus, hash_norm)
+    blob = None
+    if material is not None:
+        from .models import SCHEMA_MATERIAL_CRIACAO
+
+        blob = json.dumps(
+            {"schema": SCHEMA_MATERIAL_CRIACAO, **material}, ensure_ascii=False
+        )
 
     conn.execute("BEGIN IMMEDIATE")
     try:
         cur = conn.execute(
             "INSERT INTO criacoes (autor_id, texto, lang, task_type_sugerido, "
-            "                      domain_sugerido, brief, hash_norm, duplicata_corpus) "
-            "VALUES (:autor, :texto, :lang, :tt, :dom, :brief, :hash, :dup)",
+            "                      domain_sugerido, brief, hash_norm, duplicata_corpus, "
+            "                      pedido_id, material_json) "
+            "VALUES (:autor, :texto, :lang, :tt, :dom, :brief, :hash, :dup, "
+            "        :pedido, :material)",
             {
                 "autor": autor_id,
                 "texto": display,
@@ -202,9 +250,13 @@ def criar(
                 "brief": brief,
                 "hash": hash_norm,
                 "dup": 1 if dup else 0,
+                "pedido": pedido_id,
+                "material": blob,
             },
         )
         novo = int(cur.lastrowid or 0)
+        if pedido_id is not None:
+            pedmod.marcar_usado(conn, pedido_id, criacao_id=novo)
         evmod.registrar(
             conn,
             acao="criacao_submetida",
@@ -215,6 +267,7 @@ def criar(
             n_chars=len(display),
             duplicata_corpus=bool(dup),
             uid_duplicata=dup,
+            pedido_id=pedido_id,
         )
         conn.execute("COMMIT")
     except Exception:
@@ -259,6 +312,18 @@ def listar(
     saida = []
     for linha in linhas:
         item = _linha(linha, autor=str(linha["autor"]), revisor=linha["revisor"])
+        # O PEDIDO AO LADO. É o que permite ao revisor julgar originalidade sem
+        # sair da tela — ele precisa do recorte para saber se o texto foi
+        # escrito ou copiado. Uma consulta por linha e não um JOIN porque
+        # `pedidos.apresentar` é quem sabe desserializar as listas do blob, e
+        # duas formas para a mesma linha divergiriam.
+        if item["pedido_id"] is not None:
+            bruto = conn.execute(
+                f"SELECT {pedmod.COLUNAS} FROM pedidos p WHERE p.id = ?",
+                (int(item["pedido_id"]),),
+            ).fetchone()
+            if bruto is not None:
+                item["pedido"] = pedmod.apresentar(bruto)
         if conn_corpus is not None:
             item["uid_duplicata"] = duplicata_no_corpus(conn_corpus, item["hash_norm"])
             # O badge "no corpus ✓" (P7): a promessa da aprovação, conferida ao
