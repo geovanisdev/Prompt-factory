@@ -16,7 +16,7 @@ task_type e domain em 100% das linhas: 6.560 rótulos humanos/agente + classific
 
 ## Índice
 
-1. [O que tem dentro](#o-que-tem-dentro) · 2. [Fontes e licenças](#fontes-e-licenças) · 3. [Instalação](#instalação) · 4. [Caminho rápido (5 min)](#caminho-rápido-5-min) · 5. [Reprodução completa](#reprodução-completa-em-clone-limpo) · 6. [A interface](#a-interface) · 7. [Export](#export-e-licenças) · 8. [A Bancada](#a-bancada--plataforma-de-anotação) · 9. [Estado dos marcos](#estado-dos-marcos) · 10. [Estrutura](#estrutura-do-repositório)
+1. [O que tem dentro](#o-que-tem-dentro) · 2. [Fontes e licenças](#fontes-e-licenças) · 3. [Instalação](#instalação) · 4. [Caminho rápido (5 min)](#caminho-rápido-5-min) · 5. [Reprodução completa](#reprodução-completa-em-clone-limpo) · 6. [A interface](#a-interface) · 7. [Export](#export-e-licenças) · 8. [A Bancada](#a-bancada--plataforma-de-anotação) · 9. [Estado dos marcos](#estado-dos-marcos) · 10. [Estrutura](#estrutura-do-repositório) · 11. [Licença](#licença)
 
 ---
 
@@ -73,6 +73,8 @@ Cada prompt carrega a licença **até a linha** no banco (`license`, `commercial
 `lmsys` é o maior pool de português que existe, mas é *gated* no Hub e a licença proíbe redistribuição. `pf ingest lmsys` já existe: com `enabled = false` ele não faz rede nenhuma, imprime o passo a passo para ligar e sai com código 2.
 
 `plataforma` é a única fonte **sem repositório no Hub**: o insumo é o `annotate.sqlite` local, com os prompts que as pessoas escrevem no modo criar da Bancada e que um revisor aprovou. **Nunca entra no `pf ingest` sem argumentos** — ingerir o que a própria ferramenta escreveu é ato explícito (`pf ingest plataforma`). CC0 1.0 é a dedicação declarada no formulário no momento do envio; e no dedup a linha da plataforma **nunca vence** um prompt publicado de verdade — colar um texto do corpus no formulário não reescreve a proveniência dele.
+
+Tudo nesta seção é sobre a licença dos **dados**. A do **código** é outra, e está em [Licença](#licença) — as duas não se misturam, e é por isso que cada uma tem o seu lugar.
 
 ---
 
@@ -345,3 +347,17 @@ Cinco linhas de arquitetura:
 **Nunca abra um `.parquet` com `cat`/`Get-Content`**: é binário. Use `pf report <arquivo>`.
 
 Decisões de engenharia, medições e as dezenas de pegadinhas descobertas durante a construção estão em **[`CLAUDE.md`](CLAUDE.md)** — aquele é o documento de quem vai *mexer* no código; este é o de quem vai *usar*.
+
+---
+
+## Licença
+
+São **duas licenças diferentes**, e confundi-las é o erro que este projeto existe para tornar impossível.
+
+**O código é MIT** ([`LICENSE`](LICENSE)) — use, modifique, redistribua, inclusive comercialmente.
+
+**Os dados não são deste repositório para licenciar.** Nada em `data/` é versionado, e o repo não redistribui nenhum dos nove corpora de origem: ele carrega as *receitas* que os baixam do Hugging Face Hub, e cada corpus continua sob a licença de quem o publicou — as seis em jogo estão em [Fontes e licenças](#fontes-e-licenças). Clonar este repositório não lhe dá direito nenhum sobre os prompts; rodar a ingestão lhe dá os direitos que cada fonte concede, e não mais.
+
+**O que sai daqui carrega a licença por linha.** Todo export escreve `license`, `commercial_ok`, `redistributable` e `attribution` em cada registro — não num cabeçalho, não num arquivo ao lado: **por linha**. A razão é prática: um recorte de 500 prompts pode misturar quatro licenças, e a pergunta "posso usar isto comercialmente?" só tem resposta honesta no nível da linha. Por padrão, `redistributable = false` fica de fora do arquivo e o manifesto conta quantas linhas foram excluídas; `commercial_ok = false` **entra**, contabilizado à parte, porque licença não comercial não impede o uso — impede *um certo* uso, e quem decide é quem exporta.
+
+A exceção que confirma a regra são os prompts escritos dentro da Bancada (fonte `plataforma`): quem escreve dedica em **CC0 1.0** no ato do envio, e é por isso que eles entram no corpus sem herdar restrição alguma. É também o único caso em que o texto nasce aqui — em todos os outros, este projeto é um *encaminhador* de proveniência, nunca a origem dela.
