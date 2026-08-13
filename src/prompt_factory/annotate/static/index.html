@@ -558,6 +558,49 @@ main{padding:22px 18px 60px;max-width:1180px;margin:0 auto}
   border:1px solid var(--devolvido);border-radius:var(--raio);
 }
 
+/* --- Central de Briefs (F4-2): o painel do pedido e a tríade --- */
+/* O painel do pedido veste a casca do brief (instrução colapsável no topo do
+   trabalho), mas o acento é o âmbar de "devolvido": ele é INSUMO reservado com
+   prazo, não o enquadramento do projeto — a barra diz isso sem uma linha de
+   texto, como a do brief distingue os dois eixos de instrução. */
+.pedido{border-left-color:var(--devolvido)}
+/* O recorte é CONTEÚDO (serifado, como todo conteúdo desta casa) e pode ter
+   2.000 caracteres: rola dentro da própria caixa para o formulário logo abaixo
+   continuar ao alcance — a régua do doom scrolling do P8/P9. */
+.pedido-recorte{
+  font-family:var(--serifa);white-space:pre-wrap;max-height:340px;overflow-y:auto;
+  padding:12px 14px;margin:8px 0 12px;
+  background:var(--fundo-2);border:1px solid var(--borda);border-radius:var(--raio);
+}
+.pedido-filtros{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin:10px 0}
+.pedido-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0 10px}
+/* PERMANENTE de propósito (nunca um `recado()` que some em 2 s): a regra de
+   autoria é a política de licença do módulo inteiro, e o momento em que ela
+   importa é o momento em que a pessoa está com o recorte na frente. */
+.aviso-autoria{
+  margin:10px 0;padding:9px 12px;font-size:.87rem;
+  color:var(--devolvido);background:var(--devolvido-fundo);
+  border:1px solid var(--devolvido);border-radius:var(--raio);
+}
+/* A referência ao pedido dentro do cartão de criação: mesma barra âmbar do
+   painel, para o olho ligar as duas coisas sem legenda. */
+.pedido-ref{
+  margin-top:10px;padding:9px 12px;font-size:.9rem;
+  background:var(--fundo-2);border-left:3px solid var(--devolvido);border-radius:var(--raio);
+}
+.pedido-ref p{margin:6px 0 0}
+/* F5: o que o revisor vê ao lado de uma criação vinda de pedido. */
+.revisao-pedido,.revisao-triade{margin-top:12px;padding-top:12px;border-top:1px solid var(--borda)}
+.anticopia{margin:8px 0;font-size:.88rem;color:var(--texto-2)}
+/* Acima do limiar é a cor de ERRO de verdade — não o âmbar de nota: uma
+   submissão assim só existe se o limiar foi recalibrado para baixo depois
+   dela, e é exatamente o caso que o revisor não pode deixar passar. */
+.anticopia.grave{color:var(--erro);font-weight:600}
+.criterio-leitura{margin:8px 0 10px}
+.criterio-leitura p{margin:2px 0}
+.revisao-triade ul{margin:4px 0 10px;padding-left:22px}
+.revisao-triade li{margin-bottom:3px}
+
 .faixa-solo{
   display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
   padding:9px 14px;margin-bottom:12px;font-size:.88rem;
@@ -1949,6 +1992,56 @@ const TEXTOS = {
   "criar.status.aprovada": "approved",
   "criar.status.rejeitada": "refused",
   "criar.status.exportada": "ingested",
+  "pedido.titulo": "Prompt request",
+  "pedido.titulo_n": "Prompt request #{id}",
+  "pedido.linha": "A slice of teaching material distilled into a request: pull one, read it, and write the prompt it asks for — in your own words.",
+  "pedido.disponiveis": "{n} available",
+  "pedido.puxar": "Pull the next request",
+  "pedido.puxando": "Pulling…",
+  "pedido.devolver": "Return to the queue",
+  "pedido.filtro_disciplina": "Subject",
+  "pedido.filtro_papel": "Role",
+  "pedido.filtro_todos": "— all —",
+  "pedido.motivo_vazio": "No request available. The distillation campaign creates them (`pf annotate pedidos preparar`, run by the admin, outside this app).",
+  "pedido.motivo_vazio_filtrado": "No request matches these filters. Clear them to see everything available.",
+  "pedido.motivo_ja_reservado": "you already had a request reserved — here it is again",
+  "pedido.papel_professor": "teacher",
+  "pedido.papel_aluno": "student",
+  "pedido.recorte": "Excerpt from the material",
+  "pedido.autoria": "Write in your own words. The excerpt is for reading, not raw material — pasted text will be refused in review.",
+  "pedido.rot_tema": "Theme",
+  "pedido.rot_meta": "Teaching goal",
+  "pedido.rot_habilidades": "BNCC skills",
+  "pedido.rot_disciplina": "Subject",
+  "pedido.avisos": "Distillation warnings — why this excerpt deserves a look",
+  "pedido.ttl": "The reservation lasts {min} minutes without a submission; after that the request returns to the queue. Your draft stays.",
+  "pedido.ref_titulo": "From request #{id}",
+  "triade.rubrica_titulo": "Rubric — how to grade an answer to this prompt",
+  "triade.rubrica_linha": "3 to 5 criteria, each with both scale endpoints anchored. It becomes the live instrument when the creation is approved.",
+  "triade.gold_titulo": "Gold reference — what a good answer must contain",
+  "triade.gold_linha": "Not the ideal answer written out: a checklist the reviewer verifies item by item. One item per line.",
+  "triade.deve_conter": "Must contain",
+  "triade.deve_conter_ph": "A verifiable point a gold answer presents — one per line.",
+  "triade.nao_pode": "Must not contain",
+  "triade.nao_pode_ph": "An error that disqualifies the answer — one per line.",
+  "triade.armadilhas": "Traps (optional)",
+  "triade.armadilhas_ph": "What a fluent-but-empty answer would do here — one per line.",
+  "triade.observacoes": "Notes (optional)",
+  "triade.observacoes_ph": "Short prose that does not fit the lists.",
+  "falta.triade_titulo": "the rubric title needs {n} more character(s)",
+  "falta.triade_criterios": "the rubric needs {n} more criterion(s)",
+  "falta.triade_criterio_nome": "criterion {i} needs a name (3+ characters)",
+  "falta.triade_criterio_desc": "criterion {i} needs a description (10+ characters)",
+  "falta.triade_criterio_pontas": "criterion {i} needs both scale endpoints labelled",
+  "falta.triade_deve": "“must contain” needs at least {n} item(s)",
+  "falta.triade_nao_pode": "“must not contain” needs at least {n} item(s)",
+  "falta.triade_item_curto": "a gold item needs at least {n} characters — say what to check",
+  "revisao.anticopia": "Longest literal overlap with the excerpt: {n} character(s) — refusal threshold: {limiar}.",
+  "revisao.originalidade": "Judge originality: the prompt must reference the material in the writer's own words. Pasted or closely paraphrased text is refused, with a comment.",
+  "recado.pedido_puxado": "request reserved — it is yours while you write",
+  "recado.pedido_devolvido": "request returned to the queue",
+  "recado.reserva_expirada": "the reservation expired while you wrote — pull the request again before submitting; your draft is intact",
+  "recado.erro_pedido": "could not reach the request queue: {erro}",
   "recado.criada": "prompt submitted for review",
   "recado.criada_dup": "submitted — and it already exists in the corpus, see the note",
   "recado.criacao_aprovada": "approved — it will enter the corpus on the next ingestion",
@@ -2715,6 +2808,56 @@ const TEXTOS = {
   "criar.status.aprovada": "aprovada",
   "criar.status.rejeitada": "recusada",
   "criar.status.exportada": "ingerida",
+  "pedido.titulo": "Pedido de prompt",
+  "pedido.titulo_n": "Pedido de prompt #{id}",
+  "pedido.linha": "Um recorte de material didático destilado em pedido: puxe um, leia, e escreva o prompt que ele pede — com as suas palavras.",
+  "pedido.disponiveis": "{n} disponível(is)",
+  "pedido.puxar": "Puxar o próximo pedido",
+  "pedido.puxando": "Puxando…",
+  "pedido.devolver": "Devolver à fila",
+  "pedido.filtro_disciplina": "Disciplina",
+  "pedido.filtro_papel": "Papel",
+  "pedido.filtro_todos": "— todos —",
+  "pedido.motivo_vazio": "Nenhum pedido disponível. A campanha de destilação os cria (`pf annotate pedidos preparar`, o admin roda, fora desta app).",
+  "pedido.motivo_vazio_filtrado": "Nenhum pedido com esses filtros. Limpe-os para ver tudo o que há disponível.",
+  "pedido.motivo_ja_reservado": "você já tinha um pedido reservado — aqui está ele de novo",
+  "pedido.papel_professor": "professor",
+  "pedido.papel_aluno": "aluno",
+  "pedido.recorte": "Recorte do material",
+  "pedido.autoria": "Escreva com as suas palavras. O recorte é leitura, não matéria-prima — texto colado será recusado na revisão.",
+  "pedido.rot_tema": "Tema",
+  "pedido.rot_meta": "Meta pedagógica",
+  "pedido.rot_habilidades": "Habilidades BNCC",
+  "pedido.rot_disciplina": "Disciplina",
+  "pedido.avisos": "Avisos da destilação — por que este recorte merece um olhar",
+  "pedido.ttl": "A reserva dura {min} minutos sem envio; depois o pedido volta para a fila. O seu rascunho fica.",
+  "pedido.ref_titulo": "Do pedido #{id}",
+  "triade.rubrica_titulo": "Rubrica — como avaliar uma resposta a este prompt",
+  "triade.rubrica_linha": "3 a 5 critérios, cada um com as duas pontas da escala ancoradas. Ela vira o instrumento vivo quando a criação for aprovada.",
+  "triade.gold_titulo": "Referência gold — o que uma boa resposta precisa conter",
+  "triade.gold_linha": "Não é a resposta ideal redigida: é um checklist que o revisor confere item a item. Um item por linha.",
+  "triade.deve_conter": "Deve conter",
+  "triade.deve_conter_ph": "Um ponto verificável que uma resposta gold apresenta — um por linha.",
+  "triade.nao_pode": "Não pode conter",
+  "triade.nao_pode_ph": "Um erro que desqualifica a resposta — um por linha.",
+  "triade.armadilhas": "Armadilhas (opcional)",
+  "triade.armadilhas_ph": "O que uma resposta fluente e vazia faria aqui — uma por linha.",
+  "triade.observacoes": "Observações (opcional)",
+  "triade.observacoes_ph": "Prosa curta que não cabe nas listas.",
+  "falta.triade_titulo": "o título da rubrica precisa de mais {n} caractere(s)",
+  "falta.triade_criterios": "a rubrica precisa de mais {n} critério(s)",
+  "falta.triade_criterio_nome": "o critério {i} está sem nome (3+ caracteres)",
+  "falta.triade_criterio_desc": "o critério {i} está sem descrição (10+ caracteres)",
+  "falta.triade_criterio_pontas": "o critério {i} está sem as duas pontas da escala",
+  "falta.triade_deve": "«deve conter» precisa de ao menos {n} item(ns)",
+  "falta.triade_nao_pode": "«não pode conter» precisa de ao menos {n} item(ns)",
+  "falta.triade_item_curto": "um item da gold precisa de ao menos {n} caracteres — diga o que conferir",
+  "revisao.anticopia": "Maior trecho literal em comum com o recorte: {n} caractere(s) — limite de recusa: {limiar}.",
+  "revisao.originalidade": "Julgue a originalidade: o prompt deve referenciar o material com as palavras de quem escreveu. Texto colado ou parafraseado de perto se recusa, com comentário.",
+  "recado.pedido_puxado": "pedido reservado — é seu enquanto você escreve",
+  "recado.pedido_devolvido": "pedido devolvido à fila",
+  "recado.reserva_expirada": "a reserva expirou enquanto você escrevia — puxe o pedido de novo antes de enviar; o rascunho está intacto",
+  "recado.erro_pedido": "não deu para falar com a fila de pedidos: {erro}",
   "recado.criada": "prompt enviado para revisão",
   "recado.criada_dup": "enviado — e ele já existe no corpus, veja a nota",
   "recado.criacao_aprovada": "aprovada — ela entra no corpus na próxima ingestão",
@@ -3783,7 +3926,28 @@ const est = {
   // O RASCUNHO mora aqui, e não no DOM, pela razão de sempre: trocar de idioma
   // redesenha a tela a partir de `est`, e um texto que a pessoa está escrevendo
   // não pode sumir porque ela clicou em `EN`.
-  criacao: { texto: "", lang: "pt", task_type: "", domain: "", brief: "", enviando: false },
+  // `material` é o rascunho da TRÍADE (F4-2) — rubrica na forma do FORMULÁRIO
+  // (`escrever_rubrica@1`-like; a conversão para `rubrica@3` acontece só na
+  // montagem do envio) e gold como TEXTO das três listas (um item por linha; a
+  // montagem separa). Ele só é apagado no SUCESSO do envio: um 409 de reserva
+  // expirada que apagasse uma hora de escrita seria a pior forma de recusar.
+  criacao: {
+    texto: "", lang: "pt", task_type: "", domain: "", brief: "", enviando: false,
+    material: materialVazio(),
+  },
+  /* ---- F4-2: a fila de pedidos (Central de Briefs) ---- */
+  // `dados` guarda a resposta inteira de GET /api/pedidos ({meu, facetas,
+  // reserva_ttl_min, limites}); `null` = nunca pedido (dispara a carga),
+  // `{erro:true}` = a carga falhou (NÃO redispara sozinha — senão o erro de
+  // rede viraria um laço de requisições). `motivoChave` é a CHAVE que o
+  // servidor devolveu na fila vazia, traduzida no desenho — a lição do P3i.
+  // `painelAberto` existe pela razão do `manterDiretrizes`: trocar de idioma
+  // redesenha, e não pode fechar o painel que a pessoa acabou de abrir.
+  pedido: {
+    dados: null, filtros: { disciplina: "", papel: "" },
+    motivoChave: null, painelAberto: true, carregando: false,
+    puxando: false, devolvendo: false,
+  },
   // O que ELA já escreveu (a vista "criar" lista abaixo do formulário) e o que
   // o revisor tem para decidir. `null` = nunca pedido, que é diferente de vazio.
   minhasCriacoes: null,
@@ -4564,6 +4728,9 @@ function desenharArea() {
   if (est.vista === "criar") {
     desenharCriar(area);
     if (!est.minhasCriacoes) carregarMinhasCriacoes();
+    // `null` = nunca pedido; `{erro:true}` fica parado até um clique — senão um
+    // erro de rede viraria um laço de requisições a cada redesenho.
+    if (!est.pedido.dados && !est.pedido.carregando) carregarPedidos();
     return;
   }
   desenharFila(area);
@@ -7823,6 +7990,420 @@ function seloDeCriacao(item) {
   return el("span", "selo " + s.classe, t(s.chave));
 }
 
+/* ==========================================================================
+   A FILA DE PEDIDOS E A TRÍADE (Central de Briefs, F4-2)
+   ========================================================================== */
+
+/* As duas tabelas da fila, com a chave INTEIRA — como todas as tabelas deste
+   arquivo (`t("pedido.papel_" + p)` seria invisível para o teste de chave
+   órfã, e um valor novo do backend sairia cru na tela). Os vocabulários são os
+   de `db.PAPEIS_PEDIDO` e das chaves que `pedidos.proximo` emite; há teste
+   cobrando as três pontas. */
+const PAPEIS_PEDIDO_ROTULO = {
+  "professor": "pedido.papel_professor",
+  "aluno": "pedido.papel_aluno",
+};
+
+const MOTIVOS_PEDIDO = {
+  "vazio": "pedido.motivo_vazio",
+  "vazio_filtrado": "pedido.motivo_vazio_filtrado",
+  "ja_reservado": "pedido.motivo_ja_reservado",
+};
+
+/** O rascunho vazio da tríade. Função, e não literal duplicado: o reset do
+    envio e o `est` inicial têm de concordar sobre a forma — duas cópias
+    divergiriam na primeira coluna nova.
+
+    A rubrica fica na forma do FORMULÁRIO (a de `escrever_rubrica@1`: pontas
+    como `rotulo_min`/`rotulo_max`, `escala_max` no select); a conversão para
+    `rubrica@3` acontece SÓ na montagem do envio (`montarMaterial`). A gold é
+    TEXTO das três listas — um item por linha; a montagem separa. */
+function materialVazio() {
+  return {
+    rubrica: { titulo: "", criterios: [] },
+    gold: { deve_conter: "", nao_pode: "", armadilhas: "", observacoes: "" },
+  };
+}
+
+/** O pedido reservado por esta pessoa, ou `null`. Ponto único da pergunta que
+    o formulário, a cascata e o envio fazem — três leituras divergentes dariam
+    uma tríade enviada sem pedido (422 garantido). */
+function pedidoAtivo() {
+  const d = est.pedido.dados;
+  return d && d.meu ? d.meu : null;
+}
+
+/** Os limites da TRÍADE, do `GET /api/pedidos` — não do `/api/health`: o
+    `max_criterios_rubrica` de lá é o da aba escrever_rubrica (8), e a tríade
+    valida contra o de `[pedidos]` (5). Ler o health aqui deixaria a pessoa
+    chegar a oito critérios e tomar 422 no envio. */
+function limPedido(chave, padrao) {
+  const d = est.pedido.dados;
+  const v = d && d.limites ? Number(d.limites[chave]) : NaN;
+  return Number.isFinite(v) && v > 0 ? v : padrao;
+}
+
+/** Papel do pedido como selo. Fora da tabela = valor novo do backend: sai CRU
+    e marcado `.dado`, nunca por uma chave inventada. */
+function seloDePapel(papel) {
+  const chave = PAPEIS_PEDIDO_ROTULO[papel];
+  return chave ? el("span", "selo", t(chave)) : el("span", "selo dado", String(papel));
+}
+
+async function carregarPedidos() {
+  const p = est.pedido;
+  if (p.carregando) return;
+  p.carregando = true;
+  try {
+    p.dados = await api(comParams("/api/pedidos", { anotador_id: est.persona.id }));
+  } catch (e) {
+    // `{erro:true}` e não `null`: `null` é "nunca pedido" e redispararia a
+    // carga a cada redesenho — um erro de rede viraria um laço de requisições.
+    p.dados = { erro: true, meu: null, facetas: null, reserva_ttl_min: null, limites: null };
+    recado(t("recado.erro_pedido", { erro: e.message }), true);
+  }
+  p.carregando = false;
+  if (est.vista === "criar") desenharArea();
+}
+
+async function puxarPedido() {
+  const p = est.pedido;
+  if (p.puxando) return;
+  p.puxando = true;
+  desenharArea();
+  try {
+    const r = await postar("/api/pedidos/proximo", {
+      anotador_id: est.persona.id,
+      disciplina: p.filtros.disciplina || null,
+      papel: p.filtros.papel || null,
+    });
+    // A CHAVE é guardada e traduzida no desenho (lição do P3i): trocar de
+    // idioma com a fila vazia tem de trocar esta frase também.
+    p.motivoChave = r.pedido ? null : r.motivo_chave;
+    if (r.pedido) {
+      p.painelAberto = true;
+      recado(t(r.motivo_chave === "ja_reservado" ? MOTIVOS_PEDIDO.ja_reservado : "recado.pedido_puxado"));
+      // Refetch em vez de costurar `r.pedido` em `dados`: o GET traz o `meu` E
+      // as facetas já sem ele — os dois números têm de andar juntos.
+      p.dados = null;
+    }
+  } catch (e) {
+    recado(t("recado.erro_pedido", { erro: e.message }), true);
+  }
+  p.puxando = false;
+  desenharArea();
+}
+
+async function devolverPedido() {
+  const p = est.pedido;
+  const meuP = pedidoAtivo();
+  if (!meuP || p.devolvendo) return;
+  p.devolvendo = true;
+  try {
+    await postar("/api/pedidos/" + meuP.id + "/devolver", { anotador_id: est.persona.id });
+    recado(t("recado.pedido_devolvido"));
+    p.motivoChave = null;
+    p.dados = null;
+  } catch (e) {
+    recado(t("recado.erro_pedido", { erro: e.message }), true);
+    // 404/403/409 = o estado local está velho (a reserva expirou, outra sessão
+    // mexeu). O refetch conta a verdade; um retry cego repetiria o erro.
+    if (e.status === 404 || e.status === 403 || e.status === 409) p.dados = null;
+  }
+  p.devolvendo = false;
+  desenharArea();
+}
+
+/** O painel do pedido, no topo da vista criar — a casca do brief do P9, com
+    acento próprio. O rascunho da tríade NÃO mora aqui (mora em `est.criacao.
+    material`), então devolver o pedido não apaga o que a pessoa escreveu. */
+function blocoPedido() {
+  const p = est.pedido;
+  const det = el("details", "diretrizes brief pedido");
+  det.open = p.painelAberto;
+  det.addEventListener("toggle", () => { p.painelAberto = det.open; });
+  const dados = p.dados;
+  const meuP = pedidoAtivo();
+  det.appendChild(el("summary", null,
+    meuP ? t("pedido.titulo_n", { id: n(meuP.id) }) : t("pedido.titulo")));
+  const corpo = el("div", "brief-corpo");
+  det.appendChild(corpo);
+
+  if (!dados || p.carregando) {
+    corpo.appendChild(esqueleto("criar.carregando"));
+    return det;
+  }
+
+  if (!meuP) {
+    corpo.appendChild(el("p", "vazio-linha", t("pedido.linha")));
+    if (p.motivoChave && MOTIVOS_PEDIDO[p.motivoChave]) {
+      corpo.appendChild(el("p", "vazio-linha", t(MOTIVOS_PEDIDO[p.motivoChave])));
+    }
+    if (dados.facetas) {
+      const filtros = el("div", "pedido-filtros");
+      const campoD = el("div", "campo");
+      const selD = el("select");
+      selD.setAttribute("aria-label", t("pedido.filtro_disciplina"));
+      const opTodas = el("option", null, t("pedido.filtro_todos"));
+      opTodas.value = "";
+      selD.appendChild(opTodas);
+      for (const fx of dados.facetas.disciplina) {
+        // Disciplina "" é o default de quem o nome do arquivo não revelou:
+        // não dá para OFERECER um filtro sem rótulo (limpar o filtro já cobre).
+        if (!fx.valor) continue;
+        const o = el("option", "dado", fx.valor + " (" + n(fx.n) + ")");
+        o.value = fx.valor;
+        selD.appendChild(o);
+      }
+      selD.value = p.filtros.disciplina;
+      selD.addEventListener("change", () => { p.filtros.disciplina = selD.value; });
+      juntar(campoD, el("span", null, t("pedido.filtro_disciplina")), selD);
+      const campoP = el("div", "campo");
+      const selP = el("select");
+      selP.setAttribute("aria-label", t("pedido.filtro_papel"));
+      const opTodos = el("option", null, t("pedido.filtro_todos"));
+      opTodos.value = "";
+      selP.appendChild(opTodos);
+      for (const fx of dados.facetas.papel) {
+        const chave = PAPEIS_PEDIDO_ROTULO[fx.valor];
+        const o = el("option", chave ? null : "dado",
+          (chave ? t(chave) : fx.valor) + " (" + n(fx.n) + ")");
+        o.value = fx.valor;
+        selP.appendChild(o);
+      }
+      selP.value = p.filtros.papel;
+      selP.addEventListener("change", () => { p.filtros.papel = selP.value; });
+      juntar(campoP, el("span", null, t("pedido.filtro_papel")), selP);
+      juntar(filtros, campoD, campoP);
+      corpo.appendChild(filtros);
+    }
+    const acoes = el("div", "acoes");
+    const b = el("button", "primario", p.puxando ? t("pedido.puxando") : t("pedido.puxar"));
+    b.type = "button";
+    b.disabled = p.puxando;
+    b.addEventListener("click", puxarPedido);
+    acoes.appendChild(b);
+    if (dados.facetas) {
+      acoes.appendChild(el("span", "fraco",
+        t("pedido.disponiveis", { n: n(dados.facetas.disponiveis) })));
+    }
+    corpo.appendChild(acoes);
+    return det;
+  }
+
+  const topo = el("div", "pedido-chips");
+  juntar(topo, seloDePapel(meuP.papel), chipDeCategoria("task_type", meuP.task_type));
+  if (meuP.disciplina) {
+    const chip = el("span", "chip-cat");
+    chip.appendChild(el("span", "dado", meuP.disciplina));
+    topo.appendChild(chip);
+  }
+  corpo.appendChild(topo);
+
+  const dl = el("dl", "linhas");
+  const pares = [
+    [t("pedido.rot_tema"), meuP.tema],
+    [t("pedido.rot_meta"), meuP.meta_pedagogica],
+  ];
+  if (meuP.habilidades.length) {
+    pares.push([t("pedido.rot_habilidades"), meuP.habilidades.join(", ")]);
+  }
+  for (const [rot, valor] of pares) {
+    dl.appendChild(el("dt", null, rot));
+    dl.appendChild(el("dd", "dado", String(valor)));
+  }
+  corpo.appendChild(dl);
+
+  corpo.appendChild(el("div", "rotulo-bloco espaco-acima-2", t("pedido.recorte")));
+  corpo.appendChild(el("div", "pedido-recorte dado", meuP.recorte));
+
+  if (meuP.avisos.length) {
+    const av = el("div", "aviso-dup");
+    av.appendChild(el("strong", null, t("pedido.avisos")));
+    const ul = el("ul");
+    for (const a of meuP.avisos) ul.appendChild(el("li", "dado", a));
+    av.appendChild(ul);
+    corpo.appendChild(av);
+  }
+
+  // PERMANENTE, nunca um `recado()`: a regra de autoria é a política de
+  // licença do módulo inteiro, e o momento em que ela importa é o momento em
+  // que a pessoa está com o recorte de terceiros na frente.
+  corpo.appendChild(el("p", "aviso-autoria", t("pedido.autoria")));
+
+  const acoes = el("div", "acoes");
+  const dev = el("button", "botao", t("pedido.devolver"));
+  dev.type = "button";
+  dev.disabled = p.devolvendo;
+  dev.addEventListener("click", devolverPedido);
+  juntar(acoes, dev,
+    el("span", "fraco", t("pedido.ttl", { min: n(dados.reserva_ttl_min) })));
+  corpo.appendChild(acoes);
+  return det;
+}
+
+/** Um item por linha → lista. A separação mora aqui e na cascata, uma função. */
+function itensDeLista(texto) {
+  return String(texto || "").split("\n").map((x) => x.trim()).filter(Boolean);
+}
+
+/** Os blocos da tríade no formulário — SÓ com pedido ativo.
+
+    A rubrica REUSA `editorCriterio` (o formulário da aba escrever_rubrica),
+    não a `matrizDeCriterios`: lá a pessoa APLICA uma rubrica; aqui ela
+    ESCREVE uma. O contexto é próprio para os rascunhos não se cruzarem com o
+    `est.form` do anotador. */
+function blocoTriade() {
+  const m = est.criacao.material;
+  const c0 = {
+    leitura: false,
+    form: m.rubrica,
+    aoDigitar: atualizarBotaoCriar,
+    aoMudar: () => { desenharArea(); },
+    motivos: null,
+  };
+  const caixa = el("div", "espaco-acima-2");
+  caixa.appendChild(el("div", "rotulo-bloco", t("triade.rubrica_titulo")));
+  caixa.appendChild(el("p", "pergunta-desc", t("triade.rubrica_linha")));
+
+  const tituloCampo = el("div", "campo espaco-abaixo-2");
+  const entrada = el("input");
+  entrada.type = "text";
+  entrada.className = "largo";
+  entrada.maxLength = 200;
+  entrada.placeholder = t("ws.titulo_rubrica_ph");
+  entrada.setAttribute("aria-label", t("ws.titulo_rubrica"));
+  entrada.value = m.rubrica.titulo;
+  entrada.addEventListener("input", () => {
+    m.rubrica.titulo = entrada.value;
+    atualizarBotaoCriar();
+  });
+  juntar(tituloCampo, el("span", null, t("ws.titulo_rubrica")), entrada,
+    dicaLinguaMeta("lingua.rubrica"));
+  caixa.appendChild(tituloCampo);
+
+  const lista = el("div", "criterios");
+  m.rubrica.criterios.forEach((c, i) => lista.appendChild(editorCriterio(c, i, c0)));
+  caixa.appendChild(lista);
+
+  const rodape = el("div", "forma espaco-acima-2");
+  const mais = el("button", "botao", t("botao.acrescentar_criterio"));
+  mais.type = "button";
+  // O teto é o da TRÍADE (`[pedidos]`, 5) — menor que o 8 da aba
+  // escrever_rubrica. Vem do GET /api/pedidos, nunca do /api/health.
+  mais.disabled = m.rubrica.criterios.length >= limPedido("max_criterios_rubrica", 5);
+  mais.addEventListener("click", () => {
+    m.rubrica.criterios.push({
+      nome: "", descricao: "", escala_min: 1, escala_max: 5, rotulo_min: "", rotulo_max: "",
+    });
+    desenharArea();
+  });
+  juntar(rodape, mais, el("span", "fraco", t("ws.faixa_criterios", {
+    min: limPedido("min_criterios_rubrica", 3),
+    max: limPedido("max_criterios_rubrica", 5),
+  })));
+  caixa.appendChild(rodape);
+
+  caixa.appendChild(el("div", "rotulo-bloco espaco-acima-2", t("triade.gold_titulo")));
+  caixa.appendChild(el("p", "pergunta-desc", t("triade.gold_linha")));
+  const listas = [
+    ["deve_conter", "triade.deve_conter", "triade.deve_conter_ph", 3],
+    ["nao_pode", "triade.nao_pode", "triade.nao_pode_ph", 2],
+    ["armadilhas", "triade.armadilhas", "triade.armadilhas_ph", 2],
+    ["observacoes", "triade.observacoes", "triade.observacoes_ph", 2],
+  ];
+  for (const [campo, rotulo, ph, linhas] of listas) {
+    const cx = el("div", "campo");
+    const ta = el("textarea");
+    ta.rows = linhas;
+    ta.placeholder = t(ph);
+    ta.setAttribute("aria-label", t(rotulo));
+    ta.value = m.gold[campo];
+    ta.addEventListener("input", () => {
+      m.gold[campo] = ta.value;
+      atualizarBotaoCriar();
+    });
+    juntar(cx, el("span", null, t(rotulo)), ta);
+    caixa.appendChild(cx);
+  }
+  caixa.appendChild(dicaLinguaMeta("lingua.meta"));
+  return caixa;
+}
+
+/** Rascunho → `material_criacao@1` (sem o rótulo: quem carimba é o servidor).
+
+    É AQUI que a forma do formulário vira `rubrica@3` — as duas PONTAS
+    ancoradas, `min` fixo em 1 como na aba escrever_rubrica. Gerar no formato
+    errado daria uma rubrica que a tela abre sem âncora nenhuma: o defeito do
+    `routes_revisao:243`, documentado em `models.EscalaCriacaoIn`. */
+function montarMaterial() {
+  const m = est.criacao.material;
+  return {
+    rubrica: {
+      titulo: m.rubrica.titulo.trim(),
+      criterios: m.rubrica.criterios.map((c) => {
+        const max = Number(c.escala_max) || 5;
+        return {
+          nome: c.nome.trim(),
+          descricao: c.descricao.trim(),
+          escala: {
+            min: 1,
+            max: max,
+            ancoras: [
+              { valor: 1, rotulo: c.rotulo_min.trim() },
+              { valor: max, rotulo: c.rotulo_max.trim() },
+            ],
+          },
+        };
+      }),
+    },
+    gold: {
+      deve_conter: itensDeLista(m.gold.deve_conter),
+      nao_pode: itensDeLista(m.gold.nao_pode),
+      armadilhas: itensDeLista(m.gold.armadilhas),
+      observacoes: m.gold.observacoes.trim() || null,
+    },
+  };
+}
+
+/** O que falta, NA ORDEM DO TRABALHO: prompt → rubrica → gold — a cascata do
+    P9. Devolve `[chave, vars]` do primeiro impedimento, ou `null`. Os pisos
+    são os mesmos que o servidor aplica (`models.py`), vindos da rota. */
+function oQueFaltaCriar() {
+  const f = est.criacao;
+  const faltamTexto = lim("min_chars_criacao", 15) - f.texto.trim().length;
+  if (faltamTexto > 0) return ["criar.falta", { n: n(faltamTexto) }];
+  if (!pedidoAtivo()) return null;
+
+  const m = f.material;
+  const titulo = m.rubrica.titulo.trim();
+  if (titulo.length < 5) return ["falta.triade_titulo", { n: n(5 - titulo.length) }];
+  const minC = limPedido("min_criterios_rubrica", 3);
+  if (m.rubrica.criterios.length < minC) {
+    return ["falta.triade_criterios", { n: n(minC - m.rubrica.criterios.length) }];
+  }
+  for (let i = 0; i < m.rubrica.criterios.length; i++) {
+    const c = m.rubrica.criterios[i];
+    if (c.nome.trim().length < 3) return ["falta.triade_criterio_nome", { i: n(i + 1) }];
+    if (c.descricao.trim().length < 10) return ["falta.triade_criterio_desc", { i: n(i + 1) }];
+    if (c.rotulo_min.trim().length < 3 || c.rotulo_max.trim().length < 3) {
+      return ["falta.triade_criterio_pontas", { i: n(i + 1) }];
+    }
+  }
+
+  const minItem = limPedido("gold_min_chars_item", 15);
+  const deve = itensDeLista(m.gold.deve_conter);
+  const minDeve = limPedido("gold_min_deve_conter", 2);
+  if (deve.length < minDeve) return ["falta.triade_deve", { n: n(minDeve) }];
+  const nao = itensDeLista(m.gold.nao_pode);
+  const minNao = limPedido("gold_min_nao_pode", 1);
+  if (nao.length < minNao) return ["falta.triade_nao_pode", { n: n(minNao) }];
+  for (const item of [...deve, ...nao, ...itensDeLista(m.gold.armadilhas)]) {
+    if (item.length < minItem) return ["falta.triade_item_curto", { n: n(minItem) }];
+  }
+  return null;
+}
+
 /** Uma criação na lista — o texto, o selo, e o que a decisão produziu.
 
     O `uid_previsto` aparece porque ele é a PROMESSA: é o identificador que a
@@ -7863,6 +8444,21 @@ function cartaoDeCriacao(item, extras) {
   }
   card.appendChild(pes);
 
+  // A criação que veio de um PEDIDO leva a referência ao lado (F4-2): tema,
+  // papel e task_type — o suficiente para quem lê saber de onde o prompt
+  // veio. O RECORTE ao lado do revisor é do F5, junto do anti-cópia.
+  if (item.pedido) {
+    const ref = el("div", "pedido-ref");
+    const topoRef = el("div", "criacao-topo");
+    juntar(topoRef,
+      el("strong", null, t("pedido.ref_titulo", { id: n(item.pedido.id) })),
+      seloDePapel(item.pedido.papel),
+      chipDeCategoria("task_type", item.pedido.task_type));
+    ref.appendChild(topoRef);
+    ref.appendChild(el("p", "dado", item.pedido.tema));
+    card.appendChild(ref);
+  }
+
   // O AVISO DE DUPLICATA é RESULTADO, não erro — e a frase diz isso. A mesma
   // cadeia de normalização que junta as duplicatas do corpus acabou de
   // reconhecer que duas pessoas escreveram a mesma coisa.
@@ -7899,6 +8495,9 @@ function cartaoDeCriacao(item, extras) {
     apoia em licença por linha. Quem envia precisa ver o que está cedendo. */
 function desenharCriar(area) {
   const f = est.criacao;
+  // O PEDIDO vem antes do formulário, como o brief vem antes das diretrizes:
+  // é o enquadramento do que se vai escrever (Central de Briefs, F4-2).
+  area.appendChild(blocoPedido());
   const painel = el("div", "painel");
   const cabeca = el("div", "painel-cabeca");
   juntar(cabeca, el("h2", null, t("criar.titulo")), el("span", "crescer"));
@@ -7960,6 +8559,11 @@ function desenharCriar(area) {
     dicaLinguaMeta("lingua.meta"));
   corpo.appendChild(campoBrief);
 
+  // Com um pedido reservado, o formulário É a tríade: prompt + rubrica + gold.
+  // Para escrever uma criação livre, devolve-se o pedido — a vista tem um
+  // formulário só, e o backend exige os três juntos (`pedido_id` + `material`).
+  if (pedidoAtivo()) corpo.appendChild(blocoTriade());
+
   corpo.appendChild(el("p", "cc0", t("criar.cc0")));
 
   const acoes = el("div", "acoes");
@@ -7994,13 +8598,11 @@ function desenharCriar(area) {
 function atualizarBotaoCriar() {
   const botao = $("#botao-criar");
   if (!botao) return;
-  const piso = lim("min_chars_criacao", 15);
-  const falta = piso - est.criacao.texto.trim().length;
-  const impedido = falta > 0 || est.criacao.enviando;
-  botao.disabled = impedido;
+  const falta = oQueFaltaCriar();
+  botao.disabled = !!falta || est.criacao.enviando;
   botao.textContent = est.criacao.enviando
     ? t("criar.enviando")
-    : falta > 0 ? t("criar.falta", { n: n(falta) }) : t("criar.enviar");
+    : falta ? t(falta[0], falta[1]) : t("criar.enviar");
 }
 
 async function carregarMinhasCriacoes() {
@@ -8017,26 +8619,54 @@ async function carregarMinhasCriacoes() {
 async function enviarCriacao() {
   const f = est.criacao;
   if (f.enviando) return;
+  const meuP = pedidoAtivo();
   f.enviando = true;
   atualizarBotaoCriar();
   try {
-    const novo = await postar("/api/criacoes", {
+    const corpo = {
       autor_id: est.persona.id,
       texto: f.texto.trim(),
       lang: f.lang,
       task_type_sugerido: f.task_type || null,
       domain_sugerido: f.domain || null,
       brief: f.brief.trim() || null,
-    });
+    };
+    // Com pedido reservado, o envio É a tríade — o servidor exige os dois
+    // juntos, nos dois sentidos. O rótulo `material_criacao@1` NÃO viaja:
+    // quem carimba é o servidor (`extra="forbid"` transformaria em 422).
+    if (meuP) {
+      corpo.pedido_id = meuP.id;
+      corpo.material = montarMaterial();
+    }
+    const novo = await postar("/api/criacoes", corpo);
     // Limpa o rascunho SÓ no sucesso: um 422 que apaga o que a pessoa escreveu
     // é a pior forma de recusar um formulário.
-    est.criacao = { texto: "", lang: f.lang, task_type: "", domain: "", brief: "", enviando: false };
+    est.criacao = {
+      texto: "", lang: f.lang, task_type: "", domain: "", brief: "",
+      enviando: false, material: materialVazio(),
+    };
     est.minhasCriacoes = null;
+    if (meuP) {
+      // O pedido virou `usado` na mesma transação da criação; o refetch traz a
+      // fila e as facetas já sem ele.
+      est.pedido.dados = null;
+      est.pedido.motivoChave = null;
+    }
     recado(novo.duplicata_corpus ? t("recado.criada_dup") : t("recado.criada"));
     desenharArea();
     carregarMinhasCriacoes();
     return;
   } catch (e) {
+    // A reserva expirou no meio da escrita — o caso que MAIS vai acontecer
+    // (alguém abre o pedido, escreve por horas e envia). O rascunho FICA em
+    // `est`; o painel volta ao modo "puxar" e a frase diz o conserto.
+    if (meuP && e.status === 409) {
+      recado(t("recado.reserva_expirada"), true);
+      est.pedido.dados = null;
+      f.enviando = false;
+      desenharArea();
+      return;
+    }
     recado(t("recado.erro_criar", { erro: e.message }), true);
   }
   f.enviando = false;
@@ -8087,7 +8717,85 @@ function desenharDetalheCriacao() {
     det.appendChild(el("p", "vazio-linha", t("criar.escolha")));
     return;
   }
-  det.appendChild(cartaoDeCriacao(item, acoesDeCriacao(item)));
+  // A criação vinda de PEDIDO leva junto o que o revisor precisa para julgar
+  // originalidade (F5): o recorte AO LADO, o anti-cópia que o servidor
+  // calculou, e a tríade em leitura. Tudo dentro do mesmo cartão — um segundo
+  // painel separaria o julgamento do que está sendo julgado.
+  const extras = el("div");
+  if (item.pedido) {
+    extras.appendChild(blocoRevisaoPedido(item));
+    if (item.material) extras.appendChild(blocoTriadeLeitura(item.material));
+  }
+  extras.appendChild(acoesDeCriacao(item));
+  det.appendChild(cartaoDeCriacao(item, extras));
+}
+
+/** O recorte e o veredito do anti-cópia, para quem revisa uma criação de pedido.
+
+    O número vem do SERVIDOR (`criacoes.anticopia`, recalculado a cada leitura
+    com a régua de agora) — um revisor estimando sobreposição no olho não é
+    verificação. O trecho em comum viaja no `title` da linha: útil quando o
+    número é alto, ruído visual quando são 8 caracteres de "a partir de". */
+function blocoRevisaoPedido(item) {
+  const caixa = el("div", "revisao-pedido");
+  caixa.appendChild(el("div", "rotulo-bloco", t("pedido.recorte")));
+  caixa.appendChild(el("div", "pedido-recorte dado", item.pedido.recorte));
+  const ac = item.anticopia;
+  if (ac) {
+    const linha = el("p", ac.chars >= ac.limiar ? "anticopia grave" : "anticopia",
+      t("revisao.anticopia", { n: n(ac.chars), limiar: n(ac.limiar) }));
+    if (ac.trecho) linha.title = ac.trecho;
+    caixa.appendChild(linha);
+  }
+  caixa.appendChild(el("p", "aviso-autoria", t("revisao.originalidade")));
+  return caixa;
+}
+
+/** A tríade em LEITURA — o revisor julga o que foi entregue, não edita.
+
+    O material chega desserializado do `GET /api/criacoes` (`criacoes._material`)
+    na forma de `rubrica@3`; desenhar aqui com inputs convidaria a corrigir, e
+    a decisão do P4 é uma passagem SEM edição — proveniência não se conserta. */
+function blocoTriadeLeitura(material) {
+  const caixa = el("div", "revisao-triade");
+  const rub = material.rubrica;
+  if (rub) {
+    caixa.appendChild(el("div", "rotulo-bloco", t("triade.rubrica_titulo")));
+    caixa.appendChild(el("p", "dado", rub.titulo));
+    for (const c of rub.criterios || []) {
+      const cx = el("div", "criterio-leitura");
+      const esc = c.escala || {};
+      const ancoras = (esc.ancoras || [])
+        .map((a) => a.valor + " — " + a.rotulo).join(" · ");
+      juntar(cx,
+        el("strong", "dado", c.nome),
+        el("p", "dado", c.descricao),
+        el("p", "fraco dado",
+          (esc.min || 1) + ".." + (esc.max || "?") + (ancoras ? " · " + ancoras : "")));
+      caixa.appendChild(cx);
+    }
+  }
+  const gold = material.gold;
+  if (gold) {
+    caixa.appendChild(el("div", "rotulo-bloco espaco-acima-2", t("triade.gold_titulo")));
+    for (const [campo, chave] of [
+      ["deve_conter", "triade.deve_conter"],
+      ["nao_pode", "triade.nao_pode"],
+      ["armadilhas", "triade.armadilhas"],
+    ]) {
+      const itens = gold[campo] || [];
+      if (!itens.length) continue;
+      caixa.appendChild(el("p", "fraco", t(chave)));
+      const ul = el("ul");
+      for (const it of itens) ul.appendChild(el("li", "dado", String(it)));
+      caixa.appendChild(ul);
+    }
+    if (gold.observacoes) {
+      caixa.appendChild(el("p", "fraco", t("triade.observacoes")));
+      caixa.appendChild(el("p", "dado", gold.observacoes));
+    }
+  }
+  return caixa;
 }
 
 /** Aprovar / recusar. A recusa abre o comentário obrigatório — ele é a única

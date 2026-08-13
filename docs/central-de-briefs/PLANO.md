@@ -630,7 +630,7 @@ Decisões que a implementação fechou:
 - **a reserva expirada no meio da escrita é 409 com o conserto na frase** ("puxe-o
   de novo antes de enviar") — é o caso que mais vai acontecer.
 
-**F4-2 — a tela.**
+**F4-2 — a tela. FEITO (2026-08-12).**
 Painel do pedido, fila "puxar próximo", devolução, blocos de rubrica/gold no
 formulário, envio gravando `pedido_id` + `material_json`; i18n completo
 (`data-t`, tabelas de chave literal).
@@ -638,7 +638,35 @@ DoD: no navegador — puxar um pedido, escrever a tríade, enviar; a criação
 lista com o pedido ao lado; o toggle `en`/`pt` mantém rascunho e pedido; zero
 `innerHTML`; zero erro de console.
 
-**F5 — Revisão com anti-cópia + materialização.**
+**Medido no navegador** (2026-08-12, contra o banco real da worktree, 42
+pedidos): o painel abriu com as facetas verdadeiras (Biologia 37 / Filosofia 5;
+aluno 18 / professor 24; 42 disponíveis); o filtro Filosofia reservou o pedido
+#1 e o painel mostrou recorte serifado, tema, meta, selo `aluno`, chip
+`Pergunta aberta · qa-aberta`, o aviso de autoria permanente e o TTL de 180
+min; a cascata do botão andou na ordem do trabalho — `faltam 15 caractere(s)` →
+`o título da rubrica precisa de mais 5` → `a rubrica precisa de mais 3
+critério(s)` → `«deve conter» precisa de ao menos 2 item(ns)` → `Enviar para
+revisão`; o toggle `en` no meio do rascunho fez **zero requisição** (aba
+Network) e preservou prompt, título, 3 critérios e o painel aberto; o envio deu
+**201** com o blob `material_criacao@1` carimbado pelo servidor (3 critérios,
+pontas em 1 e 5; gold 3+1), o pedido #1 saiu para `usado` **na mesma
+transação** e as facetas caíram para 41/Filosofia 4; a criação listou com o
+bloco "Do pedido #1" ao lado; o pedido #2 foi puxado e devolvido, voltando à
+fila. Zero mensagem de console (nem aviso), zero `innerHTML` no arquivo. Suíte:
+**1.441 passando**, ruff limpo. A criação de verificação foi **apagada** e o
+pedido #1 devolvido a `disponivel` — o precedente do P4: prompt escrito por IA
+não fica num funil cuja tese é proveniência humana (a trilha de `eventos`
+fica).
+
+**Uma correção de contrato que a tela exigiu.** Os limites da tríade não eram
+descobríveis: o `/api/health` publica `max_criterios_rubrica = 8` (o da aba
+escrever_rubrica, `[annotate]`) e a tríade valida contra o **5** de
+`[pedidos]`; os pisos da gold não estavam em rota nenhuma. `GET /api/pedidos`
+passou a devolver `limites` (`pedidos.limites_da_triade()`, as MESMAS chaves e
+defaults que `models.py` lê), e a tela os consome por `limPedido()` — nunca
+pelo health.
+
+**F5 — Revisão com anti-cópia + materialização. FEITO (2026-08-13).**
 Verificação de sobreposição no servidor (submissão E revisão), recorte ao
 lado da criação na sub-aba do revisor, aprovação materializando a rubrica em
 `rubricas` (`origem='criacao'`, `prompt_uid=uid_previsto`).
@@ -647,12 +675,55 @@ aprovação de uma criação real cria exatamente 1 linha em `rubricas` apontand
 para o `uid_previsto`; o funil P6 segue intacto (smoke de `pf ingest
 plataforma --data-dir` com uma criação de pedido).
 
-**F6 — Entrega.**
+**Medido** (2026-08-13; `annotate/criacoes.py` §anti-cópia + materialização,
+`tests/test_central_revisao.py`, 15 testes; suíte **1.461**): a medida é a
+maior substring comum sobre texto casefolded com espaço colapsado, por busca
+binária no comprimento (a pergunta "existe trecho comum de k" é monotônica;
+a varredura interna é o `in` do C — a DP O(n·m) em Python custaria a listagem).
+No navegador, contra o banco real: um prompt com 165 caracteres colados do
+recorte (quebras de linha achatadas de propósito — o "conserto" barato que a
+normalização existe para pegar) foi recusado com a frase inteira ("escreva com
+as suas palavras… limite: 60" + o começo do trecho); o mesmo formulário com o
+prompt reescrito passou (422 → 201, rascunho intacto entre os dois). A sub-aba
+do revisor mostrou o recorte serifado, a linha do anti-cópia calculada pelo
+servidor ("24 caractere(s) — limite de recusa: 60", trecho no tooltip), a
+instrução de originalidade e a tríade em leitura; a aprovação materializou
+**exatamente 1 rubrica** — `origem='criacao'`, `anotacao_id` NULL, `rubrica@3`
+com os 3 critérios normalizados, e `prompt_uid = 5801998e0b2c1b01`, o MESMO
+uid que o P4 mediu para a criação id 1 (determinismo conferido de graça). O
+smoke do P6 exporta a criação de pedido e a SENHA plantada no recorte não
+aparece em byte nenhum do parquet. `[pedidos] max_overlap_chars = 60` no
+settings, **a calibrar contra submissões reais** — os 24 caracteres do prompt
+legítimo ("ferramentas para pensar", citação natural do conceito) e os 165 do
+colado sugerem que 60 separa bem os dois mundos, mas dois pontos não são uma
+distribuição. Dados de verificação apagados ao fim (precedente do P4); as duas
+personas de teste ficam (apagar anotador é recusado por desenho).
+
+**F6 — Entrega. FEITO (2026-08-13).**
 O gold e a referência ao pedido (tema/meta/papel — nunca o recorte) saindo no
 perfil de entrega adequado do P5b; dataset card dizendo a frase da §6.
 DoD: export com 1 criação-de-pedido aprovada contém a tríade e NÃO contém o
 recorte (teste varre o arquivo por uma senha plantada no recorte, não pela
 chave — o padrão do alvo escondido).
+
+**Medido** (2026-08-13; `entrega.py` §triads, 5 testes novos em
+`tests/test_central_revisao.py`; suíte **1.466**): o P5b ganhou o **sétimo
+perfil**, `triads` (o quarto de dado) — uma linha por criação-de-pedido em
+`aprovada|exportada` com prompt, `rubrica`/`gold` nas chaves pt-BR do contrato
+`material_criacao@1` (o schema gravado não se renomeia na saída; o GLOSSARIO
+ganhou as 8 chaves da tríade), o bloco `request` em inglês (tema, meta, papel,
+série, dificuldade, disciplina, BNCC — **nunca** recorte nem arquivo_fonte) e
+`anti_copy` como NÚMERO + régua (o trecho literal é texto do material e não
+atravessa). O registro é montado campo a campo porque `criacoes.listar` devolve
+o pedido com o recorte dentro — um `{**item}` vazaria na primeira chave nova. O
+`statuses` do manifesto diz os estados da CRIAÇÃO (dizer `avaliada` afirmaria
+uma passagem 2 que o modo criar não tem), e `NOTE_MATERIAL` declara a política.
+O dataset card ganhou a seção "Created prompts (Central de Briefs)" com a frase
+da §6 (âncoras de teste: "elicited by pedagogical briefs", "without reproducing
+the material"), só quando há tríade — num artefato descritivo, seção sobre
+recorte vazio prometeria um `triads.jsonl` que o `all` entrega vazio. O teste
+da DoD varre o arquivo E o card pela SENHA plantada no recorte. `--perfil all`
+passou a entregar seis coletivos (smoke real na CLI, saída em tmp).
 
 ## 9. As perguntas abertas — RESPONDIDAS pelo dono em 2026-08-12
 

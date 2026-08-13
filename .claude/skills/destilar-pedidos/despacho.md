@@ -27,6 +27,7 @@ prompt.
 - Lote: `<<LOTE_ID>>`
 - Arquivo: `<<ARQUIVO>>`
 - Coleção: `<<COLECAO>>` · Disciplina: `<<DISCIPLINA>>`
+- Série sugerida pelo volume no nome do arquivo: `<<SERIE_SUGERIDA>>`
 - Janelas: `<<N_JANELAS>>`
 
 ## Formato da saída
@@ -88,9 +89,14 @@ por etapas, eu travei na fase clara" (aluno).
 
 ### `serie` — `1`, `2`, `3` ou `indefinido`
 
-Use `indefinido` quando o trecho não amarrar o ano — é o caso mais comum e é
-resposta legítima, não desistência. Só declare `1`/`2`/`3` quando houver
-indício real (o volume, a unidade, o pré-requisito citado).
+Quando o lote traz uma **série sugerida** (o volume no nome do arquivo:
+volume 1 = 1º ano, o formato seriado do PNLD), use-a — o volume amarra o ano no
+nível do LIVRO inteiro, e vale mesmo quando o trecho não menciona série
+nenhuma. Só declare outra coisa se a própria janela contradisser o volume.
+
+Sem sugestão (volume único), use `indefinido` quando o trecho não amarrar o
+ano — é o caso mais comum e é resposta legítima, não desistência. Só declare
+`1`/`2`/`3` quando houver indício real (a unidade, o pré-requisito citado).
 
 ### `dificuldade` — `basica`, `intermediaria` ou `avancada`
 

@@ -239,12 +239,21 @@ def normalizar_nome(nome: str) -> str:
 
 
 def metadados_do_nome(nome: str) -> dict[str, str]:
-    """``{"colecao": ..., "disciplina": ...}`` — vazio quando não dá para saber.
+    """``{"colecao": ..., "disciplina": ..., "serie": ...}`` — vazio quando não dá para saber.
 
     **Vazio é resposta**, e é por isso que as colunas têm ``DEFAULT ''``. Chutar
     uma disciplina a partir de um nome que não casa nenhum padrão poria um
     rótulo errado numa faceta que o operador usa para escolher o que destilar —
     e um rótulo errado é pior que um campo em branco, que pelo menos se vê.
+
+    A ``serie`` sai do MARCADOR DE VOLUME, medido nos 35 nomes reais: ``VOL1``/
+    ``VOL2``/``VOL3`` (9 arquivos) e o dígito solto entre underscores de
+    ``..._MATEM_1_MP`` (3 arquivos). A premissa "volume N = N-ª série" é o
+    formato seriado padrão do PNLD-EM (uma obra de 3 volumes, um por ano) — e
+    ela viaja como SUGESTÃO no lote, nunca como valor forçado: o agente ainda
+    decide por janela, e o import só valida o enum. ``VU`` (volume único) e o
+    arquivo minúsculo-hifenizado não casam nada e devolvem ``""`` — o ``2026``
+    do nome dele tem 4 dígitos e não é um ``[123]`` isolado, de propósito.
     """
     alvo = normalizar_nome(nome)
     colecao = next((v for k, v in COLECOES.items() if k in alvo), "")
@@ -254,7 +263,12 @@ def metadados_do_nome(nome: str) -> dict[str, str]:
         if re.search(rf"(?:^|_){re.escape(chave)}(?:_|$)", alvo):
             disciplina = DISCIPLINAS[chave]
             break
-    return {"colecao": colecao, "disciplina": disciplina}
+    volume = re.search(r"(?:^|_)(?:VOL_?)?([123])(?:_|$)", alvo)
+    return {
+        "colecao": colecao,
+        "disciplina": disciplina,
+        "serie": volume.group(1) if volume else "",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -593,6 +607,11 @@ def montar_lote(
         "arquivo_fonte": arquivo_fonte,
         "disciplina": meta.get("disciplina", ""),
         "colecao": meta.get("colecao", ""),
+        # SUGESTÃO, não valor forçado: o volume no nome do arquivo amarra o ano
+        # no nível do LIVRO (volume 1 = 1º ano, o formato seriado do PNLD-EM),
+        # onde o destilador não enxerga. O agente ainda decide por janela; o
+        # import usa isto só como fallback quando ele não amarra nada.
+        "serie_sugerida": meta.get("serie", ""),
         "n_janelas": len(janelas),
         "instrucoes": (
             "Para CADA janela, proponha de 0 a "
@@ -845,6 +864,17 @@ def validar(
         if erro:
             erros.append(erro)
             continue
+        # O fallback da SUGESTÃO do nome do arquivo: o volume amarra o ano no
+        # nível do LIVRO, e um `indefinido` do agente significa "a janela não
+        # amarra" — que não apaga um fato do arquivo. Um `1`/`2`/`3` explícito
+        # do agente VENCE a sugestão (é para isso que ela é sugestão); um valor
+        # torto em `serie_sugerida` (lote editado à mão) é ignorado, porque
+        # recusar o pedido por um campo que o agente nem escreveu seria punir a
+        # resposta pela pergunta.
+        if serie == "indefinido":
+            sugerida = str(lote.get("serie_sugerida") or "")
+            if sugerida in adb.SERIES_PEDIDO:
+                serie = sugerida
         dificuldade, erro = _enum(
             bruto.get("dificuldade") or "intermediaria",
             adb.DIFICULDADES_PEDIDO,

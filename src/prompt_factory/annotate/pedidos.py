@@ -60,6 +60,27 @@ def reserva_ttl_min() -> int:
     return int(_cfg("pedidos", "reserva_ttl_min", default=180))
 
 
+def limites_da_triade() -> dict[str, int]:
+    """Os pisos e tetos que a TELA precisa para desenhar a tríade.
+
+    O ``/api/health`` já publica limites — mas o ``max_criterios_rubrica`` de lá
+    é o da aba escrever_rubrica (``[annotate]``, 8), e a tríade valida contra o
+    de ``[pedidos]`` (5): uma tela que lesse o health deixaria a pessoa chegar a
+    oito critérios e tomar 422 no envio. E os pisos da gold não estavam em rota
+    nenhuma. As MESMAS chaves e defaults que ``models.RubricaCriacaoIn`` e
+    ``models.GoldCriacaoIn`` leem — divergir aqui é o botão e o 422 contando
+    histórias diferentes, o defeito que a regra "limite vem do servidor" existe
+    para evitar.
+    """
+    return {
+        "min_criterios_rubrica": int(_cfg("annotate", "min_criterios_rubrica", default=3)),
+        "max_criterios_rubrica": int(_cfg("pedidos", "max_criterios_rubrica", default=5)),
+        "gold_min_deve_conter": int(_cfg("pedidos", "gold_min_deve_conter", default=2)),
+        "gold_min_nao_pode": int(_cfg("pedidos", "gold_min_nao_pode", default=1)),
+        "gold_min_chars_item": int(_cfg("pedidos", "gold_min_chars_item", default=15)),
+    }
+
+
 def expirar(conn: sqlite3.Connection) -> int:
     """Devolve à fila as reservas vencidas. Devolve quantas foram.
 
@@ -340,6 +361,7 @@ __all__ = [
     "devolver",
     "expirar",
     "facetas",
+    "limites_da_triade",
     "marcar_usado",
     "meu",
     "proximo",

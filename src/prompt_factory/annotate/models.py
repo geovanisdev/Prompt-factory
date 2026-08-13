@@ -811,9 +811,9 @@ class MaterialCriacaoIn(BaseModel):
     revisão. Os três juntos são o que datasets de instruction-following pedem, e
     é a razão de a Central existir — um prompt solto qualquer pessoa escreve.
 
-    ``schema`` é aceito e ignorado se vier: quem carimba é o servidor
-    (``SCHEMA_MATERIAL_CRIACAO``), porque um cliente que declarasse o contrato
-    poderia declarar um que ele não cumpre.
+    ``schema`` NÃO é aceito no corpo (``extra="forbid"`` o transforma em 422):
+    quem carimba é o servidor (``SCHEMA_MATERIAL_CRIACAO``), porque um cliente
+    que declarasse o próprio contrato poderia declarar um que ele não cumpre.
     """
 
     model_config = ConfigDict(extra="forbid")

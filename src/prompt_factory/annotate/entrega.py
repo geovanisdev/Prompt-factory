@@ -5,13 +5,14 @@ DENTRO dela: um banco SQLite que ninguém fora desta máquina abre. Um fornecedo
 de data annotation não entrega um banco — entrega arquivos com o dado, a
 proveniência e a **prova de que o QC aconteceu**. É isso que mora aqui.
 
-SEIS PERFIS, DOIS PRODUTOS DIFERENTES
+SETE PERFIS, DOIS PRODUTOS DIFERENTES
 =====================================
-Três perfis são **dado** (``annotations``, ``sft``, ``preference``): uma linha
-por item, com licença e atribuição por linha, prontos para carregar. Três são
-**prosa** (``quality-report``, ``dataset-card``, ``audit``): o que um avaliador
-lê para decidir se confia no dado. O portfólio vive nos dois — dado sem prova de
-QC é um arquivo; prova de QC sem dado é uma apresentação.
+Quatro perfis são **dado** (``annotations``, ``sft``, ``preference`` e, desde o
+F6, ``triads`` — a tríade da Central de Briefs): uma linha por item, com licença
+e atribuição por linha, prontos para carregar. Três são **prosa**
+(``quality-report``, ``dataset-card``, ``audit``): o que um avaliador lê para
+decidir se confia no dado. O portfólio vive nos dois — dado sem prova de QC é um
+arquivo; prova de QC sem dado é uma apresentação.
 
 AS DECISÕES QUE NÃO SÃO DETALHE DE FORMATO
 ==========================================
@@ -89,6 +90,12 @@ STATUS_ENTREGUE: tuple[str, ...] = ("avaliada",)
 #: Passou na triagem, ainda não passou pelo Rate and Review. Entra só a pedido.
 STATUS_PARCIAL: tuple[str, ...] = ("pendente_avaliacao",)
 
+#: O que conta como entregável no perfil ``triads`` (F6). A criação tem UMA
+#: passagem de revisão (decisão do P4), então ``aprovada`` já é aceitação; a
+#: ``exportada`` continua entrando porque o carimbo do P6 não muda o conteúdo —
+#: excluí-la faria a tríade SUMIR da entrega no dia em que a ingestão rodasse.
+STATUS_TRIADE: tuple[str, ...] = ("aprovada", "exportada")
+
 #: Chave de payload (pt-BR, do schema gravado) → o que ela significa, em inglês.
 #: Vai publicado no dataset card. NÃO é uma tradução aplicada ao arquivo: o
 #: arquivo carrega o contrato como ele foi gravado (ver o docstring do módulo).
@@ -133,6 +140,16 @@ GLOSSARIO: dict[str, str] = {
     "titulo": "rubric title",
     "rubrica": "scores for the rubric applied to the conversation as a whole",
     "notas_do_autor": "free-form notes the annotator left about the session",
+    # As chaves da TRÍADE (`material_criacao@1`, perfil `triads` — F6). Mesma
+    # regra dos payloads: o contrato gravado não se renomeia na saída.
+    "escala": "the criterion's anchored scale: {min, max, ancoras}",
+    "ancoras": "scale anchors (list of {valor, rotulo}); both endpoints are always anchored",
+    "valor": "the scale position an anchor describes",
+    "rotulo": "the anchor's text",
+    "deve_conter": "verifiable points a gold answer must present (list)",
+    "nao_pode": "errors that disqualify an answer (list)",
+    "armadilhas": "what a fluent-but-empty answer would do here (list, optional)",
+    "observacoes": "short free prose that does not fit the lists (optional)",
 }
 
 
@@ -179,6 +196,16 @@ PERFIS: dict[str, Perfil] = {
         "carrying the conversation that preceded the choice.",
         dado=True,
         tipos=("comparar_ab", "duelo_modelos"),
+    ),
+    "triads": Perfil(
+        "triads",
+        "jsonl",
+        "Created-prompt triads",
+        "One line per prompt written from a pedagogical brief (Central de "
+        "Briefs): the human-written prompt (CC0), the rubric to grade answers "
+        "with, and the descriptive gold reference. References the request's "
+        "theme, teaching goal and role — never the copyrighted excerpt.",
+        dado=True,
     ),
     "quality-report": Perfil(
         "quality-report",
@@ -592,6 +619,79 @@ def registros_preference(
             }
 
 
+def registros_triades(
+    conn: sqlite3.Connection, conn_corpus: sqlite3.Connection
+) -> Iterable[dict[str, Any]]:
+    """A tríade da Central de Briefs: prompt humano + rubrica + gold (F6).
+
+    O registro é montado CAMPO A CAMPO, e a disciplina aqui é a mesma do
+    ``gabarito_json`` do P2: ``criacoes.listar`` devolve o pedido INTEIRO
+    (recorte incluído — o revisor precisa dele) e o ``anticopia`` com o TRECHO
+    literal em comum. Nenhum dos dois pode sair: são texto do material de
+    editora, e a §6 do plano é a razão de ser do módulo. Um ``{**item}``
+    passaria no teste de hoje e vazaria no dia em que alguém acrescentasse uma
+    chave.
+
+    As chaves de ``rubrica``/``gold`` ficam em pt-BR (o contrato
+    ``material_criacao@1`` gravado — ver o docstring do módulo); o bloco
+    ``request`` é metadado NOSSO e sai em inglês, como toda prosa de artefato.
+    ``anti_copy`` publica o NÚMERO da verificação e a régua, nunca o trecho.
+    """
+    from . import criacoes as crimod
+
+    for item in crimod.listar(conn, conn_corpus):
+        if item["status"] not in STATUS_TRIADE:
+            continue
+        if item["pedido_id"] is None or not item["material"]:
+            continue
+        material = item["material"]
+        ped = item["pedido"] or {}
+        ac = item["anticopia"] or {}
+        yield {
+            "creation_id": item["id"],
+            "uid": item["uid_previsto"],
+            "in_corpus": item["chegou_ao_corpus"],
+            "lang": item["lang"],
+            "source": crimod.FONTE,
+            "license": item["licenca"],
+            "author": item["autor"],
+            "status": item["status"],
+            "prompt": item["texto"],
+            "material_schema": material.get("schema"),
+            "rubrica": material.get("rubrica"),
+            "gold": material.get("gold"),
+            "request": {
+                "id": item["pedido_id"],
+                "role": ped.get("papel"),
+                "task_type": ped.get("task_type"),
+                "theme": ped.get("tema"),
+                "teaching_goal": ped.get("meta_pedagogica"),
+                "series": ped.get("serie"),
+                "difficulty": ped.get("dificuldade"),
+                "subject": ped.get("disciplina"),
+                "bncc_skills": ped.get("habilidades"),
+            },
+            "anti_copy": (
+                {"overlap_chars": ac.get("chars"), "threshold": ac.get("limiar")}
+                if ac
+                else None
+            ),
+            "reviewer": item["revisor"],
+            "reviewed_at": item["revisada_em"],
+        }
+
+
+def resumo_central(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Quantas tríades entregáveis existem, para o dataset card declarar."""
+    linha = conn.execute(
+        "SELECT count(*) AS n, count(DISTINCT pedido_id) AS pedidos FROM criacoes "
+        f"WHERE pedido_id IS NOT NULL AND material_json IS NOT NULL "
+        f"  AND status IN ({','.join('?' * len(STATUS_TRIADE))})",
+        STATUS_TRIADE,
+    ).fetchone()
+    return {"triades": int(linha["n"]), "pedidos": int(linha["pedidos"])}
+
+
 # ---------------------------------------------------------------------------
 # métricas (leem TUDO, sintéticas incluídas — descrever é a função delas)
 # ---------------------------------------------------------------------------
@@ -961,6 +1061,27 @@ def dataset_card(itens: list[dict[str, Any]], contexto: dict[str, Any]) -> str:
             ),
         ]
 
+    central = contexto.get("central") or {}
+    if central.get("triades"):
+        linhas += [
+            "",
+            "## Created prompts (Central de Briefs)",
+            "",
+            f"{central['triades']} prompt(s) in this platform were **elicited by "
+            "pedagogical briefs derived from commercial teaching material** (PNLD "
+            "textbooks), **without reproducing the material**: the writer reads an "
+            "excerpt locally and writes the prompt in their own words, dedicated "
+            "CC0. The excerpt never enters the prompt, the platform's exports or "
+            "this delivery — an automated anti-copy check (longest literal overlap "
+            "against a configured threshold) enforces the rule at submission, and "
+            "the reviewer judges originality with the excerpt at hand.",
+            "",
+            "Each such prompt ships as a **triad** in `triads.jsonl`: the prompt, "
+            "the rubric to grade answers with, and a descriptive gold reference. "
+            "Rows reference the request's theme, teaching goal and role — never "
+            "the excerpt.",
+        ]
+
     linhas += [
         "",
         "## Language convention",
@@ -1183,13 +1304,20 @@ def executar(
     # Os perfis de PROVA descrevem o conjunto inteiro (sintéticas incluídas):
     # descrever é a função deles, e um relatório de QC que esconde metade do
     # material sobre o qual o QC foi exercido não é um relatório de QC.
-    itens = coletar(
-        conn,
-        conn_corpus,
-        incluir_sinteticas=True if not pf.dado else incluir_sinteticas,
-        incluir_pendentes=incluir_pendentes,
-        tipos=tipos or pf.tipos,
-        projeto=projeto,
+    # O `triads` (F6) não lê anotações de jeito nenhum: a fonte dele é
+    # `criacoes`, e coletar aqui faria o manifesto descrever um recorte de
+    # anotações que o arquivo não contém.
+    itens = (
+        []
+        if chave_perfil == "triads"
+        else coletar(
+            conn,
+            conn_corpus,
+            incluir_sinteticas=True if not pf.dado else incluir_sinteticas,
+            incluir_pendentes=incluir_pendentes,
+            tipos=tipos or pf.tipos,
+            projeto=projeto,
+        )
     )
 
     agora = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1198,9 +1326,19 @@ def executar(
     contexto = {
         "created_at": agora,
         "taxonomy_version": TAXONOMY_VERSION,
-        "statuses": list(STATUS_ENTREGUE) + (list(STATUS_PARCIAL) if incluir_pendentes else []),
+        # O `statuses` do manifesto descreve O QUE o arquivo contém — para o
+        # `triads` são os estados da CRIAÇÃO, não os da anotação: dizer
+        # `avaliada` num arquivo de criações afirmaria uma passagem 2 que o
+        # modo criar não tem (decisão do P4).
+        "statuses": (
+            list(STATUS_TRIADE)
+            if chave_perfil == "triads"
+            else list(STATUS_ENTREGUE)
+            + (list(STATUS_PARCIAL) if incluir_pendentes else [])
+        ),
         "synthetic_signal": f"anotacoes.{adb.COLUNA_GABARITO_AVALIACAO} IS NOT NULL",
         "composicao": germod.composicao(conn),
+        "central": resumo_central(conn),
     }
 
     n = 0
@@ -1212,6 +1350,7 @@ def executar(
             "annotations": lambda: registros_annotations(itens),
             "sft": lambda: registros_sft(itens),
             "preference": lambda: registros_preference(conn, itens),
+            "triads": lambda: registros_triades(conn, conn_corpus),
         }[pf.chave]
 
         def _escrever_jsonl(tmp: Path) -> None:
@@ -1238,6 +1377,9 @@ def executar(
                 if i["tipo"] == "comparar_ab"
                 and (i["payload_final"] or {}).get("preferencia") == "empate"
             )
+        if pf.chave == "triads":
+            extra["requests_referenced"] = contexto["central"]["pedidos"]
+            extra["material_schema"] = "material_criacao@1"
     else:
         if pf.chave == "audit":
             if anotacao_id is None:
@@ -1304,6 +1446,12 @@ def executar(
             "the corpus (the corpus is rebuilt and swapped by `pf load-db`) and "
             "were dropped from this artifact."
         )
+    if pf.chave == "triads":
+        manifest["NOTE_MATERIAL"] = (
+            "the excerpt from the source teaching material never leaves the "
+            "machine: rows reference the request (theme, teaching goal, role) and "
+            "carry the anti-copy measurement — never the excerpt itself."
+        )
 
     manifesto = destino_dir / f"{base}.manifest.json"
     _escrever_atomico(
@@ -1320,6 +1468,7 @@ __all__ = [
     "PERFIS",
     "STATUS_ENTREGUE",
     "STATUS_PARCIAL",
+    "STATUS_TRIADE",
     "Perfil",
     "Resultado",
     "auditoria",
@@ -1332,6 +1481,8 @@ __all__ = [
     "registros_annotations",
     "registros_preference",
     "registros_sft",
+    "registros_triades",
     "relatorio_qualidade",
+    "resumo_central",
     "triagem_deixou_passar",
 ]

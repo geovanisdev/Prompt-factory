@@ -90,6 +90,7 @@ def compor_despacho(
         "<<ARQUIVO>>": lote["arquivo_fonte"],
         "<<COLECAO>>": lote.get("colecao") or "(não identificada)",
         "<<DISCIPLINA>>": lote.get("disciplina") or "(não identificada)",
+        "<<SERIE_SUGERIDA>>": lote.get("serie_sugerida") or "(nenhuma — volume único)",
         "<<N_JANELAS>>": str(len(janelas)),
         "<<MAX_POR_JANELA>>": str(limites["max_pedidos_por_janela"]),
         "<<RECORTE_MIN>>": str(limites["recorte_min_chars"]),

@@ -1129,8 +1129,9 @@ def _annotate_export(args: argparse.Namespace, banco: Path, corpus: Path) -> int
     prompt, não há licença e não há atribuição — e um export de anotação sem a
     proveniência da linha não cumpre a licença de nenhuma das fontes.
 
-    ``--perfil all`` gera os cinco perfis coletivos de uma vez. A auditoria fica
-    de fora dele de propósito: ela é de UM item e precisa de ``--anotacao``.
+    ``--perfil all`` gera os seis perfis coletivos de uma vez (os quatro de dado
+    — ``triads`` incluído desde o F6 — e os dois de prova coletiva). A auditoria
+    fica de fora dele de propósito: ela é de UM item e precisa de ``--anotacao``.
     """
     from . import db as dbmod
     from . import paths
