@@ -119,45 +119,54 @@ def _importar(conn: sqlite3.Connection, dp: dmod.DestilacaoPaths, lote_id: str, 
 # ---------------------------------------------------------------------------
 
 #: Os casos REAIS que quebram um ``split("_")``. Foram medidos nos 35 arquivos: a
-#: nomenclatura não tem padrão único, e os três primeiros são a prova.
+#: nomenclatura não tem padrão único, e os três primeiros são a prova. A quarta
+#: coluna é a SÉRIE do marcador de volume (``VOL2``, ``_1_``); ``VU`` e o nome
+#: hifenizado (cujo ``2026`` não é um ``[123]`` isolado) devolvem vazio.
 NOMES = [
     # a disciplina vem ANTES da coleção
-    ("ESPANHOL_SINTESIS_PNLD26_VU_LP.txt", "Síntesis", "Espanhol"),
+    ("ESPANHOL_SINTESIS_PNLD26_VU_LP.txt", "Síntesis", "Espanhol", ""),
     # tudo minúsculo e hifenizado, sem "PNLD26" no lugar de sempre
     (
         "identidade-saraiva-projetos-integradores-matematica-pnld-ensino-medio-2026.txt",
         "Identidade Saraiva",
         "Projetos Integradores",
+        "",
     ),
     # a mesma coleção com ESPAÇO em vez de underscore
-    ("IDENTIDADE SARAIVA_PNLD26_REDACAO_VU_MP.txt", "Identidade Saraiva", "Redação"),
-    ("CIENCIA VIVA_PNLD26_BIOLOGIA_VU_PR.txt", "Ciência Viva", "Biologia"),
-    ("DOSEUJEITO_PNLD26_Filosofia_VU_MP.txt", "Do Seu Jeito", "Filosofia"),
-    ("DOSEUJEITO_PNLD26_CIE_HUMANAS_VU_MP.txt", "Do Seu Jeito", "Ciências Humanas"),
-    ("DOSEUJEITO_PNLD26_LP_VOL2_MP.txt", "Do Seu Jeito", "Língua Portuguesa"),
+    ("IDENTIDADE SARAIVA_PNLD26_REDACAO_VU_MP.txt", "Identidade Saraiva", "Redação", ""),
+    ("CIENCIA VIVA_PNLD26_BIOLOGIA_VU_PR.txt", "Ciência Viva", "Biologia", ""),
+    ("DOSEUJEITO_PNLD26_Filosofia_VU_MP.txt", "Do Seu Jeito", "Filosofia", ""),
+    ("DOSEUJEITO_PNLD26_CIE_HUMANAS_VU_MP.txt", "Do Seu Jeito", "Ciências Humanas", ""),
+    ("DOSEUJEITO_PNLD26_LP_VOL2_MP.txt", "Do Seu Jeito", "Língua Portuguesa", "2"),
+    ("DOSEUJEITO_PNLD26_MATEM_VOL3_MP.txt", "Do Seu Jeito", "Matemática", "3"),
+    # o dígito SOLTO entre underscores — a outra grafia real de volume
+    ("IDENTIDADE_SARAIVA_PNLD26_MATEM_1_MP.txt", "Identidade Saraiva", "Matemática", "1"),
     # `ED_FISICA` tem de vencer `FISICA` — é o caso que a ordem por tamanho salva
-    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_FISICA_VU_MP.txt", "Identidade Saraiva", "Educação Física"),
-    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_DIGITAL_VU_MP.txt", "Identidade Saraiva", "Educação Digital"),
+    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_FISICA_VU_MP.txt", "Identidade Saraiva", "Educação Física", ""),
+    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_DIGITAL_VU_MP.txt", "Identidade Saraiva", "Educação Digital", ""),
 ]
 
 
-@pytest.mark.parametrize(("nome", "colecao", "disciplina"), NOMES)
-def test_o_nome_do_arquivo_revela_colecao_e_disciplina(
-    nome: str, colecao: str, disciplina: str
+@pytest.mark.parametrize(("nome", "colecao", "disciplina", "serie"), NOMES)
+def test_o_nome_do_arquivo_revela_colecao_disciplina_e_serie(
+    nome: str, colecao: str, disciplina: str, serie: str
 ) -> None:
     saida = dmod.metadados_do_nome(nome)
-    assert saida == {"colecao": colecao, "disciplina": disciplina}
+    assert saida == {"colecao": colecao, "disciplina": disciplina, "serie": serie}
 
 
 def test_nome_desconhecido_devolve_vazio_em_vez_de_chutar() -> None:
     """Vazio é resposta, e as colunas têm ``DEFAULT ''`` por causa disso.
 
     Um rótulo errado numa faceta que o operador usa para escolher o que destilar
-    é pior que um campo em branco — o branco pelo menos se vê.
+    é pior que um campo em branco — o branco pelo menos se vê. Vale para a
+    série também: o ``2026`` deste nome contém ``2``, mas não é um ``[123]``
+    isolado entre fronteiras.
     """
     assert dmod.metadados_do_nome("apostila_qualquer_2026.txt") == {
         "colecao": "",
         "disciplina": "",
+        "serie": "",
     }
 
 
@@ -515,6 +524,70 @@ def test_enum_fora_do_vocabulario_e_recusado(
 ) -> None:
     _, erros, _ = dmod.validar(lote, {"pedidos": [_pedido(lote, **{campo: valor})]})
     assert erros and campo in erros[0]
+
+
+# ---------------------------------------------------------------------------
+# 7b. a série sugerida pelo nome do arquivo (decisão fechada em 2026-08-13)
+# ---------------------------------------------------------------------------
+#
+# Na rodada do F3, `serie` saiu `indefinido` em 42 de 42: os arquivos eram de
+# volume único E o ano não aparece no texto — mas as coleções seriadas carregam
+# o volume no NOME do arquivo, onde o destilador não enxerga. A premissa
+# "volume N = N-ª série" é o formato seriado do PNLD-EM, e ela entra como
+# SUGESTÃO: viaja no lote, o agente ainda decide por janela, e o import só a
+# usa quando o agente não amarrou nada.
+
+
+def test_o_lote_carrega_a_serie_sugerida_do_nome(lote: dict[str, Any]) -> None:
+    """O material da fixture é volume único: a sugestão viaja VAZIA — presente
+    como chave (o despacho a preenche com "nenhuma") e sem valor inventado."""
+    assert lote["serie_sugerida"] == ""
+
+
+def test_montar_lote_propaga_a_serie_do_meta() -> None:
+    lote = dmod.montar_lote(
+        [], "ped_0001", arquivo_fonte="X_VOL2_MP.txt",
+        meta=dmod.metadados_do_nome("X_MATEM_VOL2_MP.txt"),
+    )
+    assert lote["serie_sugerida"] == "2"
+
+
+def test_serie_omitida_pelo_agente_cai_na_sugestao_do_arquivo(
+    lote: dict[str, Any],
+) -> None:
+    """`indefinido` do agente significa "a janela não amarra o ano" — que não
+    apaga um fato do ARQUIVO: o volume amarra a série no nível do livro."""
+    lote["serie_sugerida"] = "2"
+    pedidos, erros, _ = dmod.validar(lote, {"pedidos": [_pedido(lote)]})
+    assert erros == [] and pedidos[0]["serie"] == "2"
+
+
+def test_serie_explicita_do_agente_VENCE_a_sugestao(lote: dict[str, Any]) -> None:
+    """É para isso que ela é sugestão e não valor forçado: um capítulo de
+    revisão pode amarrar outro ano que o do volume."""
+    lote["serie_sugerida"] = "2"
+    pedidos, erros, _ = dmod.validar(lote, {"pedidos": [_pedido(lote, serie="3")]})
+    assert erros == [] and pedidos[0]["serie"] == "3"
+
+
+def test_indefinido_explicito_tambem_cai_na_sugestao(lote: dict[str, Any]) -> None:
+    """As duas formas de "não amarrei" — omitir e escrever `indefinido` — são a
+    mesma resposta, e tratá-las diferente faria o resultado depender do estilo
+    do modelo."""
+    lote["serie_sugerida"] = "1"
+    pedidos, erros, _ = dmod.validar(
+        lote, {"pedidos": [_pedido(lote, serie="indefinido")]}
+    )
+    assert erros == [] and pedidos[0]["serie"] == "1"
+
+
+def test_sugestao_torta_e_ignorada_sem_recusar_o_pedido(lote: dict[str, Any]) -> None:
+    """Um `serie_sugerida` inválido (lote editado à mão) não pode derrubar o
+    pedido: o agente nem escreveu esse campo — seria punir a resposta pela
+    pergunta. Ignorado, o pedido sai `indefinido`, que é a verdade disponível."""
+    lote["serie_sugerida"] = "9"
+    pedidos, erros, _ = dmod.validar(lote, {"pedidos": [_pedido(lote)]})
+    assert erros == [] and pedidos[0]["serie"] == "indefinido"
 
 
 def test_recorte_fora_dos_caps_e_recusado(lote: dict[str, Any]) -> None:
