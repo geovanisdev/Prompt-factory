@@ -666,7 +666,7 @@ passou a devolver `limites` (`pedidos.limites_da_triade()`, as MESMAS chaves e
 defaults que `models.py` lê), e a tela os consome por `limPedido()` — nunca
 pelo health.
 
-**F5 — Revisão com anti-cópia + materialização.**
+**F5 — Revisão com anti-cópia + materialização. FEITO (2026-08-13).**
 Verificação de sobreposição no servidor (submissão E revisão), recorte ao
 lado da criação na sub-aba do revisor, aprovação materializando a rubrica em
 `rubricas` (`origem='criacao'`, `prompt_uid=uid_previsto`).
@@ -674,6 +674,30 @@ DoD: submissão com trecho colado do recorte é recusada com a mensagem certa;
 aprovação de uma criação real cria exatamente 1 linha em `rubricas` apontando
 para o `uid_previsto`; o funil P6 segue intacto (smoke de `pf ingest
 plataforma --data-dir` com uma criação de pedido).
+
+**Medido** (2026-08-13; `annotate/criacoes.py` §anti-cópia + materialização,
+`tests/test_central_revisao.py`, 15 testes; suíte **1.461**): a medida é a
+maior substring comum sobre texto casefolded com espaço colapsado, por busca
+binária no comprimento (a pergunta "existe trecho comum de k" é monotônica;
+a varredura interna é o `in` do C — a DP O(n·m) em Python custaria a listagem).
+No navegador, contra o banco real: um prompt com 165 caracteres colados do
+recorte (quebras de linha achatadas de propósito — o "conserto" barato que a
+normalização existe para pegar) foi recusado com a frase inteira ("escreva com
+as suas palavras… limite: 60" + o começo do trecho); o mesmo formulário com o
+prompt reescrito passou (422 → 201, rascunho intacto entre os dois). A sub-aba
+do revisor mostrou o recorte serifado, a linha do anti-cópia calculada pelo
+servidor ("24 caractere(s) — limite de recusa: 60", trecho no tooltip), a
+instrução de originalidade e a tríade em leitura; a aprovação materializou
+**exatamente 1 rubrica** — `origem='criacao'`, `anotacao_id` NULL, `rubrica@3`
+com os 3 critérios normalizados, e `prompt_uid = 5801998e0b2c1b01`, o MESMO
+uid que o P4 mediu para a criação id 1 (determinismo conferido de graça). O
+smoke do P6 exporta a criação de pedido e a SENHA plantada no recorte não
+aparece em byte nenhum do parquet. `[pedidos] max_overlap_chars = 60` no
+settings, **a calibrar contra submissões reais** — os 24 caracteres do prompt
+legítimo ("ferramentas para pensar", citação natural do conceito) e os 165 do
+colado sugerem que 60 separa bem os dois mundos, mas dois pontos não são uma
+distribuição. Dados de verificação apagados ao fim (precedente do P4); as duas
+personas de teste ficam (apagar anotador é recusado por desenho).
 
 **F6 — Entrega.**
 O gold e a referência ao pedido (tema/meta/papel — nunca o recorte) saindo no

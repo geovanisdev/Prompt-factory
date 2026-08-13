@@ -90,13 +90,30 @@ def criar(corpo: CriacaoIn, anot: ConAnotacao, corpus: ConCorpus) -> dict[str, A
         # Duas implementações da regra dariam um botão habilitado que devolve
         # erro — o defeito que `catalogo.material_faltando` já evitou uma vez.
         try:
-            pedmod.conferir_para_criacao(anot, corpo.pedido_id, anotador_id=corpo.autor_id)
+            linha_pedido = pedmod.conferir_para_criacao(
+                anot, corpo.pedido_id, anotador_id=corpo.autor_id
+            )
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # ANTI-CÓPIA (F5): a regra do brief v2 ("in your own words") deixa de
+        # depender só de disciplina. Comparação sobre texto casefolded com
+        # espaço colapsado — só para comparar; o que se grava não é tocado.
+        # 422 e não 409: a reserva está válida, o CONTEÚDO é que viola a regra.
+        resultado = crimod.anticopia(corpo.texto or "", str(linha_pedido["recorte"]))
+        if resultado["chars"] >= resultado["limiar"]:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"o prompt reproduz {resultado['chars']} caracteres literais do "
+                    f"recorte (limite: {resultado['limiar']}) — escreva com as suas "
+                    "palavras: o recorte é leitura, não matéria-prima. O trecho em "
+                    f"comum começa com {resultado['trecho'][:60]!r}"
+                ),
+            )
     return crimod.criar(
         anot,
         corpus,

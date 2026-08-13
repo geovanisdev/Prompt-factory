@@ -51,10 +51,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from typing import Any
 
 from .. import schema, textnorm
+from ..config import get as _cfg
 from . import db as adb
 from . import eventos as evmod
 from . import pedidos as pedmod
@@ -139,6 +141,73 @@ def uid_no_corpus(conn_corpus: sqlite3.Connection, uid: str) -> bool:
     )
 
 
+def limiar_anticopia() -> int:
+    """Caracteres de sobreposição literal a partir dos quais a submissão é recusada.
+
+    O default (60) é menor que uma frase didática e maior que um termo técnico
+    composto — e é declaradamente um chute inicial, **a calibrar contra
+    submissões reais**: o número final se mede, não se promete.
+    """
+    return int(_cfg("pedidos", "max_overlap_chars", default=60))
+
+
+def _norm_comparacao(texto: str) -> str:
+    """Casefold + espaço colapsado, SÓ para comparar.
+
+    Sem isso, trocar maiúscula ou quebrar a linha em outro lugar "zeraria" a
+    sobreposição de um texto colado. Nada daqui toca o que é gravado: a criação
+    entra pelo ``norm_display`` de sempre, e o recorte nem é nosso para tocar.
+    """
+    return re.sub(r"\s+", " ", texto.casefold()).strip()
+
+
+def maior_trecho_comum(a: str, b: str) -> str:
+    """A maior substring comum entre os dois textos normalizados.
+
+    Busca binária sobre o COMPRIMENTO (se existe trecho comum de k caracteres,
+    existe de k-1 — todo prefixo de um trecho comum é comum, então a pergunta é
+    monotônica), com a varredura interna feita pelo ``in`` do C. Para os caps
+    reais (prompt ≤ 2.000, recorte ≤ 2.000) isso é milissegundos; a DP clássica
+    de O(n·m) em Python puro seria a mesma resposta custando a listagem inteira.
+    """
+    a, b = _norm_comparacao(a), _norm_comparacao(b)
+    if not a or not b:
+        return ""
+    if len(a) > len(b):
+        a, b = b, a
+
+    def _algum(k: int) -> str | None:
+        for i in range(len(a) - k + 1):
+            trecho = a[i : i + k]
+            if trecho in b:
+                return trecho
+        return None
+
+    melhor = ""
+    lo, hi = 1, len(a)
+    while lo <= hi:
+        k = (lo + hi) // 2
+        achado = _algum(k)
+        if achado is not None:
+            melhor = achado
+            lo = k + 1
+        else:
+            hi = k - 1
+    return melhor
+
+
+def anticopia(texto: str, recorte: str) -> dict[str, Any]:
+    """O resultado da verificação, no shape que a rota recusa e a tela mostra.
+
+    ``chars``/``trecho`` descrevem a maior sobreposição literal; ``limiar`` vai
+    junto porque um número sem a régua não diz nada a quem revisa — e porque o
+    limiar pode ser recalibrado depois que a criação foi gravada, e a tela tem
+    de mostrar a régua DE AGORA, não a do dia do envio.
+    """
+    trecho = maior_trecho_comum(texto, recorte)
+    return {"chars": len(trecho), "trecho": trecho, "limiar": limiar_anticopia()}
+
+
 def _linha(linha: sqlite3.Row, autor: str | None = None, revisor: str | None = None) -> dict[str, Any]:
     return {
         "id": int(linha["id"]),
@@ -172,8 +241,11 @@ def _linha(linha: sqlite3.Row, autor: str | None = None, revisor: str | None = N
         # logo acima.
         "material": _material(linha["material_json"]),
         # Preenchido por `listar`: o pedido ao LADO da criação, que é o que
-        # permite ao revisor julgar originalidade sem sair da tela.
+        # permite ao revisor julgar originalidade sem sair da tela — e o
+        # anti-cópia (F5) que o servidor calcula sobre os dois. `None` mantém o
+        # shape estável, como o `chegou_ao_corpus` logo acima.
         "pedido": None,
+        "anticopia": None,
     }
 
 
@@ -324,6 +396,14 @@ def listar(
             ).fetchone()
             if bruto is not None:
                 item["pedido"] = pedmod.apresentar(bruto)
+                # O ANTI-CÓPIA calculado pelo servidor, já na listagem: é o
+                # papel do revisor cobrar originalidade, e um número que ele
+                # tivesse de estimar no olho não é verificação. Recalculado a
+                # cada leitura (e não gravado) porque o limiar é recalibrável —
+                # a tela tem de mostrar a régua de agora.
+                item["anticopia"] = anticopia(
+                    item["texto"], str(item["pedido"]["recorte"])
+                )
         if conn_corpus is not None:
             item["uid_duplicata"] = duplicata_no_corpus(conn_corpus, item["hash_norm"])
             # O badge "no corpus ✓" (P7): a promessa da aprovação, conferida ao
@@ -380,6 +460,9 @@ def revisar(
                 "id": criacao_id,
             },
         )
+        rubrica_id = None
+        if aprovar and uid:
+            rubrica_id = _materializar_rubrica_da_triade(conn, linha, uid)
         evmod.registrar(
             conn,
             acao="criacao_revisada",
@@ -389,6 +472,7 @@ def revisar(
             status=novo,
             uid_previsto=uid,
             comentario=comentario,
+            rubrica_id=rubrica_id,
         )
         conn.execute("COMMIT")
     except Exception:
@@ -398,6 +482,59 @@ def revisar(
     return _linha(
         conn.execute(f"SELECT {COLUNAS} FROM criacoes c WHERE c.id = ?", (criacao_id,)).fetchone()
     )
+
+
+def _materializar_rubrica_da_triade(
+    conn: sqlite3.Connection, linha: sqlite3.Row, uid: str
+) -> int | None:
+    """Aprovou uma criação com tríade? A rubrica vira instrumento de verdade.
+
+    O mesmo gesto de ``routes_revisao._materializar_rubrica`` (a triagem já o
+    faz com a rubrica de escrever_rubrica), com duas diferenças que são o F5:
+    ``origem='criacao'`` — a quarta procedência, o valor que custou o CHECK da
+    v7 — e ``prompt_uid = uid_previsto``, um uid que AINDA não está no corpus.
+    Isso não é problema: a coluna é TEXT sem FK (bancos separados, por
+    desenho), e no dia em que ``pf ingest plataforma`` + pipeline + ``pf
+    load-db`` levarem o prompt ao pool, a rubrica já estará ativa — o prompt
+    nasce sustentando ``avaliar_rubrica`` assim que houver resposta de modelo.
+
+    Os critérios passam por ``tarefas.normalizar_criterio`` — a MESMA função da
+    leitura e das outras materializações. O material foi validado na entrada
+    (``models.RubricaCriacaoIn``, já na forma de ``rubrica@3``), então isto é
+    quase identidade — e é justamente por "quase" que a função roda: gravar sem
+    ela é como o ``routes_revisao:243`` começou.
+
+    ``anotacao_id`` fica NULL: esta rubrica não nasceu de uma anotação, e um id
+    de mentira quebraria o ``SET NULL`` que a coluna existe para honrar.
+    """
+    material = _material(linha["material_json"])
+    if not material or not isinstance(material.get("rubrica"), dict):
+        return None
+    # Imports tardios como o do SCHEMA_MATERIAL_CRIACAO em `criar`, e pela
+    # mesma razão: módulos de camada de cima (seed puxa fixtures; tarefas puxa
+    # o corpus) não entram no custo de importar `criacoes`.
+    from . import seed as seedmod
+    from . import tarefas as tmod
+
+    rub = material["rubrica"]
+    cur = conn.execute(
+        "INSERT INTO rubricas (prompt_uid, titulo, criterios_json, origem, status) "
+        "VALUES (?, ?, ?, 'criacao', 'ativa')",
+        (
+            uid,
+            str(rub.get("titulo") or "Rubrica da criação"),
+            json.dumps(
+                {
+                    "schema": seedmod.SCHEMA_RUBRICA,
+                    "criterios": [
+                        tmod.normalizar_criterio(c) for c in rub.get("criterios", [])
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    )
+    return int(cur.lastrowid or 0)
 
 
 def funil(conn: sqlite3.Connection) -> dict[str, int]:
@@ -417,11 +554,14 @@ __all__ = [
     "COLUNAS",
     "FONTE",
     "LICENCA",
+    "anticopia",
     "chave",
     "criar",
     "duplicata_no_corpus",
     "funil",
+    "limiar_anticopia",
     "listar",
+    "maior_trecho_comum",
     "revisar",
     "uid_no_corpus",
     "uid_previsto",

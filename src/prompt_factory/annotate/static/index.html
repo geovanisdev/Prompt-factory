@@ -589,6 +589,17 @@ main{padding:22px 18px 60px;max-width:1180px;margin:0 auto}
   background:var(--fundo-2);border-left:3px solid var(--devolvido);border-radius:var(--raio);
 }
 .pedido-ref p{margin:6px 0 0}
+/* F5: o que o revisor vê ao lado de uma criação vinda de pedido. */
+.revisao-pedido,.revisao-triade{margin-top:12px;padding-top:12px;border-top:1px solid var(--borda)}
+.anticopia{margin:8px 0;font-size:.88rem;color:var(--texto-2)}
+/* Acima do limiar é a cor de ERRO de verdade — não o âmbar de nota: uma
+   submissão assim só existe se o limiar foi recalibrado para baixo depois
+   dela, e é exatamente o caso que o revisor não pode deixar passar. */
+.anticopia.grave{color:var(--erro);font-weight:600}
+.criterio-leitura{margin:8px 0 10px}
+.criterio-leitura p{margin:2px 0}
+.revisao-triade ul{margin:4px 0 10px;padding-left:22px}
+.revisao-triade li{margin-bottom:3px}
 
 .faixa-solo{
   display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
@@ -2025,6 +2036,8 @@ const TEXTOS = {
   "falta.triade_deve": "“must contain” needs at least {n} item(s)",
   "falta.triade_nao_pode": "“must not contain” needs at least {n} item(s)",
   "falta.triade_item_curto": "a gold item needs at least {n} characters — say what to check",
+  "revisao.anticopia": "Longest literal overlap with the excerpt: {n} character(s) — refusal threshold: {limiar}.",
+  "revisao.originalidade": "Judge originality: the prompt must reference the material in the writer's own words. Pasted or closely paraphrased text is refused, with a comment.",
   "recado.pedido_puxado": "request reserved — it is yours while you write",
   "recado.pedido_devolvido": "request returned to the queue",
   "recado.reserva_expirada": "the reservation expired while you wrote — pull the request again before submitting; your draft is intact",
@@ -2839,6 +2852,8 @@ const TEXTOS = {
   "falta.triade_deve": "«deve conter» precisa de ao menos {n} item(ns)",
   "falta.triade_nao_pode": "«não pode conter» precisa de ao menos {n} item(ns)",
   "falta.triade_item_curto": "um item da gold precisa de ao menos {n} caracteres — diga o que conferir",
+  "revisao.anticopia": "Maior trecho literal em comum com o recorte: {n} caractere(s) — limite de recusa: {limiar}.",
+  "revisao.originalidade": "Julgue a originalidade: o prompt deve referenciar o material com as palavras de quem escreveu. Texto colado ou parafraseado de perto se recusa, com comentário.",
   "recado.pedido_puxado": "pedido reservado — é seu enquanto você escreve",
   "recado.pedido_devolvido": "pedido devolvido à fila",
   "recado.reserva_expirada": "a reserva expirou enquanto você escrevia — puxe o pedido de novo antes de enviar; o rascunho está intacto",
@@ -8702,7 +8717,85 @@ function desenharDetalheCriacao() {
     det.appendChild(el("p", "vazio-linha", t("criar.escolha")));
     return;
   }
-  det.appendChild(cartaoDeCriacao(item, acoesDeCriacao(item)));
+  // A criação vinda de PEDIDO leva junto o que o revisor precisa para julgar
+  // originalidade (F5): o recorte AO LADO, o anti-cópia que o servidor
+  // calculou, e a tríade em leitura. Tudo dentro do mesmo cartão — um segundo
+  // painel separaria o julgamento do que está sendo julgado.
+  const extras = el("div");
+  if (item.pedido) {
+    extras.appendChild(blocoRevisaoPedido(item));
+    if (item.material) extras.appendChild(blocoTriadeLeitura(item.material));
+  }
+  extras.appendChild(acoesDeCriacao(item));
+  det.appendChild(cartaoDeCriacao(item, extras));
+}
+
+/** O recorte e o veredito do anti-cópia, para quem revisa uma criação de pedido.
+
+    O número vem do SERVIDOR (`criacoes.anticopia`, recalculado a cada leitura
+    com a régua de agora) — um revisor estimando sobreposição no olho não é
+    verificação. O trecho em comum viaja no `title` da linha: útil quando o
+    número é alto, ruído visual quando são 8 caracteres de "a partir de". */
+function blocoRevisaoPedido(item) {
+  const caixa = el("div", "revisao-pedido");
+  caixa.appendChild(el("div", "rotulo-bloco", t("pedido.recorte")));
+  caixa.appendChild(el("div", "pedido-recorte dado", item.pedido.recorte));
+  const ac = item.anticopia;
+  if (ac) {
+    const linha = el("p", ac.chars >= ac.limiar ? "anticopia grave" : "anticopia",
+      t("revisao.anticopia", { n: n(ac.chars), limiar: n(ac.limiar) }));
+    if (ac.trecho) linha.title = ac.trecho;
+    caixa.appendChild(linha);
+  }
+  caixa.appendChild(el("p", "aviso-autoria", t("revisao.originalidade")));
+  return caixa;
+}
+
+/** A tríade em LEITURA — o revisor julga o que foi entregue, não edita.
+
+    O material chega desserializado do `GET /api/criacoes` (`criacoes._material`)
+    na forma de `rubrica@3`; desenhar aqui com inputs convidaria a corrigir, e
+    a decisão do P4 é uma passagem SEM edição — proveniência não se conserta. */
+function blocoTriadeLeitura(material) {
+  const caixa = el("div", "revisao-triade");
+  const rub = material.rubrica;
+  if (rub) {
+    caixa.appendChild(el("div", "rotulo-bloco", t("triade.rubrica_titulo")));
+    caixa.appendChild(el("p", "dado", rub.titulo));
+    for (const c of rub.criterios || []) {
+      const cx = el("div", "criterio-leitura");
+      const esc = c.escala || {};
+      const ancoras = (esc.ancoras || [])
+        .map((a) => a.valor + " — " + a.rotulo).join(" · ");
+      juntar(cx,
+        el("strong", "dado", c.nome),
+        el("p", "dado", c.descricao),
+        el("p", "fraco dado",
+          (esc.min || 1) + ".." + (esc.max || "?") + (ancoras ? " · " + ancoras : "")));
+      caixa.appendChild(cx);
+    }
+  }
+  const gold = material.gold;
+  if (gold) {
+    caixa.appendChild(el("div", "rotulo-bloco espaco-acima-2", t("triade.gold_titulo")));
+    for (const [campo, chave] of [
+      ["deve_conter", "triade.deve_conter"],
+      ["nao_pode", "triade.nao_pode"],
+      ["armadilhas", "triade.armadilhas"],
+    ]) {
+      const itens = gold[campo] || [];
+      if (!itens.length) continue;
+      caixa.appendChild(el("p", "fraco", t(chave)));
+      const ul = el("ul");
+      for (const it of itens) ul.appendChild(el("li", "dado", String(it)));
+      caixa.appendChild(ul);
+    }
+    if (gold.observacoes) {
+      caixa.appendChild(el("p", "fraco", t("triade.observacoes")));
+      caixa.appendChild(el("p", "dado", gold.observacoes));
+    }
+  }
+  return caixa;
 }
 
 /** Aprovar / recusar. A recusa abre o comentário obrigatório — ele é a única

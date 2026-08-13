@@ -631,3 +631,9 @@ max_criterios_rubrica = 5
 gold_min_deve_conter = 2
 gold_min_nao_pode = 1
 gold_min_chars_item = 15
+# Anti-cópia (F5): o maior trecho literal em comum entre o prompt e o recorte,
+# medido sobre texto casefolded com espaço colapsado (só para COMPARAR — nada
+# disso toca o que é gravado). 60 é menor que uma frase didática e maior que um
+# termo técnico composto ("fotossíntese oxigênica das cianobactérias" tem 44).
+# A CALIBRAR contra submissões reais — o número final se mede, não se promete.
+max_overlap_chars = 60
