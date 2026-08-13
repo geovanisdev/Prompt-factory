@@ -135,6 +135,7 @@ def pedidos_fila(
         "meu": pedmod.meu(anot, anotador_id),
         "facetas": pedmod.facetas(anot),
         "reserva_ttl_min": pedmod.reserva_ttl_min(),
+        "limites": pedmod.limites_da_triade(),
     }
 
 

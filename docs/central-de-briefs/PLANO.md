@@ -630,13 +630,41 @@ Decisões que a implementação fechou:
 - **a reserva expirada no meio da escrita é 409 com o conserto na frase** ("puxe-o
   de novo antes de enviar") — é o caso que mais vai acontecer.
 
-**F4-2 — a tela.**
+**F4-2 — a tela. FEITO (2026-08-12).**
 Painel do pedido, fila "puxar próximo", devolução, blocos de rubrica/gold no
 formulário, envio gravando `pedido_id` + `material_json`; i18n completo
 (`data-t`, tabelas de chave literal).
 DoD: no navegador — puxar um pedido, escrever a tríade, enviar; a criação
 lista com o pedido ao lado; o toggle `en`/`pt` mantém rascunho e pedido; zero
 `innerHTML`; zero erro de console.
+
+**Medido no navegador** (2026-08-12, contra o banco real da worktree, 42
+pedidos): o painel abriu com as facetas verdadeiras (Biologia 37 / Filosofia 5;
+aluno 18 / professor 24; 42 disponíveis); o filtro Filosofia reservou o pedido
+#1 e o painel mostrou recorte serifado, tema, meta, selo `aluno`, chip
+`Pergunta aberta · qa-aberta`, o aviso de autoria permanente e o TTL de 180
+min; a cascata do botão andou na ordem do trabalho — `faltam 15 caractere(s)` →
+`o título da rubrica precisa de mais 5` → `a rubrica precisa de mais 3
+critério(s)` → `«deve conter» precisa de ao menos 2 item(ns)` → `Enviar para
+revisão`; o toggle `en` no meio do rascunho fez **zero requisição** (aba
+Network) e preservou prompt, título, 3 critérios e o painel aberto; o envio deu
+**201** com o blob `material_criacao@1` carimbado pelo servidor (3 critérios,
+pontas em 1 e 5; gold 3+1), o pedido #1 saiu para `usado` **na mesma
+transação** e as facetas caíram para 41/Filosofia 4; a criação listou com o
+bloco "Do pedido #1" ao lado; o pedido #2 foi puxado e devolvido, voltando à
+fila. Zero mensagem de console (nem aviso), zero `innerHTML` no arquivo. Suíte:
+**1.441 passando**, ruff limpo. A criação de verificação foi **apagada** e o
+pedido #1 devolvido a `disponivel` — o precedente do P4: prompt escrito por IA
+não fica num funil cuja tese é proveniência humana (a trilha de `eventos`
+fica).
+
+**Uma correção de contrato que a tela exigiu.** Os limites da tríade não eram
+descobríveis: o `/api/health` publica `max_criterios_rubrica = 8` (o da aba
+escrever_rubrica, `[annotate]`) e a tríade valida contra o **5** de
+`[pedidos]`; os pisos da gold não estavam em rota nenhuma. `GET /api/pedidos`
+passou a devolver `limites` (`pedidos.limites_da_triade()`, as MESMAS chaves e
+defaults que `models.py` lê), e a tela os consome por `limPedido()` — nunca
+pelo health.
 
 **F5 — Revisão com anti-cópia + materialização.**
 Verificação de sobreposição no servidor (submissão E revisão), recorte ao

@@ -237,6 +237,11 @@ ROTAS_DO_FRONT: frozenset[str] = frozenset(
         # dos outros. O prefixo cobre `/api/criacoes/{id}/revisar`.
         "/api/criacoes",
         "/api/criacoes/",
+        # F4-2: a fila de pedidos da Central de Briefs. O prefixo cobre
+        # `/api/pedidos/{id}/devolver`.
+        "/api/pedidos",
+        "/api/pedidos/proximo",
+        "/api/pedidos/",
         # P4d: o runtime de modelos locais e a conversa ao vivo.
         "/api/modelos",
         "/api/conversa/",

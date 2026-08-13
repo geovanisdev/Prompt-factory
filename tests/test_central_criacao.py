@@ -19,7 +19,9 @@ As famílias:
 
 from __future__ import annotations
 
+import inspect
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -588,6 +590,33 @@ def test_o_ttl_da_reserva_sai_do_settings(cliente: TestClient) -> None:
     assert corpo["reserva_ttl_min"] == pedmod.reserva_ttl_min()
 
 
+def test_os_limites_da_triade_saem_da_rota_e_batem_com_o_settings(
+    cliente: TestClient,
+) -> None:
+    """A armadilha que esta rota existe para fechar: o ``max_criterios_rubrica``
+    do ``/api/health`` é o da aba escrever_rubrica (``[annotate]``, 8), e a
+    tríade valida contra o de ``[pedidos]`` (5) — uma tela que lesse o health
+    deixaria a pessoa chegar a oito critérios e tomar 422 no envio. Os valores
+    têm de bater com os que ``models.RubricaCriacaoIn``/``GoldCriacaoIn`` leem.
+    """
+    quem = _papeis(cliente)["anotador"][0]
+    corpo = cliente.get("/api/pedidos", params={"anotador_id": quem}).json()
+    assert corpo["limites"] == pedmod.limites_da_triade()
+    lim = corpo["limites"]
+    assert set(lim) == {
+        "min_criterios_rubrica",
+        "max_criterios_rubrica",
+        "gold_min_deve_conter",
+        "gold_min_nao_pode",
+        "gold_min_chars_item",
+    }
+    # O teto da tríade é o de [pedidos] — MENOR que o do health. Se um dia os
+    # dois coincidirem, este assert deixa de provar a separação; a igualdade
+    # contra `limites_da_triade()` acima continua provando a fonte.
+    saude = cliente.get("/api/health").json()
+    assert lim["max_criterios_rubrica"] <= saude["limites"]["max_criterios_rubrica"]
+
+
 def test_o_apresentar_devolve_listas_de_verdade(semeado: Path) -> None:
     """O front escreve ``pedido.avisos.length`` e precisa que isso signifique o
     que parece — a mesma regra do ``ativo`` booleano em ``models.perfil``."""
@@ -606,3 +635,49 @@ def test_o_apresentar_devolve_listas_de_verdade(semeado: Path) -> None:
     item = pedmod.apresentar(linha)
     assert item["habilidades"] == ["EM13CHS101"]
     assert item["avisos"] == ["contem 'Resposta:'"]
+
+
+# ---------------------------------------------------------------------------
+# 7. as tabelas da tela (F4-2) — três pontas: JS x backend x dicionário
+# ---------------------------------------------------------------------------
+#
+# O padrão do MOTIVOS_SKIP do P9: a tabela do JS guarda a chave INTEIRA (chave
+# montada por concatenação é invisível para o teste de chave órfã), e este
+# teste é o que impede as duas listas da mesma coisa — uma em Python, uma em
+# JavaScript — de divergirem em silêncio. A existência das chaves nos DOIS
+# idiomas do dicionário é cobrada pelos testes de paridade de
+# `test_annotate_i18n.py`, que enxergam os literais destas tabelas.
+
+
+@pytest.fixture
+def js() -> str:
+    return (
+        Path(__file__).resolve().parents[1]
+        / "src/prompt_factory/annotate/static/index.html"
+    ).read_text(encoding="utf-8")
+
+
+def test_a_tabela_de_papeis_do_JS_bate_com_o_enum_do_BACKEND(js: str) -> None:
+    """Um papel novo em ``db.PAPEIS_PEDIDO`` sem linha na tabela sairia CRU na
+    tela (o fallback `.dado` existe para isso, mas ele é degradação, não
+    convenção); uma linha sem enum seria um selo que nenhum pedido produz."""
+    bloco = js.split("const PAPEIS_PEDIDO_ROTULO = {", 1)[1].split("};", 1)[0]
+    ids = re.findall(r'"([a-z_]+)": "pedido\.papel_[a-z_]+"', bloco)
+    assert tuple(ids) == adb.PAPEIS_PEDIDO
+
+
+def test_a_tabela_de_motivos_do_JS_cobre_o_que_o_proximo_emite(js: str) -> None:
+    """As chaves que ``pedidos.proximo`` devolve em ``motivo_chave``. Uma chave
+    emitida sem linha na tabela apareceria como frase nenhuma na tela (a fila
+    vazia ficaria muda); uma linha sem emissor é chave morta no dicionário.
+
+    O contrato não tem tupla no backend (as chaves nascem nos ``return`` de
+    ``proximo``), então a ponta do Python é conferida contra o FONTE do módulo:
+    renomear uma chave lá quebra aqui, que é o que se quer.
+    """
+    bloco = js.split("const MOTIVOS_PEDIDO = {", 1)[1].split("};", 1)[0]
+    ids = re.findall(r'"([a-z_]+)": "pedido\.motivo_[a-z_]+"', bloco)
+    assert set(ids) == {"ja_reservado", "vazio", "vazio_filtrado"}
+    fonte = inspect.getsource(pedmod)
+    for chave in ids:
+        assert f'"{chave}"' in fonte, f"{chave!r} não aparece mais em pedidos.py"
