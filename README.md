@@ -1,5 +1,7 @@
 # Prompt Factory
 
+[![ci](https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/badge.svg)](https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml)
+
 Banco de **prompts escritos por pessoas reais** — o primeiro turno de usuário em conversas com LLMs, nunca texto sintético — em **português brasileiro e inglês**, deduplicado, limpo de PII e navegável numa interface local. Serve para curar coleções e exportar JSONL/CSV **com licença e atribuição em cada linha**, para alimentar plataformas de data annotation.
 
 E, sobre uma amostra dele, roda a **[Bancada](#a-bancada--plataforma-de-anotação)**: uma plataforma de anotação completa — três papéis, seis tipos de tarefa, QC em duas passagens — em que o prompt escrito na ferramenta volta para o corpus com licença e uid rastreáveis.

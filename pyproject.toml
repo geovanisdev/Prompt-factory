@@ -52,6 +52,33 @@ system-certs = true
 # funciona. Copiar de vez elimina o warning "Failed to hardlink files".
 link-mode = "copy"
 
+# ATENÇÃO À ORDEM: as duas seções abaixo são sub-tabelas de `tool.uv`, e toda
+# chave simples que viesse DEPOIS delas passaria a pertencer à última sub-tabela
+# aberta. `system-certs` e `link-mode` têm de ficar acima — invertido, o TOML
+# continua válido e o pyproject muda de significado em silêncio.
+#
+# Por que o índice existe: `torch` no PyPI arrasta CUDA em Linux. Medido no
+# uv.lock: 526,6 MB do wheel manylinux + 2.094,3 MB de 17 wheels CUDA/triton =
+# ~2,6 GB que o runner de CI baixaria para rodar uma suíte que nem importa
+# torch (o único teste que o faz está marcado `slow` e é desselecionado).
+# O índice pytorch-cpu serve o mesmo torch sem as dependências de GPU.
+#
+# `explicit = true` é o que torna a mudança segura: sem ele o índice entraria
+# no pool de resolução de TODOS os pacotes e o lock inteiro poderia se mexer,
+# inclusive no Windows. Com ele, só quem apontar para o índice em
+# `[tool.uv.sources]` o consulta.
+#
+# O marcador fica na SOURCE, não no índice — é a granularidade que o uv
+# oferece. Fora do Linux (o Windows desta máquina), `torch` continua vindo do
+# PyPI, e o wheel `win_amd64` de 122,1 MB não muda.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
 [tool.pytest.ini_options]
 markers = [
     "slow: precisa de modelo baixado ou de I/O pesado (pule com `-m 'not slow'`)",

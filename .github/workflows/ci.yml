@@ -1,0 +1,76 @@
+# Gate de qualidade do repositório: lint + suíte, em Linux.
+#
+# O nome deste workflow e o nome deste arquivo são o endereço do badge do
+# README (`workflows/ci.yml/badge.svg`). Renomear qualquer um dos dois quebra
+# o badge silenciosamente — o README continua exibindo uma imagem, e ela passa
+# a ser a de um workflow que não existe.
+#
+# Por que ubuntu e não windows (decisão D2): é onde o custo aparece. O torch do
+# PyPI arrasta ~2,6 GB de CUDA em Linux, e o `pyproject.toml` resolve isso com
+# um índice pytorch-cpu marcado para Linux. Rodar aqui também prova a
+# hermeticidade de verdade — a suíte nasceu e sempre rodou em Windows.
+# Fallback documentado, se a suíte quebrar por algo estrutural do sistema
+# operacional: trocar para `windows-latest`.
+#
+# O gate é lint + testes, e só (decisão D3). A conferência de estilo em massa
+# ficaria vermelha hoje em 98 dos 146 arquivos, e reescrever todos eles de uma
+# vez enterraria a autoria de cada linha no histórico por um ganho estético.
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# Um run por referência: um push em cima do outro cancela o anterior em vez de
+# enfileirar dois runs que testam a mesma coisa.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# O job só lê o repositório. Não peça mais do que isso.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Instalar o uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          # `enable-cache` tem default "auto" desde a v10, que desliga o cache
+          # em alguns eventos. Explícito aqui para o comportamento não depender
+          # de qual evento disparou o run.
+          enable-cache: true
+          # O cache só é invalidado quando o lock muda — é o que impede o
+          # runner de servir um wheel velho depois de a resolução mudar.
+          cache-dependency-glob: "uv.lock"
+          python-version: "3.12"
+
+      # `--locked` faz o job FALHAR se o uv.lock estiver dessincronizado do
+      # pyproject.toml. É este passo que transforma o CI em prova de que o
+      # ambiente é reproduzível, em vez de só um lugar onde os testes rodam.
+      #
+      # O grupo `dev` (pytest, httpx, ruff) entra por padrão; o grupo
+      # `analysis` (matplotlib, jupyter, nbconvert) não entra, e não precisa —
+      # nenhum teste importa notebook.
+      - name: Sincronizar dependências
+        run: uv sync --locked
+
+      # `--no-sync` impede o uv de re-resolver a cada passo: a sincronização
+      # travada já aconteceu acima. Sem isso, um lock sujo poderia ser
+      # corrigido no meio do caminho e o job passaria escondendo o problema.
+      - name: Lint
+        run: uv run --no-sync ruff check .
+
+      # `-m "not slow"` desseleciona os 5 testes de embedding, que exigem o
+      # modelo e5 baixado (~450 MB). Os outros 1.462 são herméticos: sem rede,
+      # sem modelo, sem tocar em data/.
+      - name: Testes
+        run: uv run --no-sync pytest -q -m "not slow"
