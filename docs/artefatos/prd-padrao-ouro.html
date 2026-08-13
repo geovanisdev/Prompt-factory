@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-slot="titulo">PRD — Prompt Factory: padrão-ouro SOTA em Data Annotation</title>
+<!--
+  TEMPLATE CANÔNICO: PRD/Especificação (Tier 0). Herda DESIGN_SYSTEM.html.
+  Single-file, zero rede (D5). Cobre /to-prd e /write-a-prd como artefato durável (D10).
+  Aba Machine-Readable = resumo estruturado p/ prd-to-issues / to-issues (D4).
+  data-skel="fixo" = esqueleto; data-slot = preenchido pela Skill B (D9).
+-->
+<style data-skel="fixo">
+  :root{--paper:#faf8f4;--paper-sunk:#f1eee7;--ink:#1c1b18;--ink-soft:#4a4843;--ink-faint:#8a877f;--rule:#d9d4c8;--rule-strong:#b8b2a3;--accent:#2f5d57;--accent-soft:#e4ece9;--ok:#3f6b3a;--ok-bg:#e8efe5;--warn:#8a6d1f;--warn-bg:#f4ecd6;--danger:#9c3a32;--danger-bg:#f3e0dd;--info:#355c7a;--info-bg:#e1e9ef;--neutral:#5c5a53;--neutral-bg:#eceae3;--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,Cambria,"Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"Cascadia Code","Source Code Pro",Menlo,Consolas,"DejaVu Sans Mono",monospace;--t-xs:.75rem;--t-sm:.875rem;--t-base:1rem;--t-md:1.25rem;--t-lg:1.5625rem;--t-xl:1.953rem;--t-xxl:2.441rem;--s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.5rem;--s6:2rem;--s7:3rem;--s8:4rem;--measure:74ch;--radius:3px}
+  @media (prefers-color-scheme:dark){:root{--paper:#16150f;--paper-sunk:#1f1d16;--ink:#ece8df;--ink-soft:#b9b4a6;--ink-faint:#807c70;--rule:#33302a;--rule-strong:#4a463c;--accent:#7fb3aa;--accent-soft:#1d2b29;--ok:#8fb886;--ok-bg:#1b251a;--warn:#cdae6a;--warn-bg:#2a2415;--danger:#d28a82;--danger-bg:#2c1916;--info:#8fb2cc;--info-bg:#15222b;--neutral:#a8a59c;--neutral-bg:#23211b}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:var(--t-base);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:var(--s6) var(--s5) var(--s8)}
+  .measure{max-width:var(--measure)}
+  .doc-head{border-bottom:2px solid var(--ink);padding-bottom:var(--s4);margin-bottom:var(--s5)}
+  .doc-kicker{font-family:var(--sans);font-size:var(--t-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 var(--s2)}
+  .doc-title{font-size:var(--t-xxl);line-height:1.15;margin:0 0 var(--s3);font-weight:600}
+  .doc-meta{font-family:var(--sans);font-size:var(--t-sm);color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:0}
+  .doc-meta b{color:var(--ink);font-weight:600}
+  .canon{font-family:var(--sans);font-size:var(--t-sm);margin-top:var(--s3)}
+  .canon a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
+  .canon a:hover{border-bottom-color:var(--accent)}
+  h2{font-size:var(--t-xl);font-weight:600;margin:var(--s7) 0 var(--s3);line-height:1.2}
+  h3{font-size:var(--t-lg);font-weight:600;margin:var(--s5) 0 var(--s3)}
+  h4{font-family:var(--sans);font-size:var(--t-base);font-weight:700;margin:var(--s4) 0 var(--s2)}
+  p{margin:0 0 var(--s4)}
+  code,kbd{font-family:var(--mono);font-size:.92em;background:var(--paper-sunk);padding:.1em .35em;border-radius:var(--radius)}
+  .tabs{margin:var(--s5) 0}
+  .tab-strip{display:flex;flex-wrap:wrap;gap:var(--s1);border-bottom:1px solid var(--rule-strong);font-family:var(--sans)}
+  .tab-btn{appearance:none;background:none;border:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;color:var(--ink-faint);padding:var(--s2) var(--s4);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab-btn:hover{color:var(--ink)}
+  .tab-btn[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-btn.machine{margin-left:auto;color:var(--neutral)}
+  .tab-btn.machine[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+  .tab-panel{padding:var(--s5) 0}
+  .tab-panel[hidden]{display:none}
+  .lang-bar{display:flex;align-items:center;gap:var(--s2);margin:0 0 var(--s4);font-family:var(--sans)}
+  .lang-bar .lang-lbl{color:var(--ink-faint);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .lang-btn{appearance:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;background:none;color:var(--ink-faint);border:1px solid var(--rule);border-radius:100px;padding:.2em .9em}
+  .lang-btn:hover{color:var(--ink);border-color:var(--rule-strong)}
+  .lang-btn[aria-pressed="true"]{color:#fff;background:var(--accent);border-color:var(--accent)}
+  [data-lang="pt"] .lang-en,[data-lang="en"] .lang-pt{display:none}
+  .badge{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.15em .6em;border-radius:100px;display:inline-block;line-height:1.6}
+  .badge.ok{color:var(--ok);background:var(--ok-bg)}.badge.warn{color:var(--warn);background:var(--warn-bg)}.badge.danger{color:var(--danger);background:var(--danger-bg)}.badge.info{color:var(--info);background:var(--info-bg)}.badge.neutral{color:var(--neutral);background:var(--neutral-bg)}
+  table.grid{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:var(--t-sm);margin:var(--s4) 0}
+  table.grid caption{text-align:left;font-size:var(--t-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:var(--s2)}
+  table.grid th{text-align:left;font-weight:700;color:var(--ink);border-bottom:2px solid var(--rule-strong);padding:var(--s2) var(--s3)}
+  table.grid td{border-bottom:1px solid var(--rule);padding:var(--s2) var(--s3);vertical-align:top}
+  table.grid tr:hover td{background:var(--paper-sunk)}
+  .callout{border-left:3px solid var(--rule-strong);background:var(--paper-sunk);padding:var(--s3) var(--s4);margin:var(--s4) 0;border-radius:0 var(--radius) var(--radius) 0}
+  .callout .lbl{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:var(--s1)}
+  .callout.note{border-color:var(--info)}.callout.note .lbl{color:var(--info)}
+  .callout.warn{border-color:var(--warn)}.callout.warn .lbl{color:var(--warn)}
+  .callout.danger{border-color:var(--danger)}.callout.danger .lbl{color:var(--danger)}
+  .callout p:last-child{margin-bottom:0}
+  ul.check{list-style:none;padding:0;font-family:var(--sans);font-size:var(--t-sm)}
+  ul.check li{display:flex;gap:var(--s2);align-items:flex-start;padding:var(--s2) 0;border-bottom:1px solid var(--rule)}
+  ul.check input{margin-top:.25em;accent-color:var(--accent)}
+  ul.check li.done label{color:var(--ink-faint);text-decoration:line-through}
+  .btn{font-family:var(--sans);font-size:var(--t-sm);font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:var(--s2) var(--s4);cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:none;color:var(--accent);border:1px solid var(--accent)}
+  .btn-row{display:flex;gap:var(--s2);flex-wrap:wrap;margin:var(--s4) 0}
+  .toast{font-family:var(--sans);font-size:var(--t-sm);color:var(--ok);margin-left:var(--s2);opacity:0;transition:opacity .2s}
+  .toast.show{opacity:1}
+  .machine-block{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:var(--t-sm);line-height:1.6;padding:var(--s5);border-radius:var(--radius);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  @media (prefers-color-scheme:dark){.machine-block{background:#000}}
+  footer.doc-foot{margin-top:var(--s8);padding-top:var(--s4);border-top:1px solid var(--rule);font-family:var(--sans);font-size:var(--t-xs);color:var(--ink-faint)}
+  @media print{.tab-btn{display:none}.lang-bar{display:none}.tab-panel[hidden]{display:block!important}.btn,.btn-row{display:none}body{background:#fff;color:#000}a{color:#000}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  .save-bar{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px solid var(--rule);padding:var(--s2) var(--s5);display:flex;align-items:center;gap:var(--s3);font-family:var(--sans);font-size:var(--t-sm);margin:0 calc(-1*var(--s5))}
+  .save-hint{font-size:var(--t-xs);color:var(--ink-faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc-head" data-skel="fixo">
+    <p class="doc-kicker">PRD · Especificação</p>
+    <h1 class="doc-title" data-slot="titulo">Prompt Factory — padrão-ouro SOTA em Data Annotation</h1>
+    <p class="doc-meta">
+      <span><b>Estado:</b> <span data-slot="estado"><span class="badge ok">aprovado</span> <span class="badge neutral">2026-08-13, com emenda no R3</span></span></span>
+      <span><b>Autor:</b> <span data-slot="autor">Geovani H. S. de Souza · redigido com Claude Code</span></span>
+      <span><b>Data:</b> <span data-slot="data">2026-08-13</span></span>
+    </p>
+    <p class="canon" data-slot="canon">Links canônicos: auditoria de portfólio de 2026-08-13 (artifact privado no claude.ai) · <code>CLAUDE.md</code> · <code>README.md</code> · <code>docs/artefatos/adr-bancada-multi-tenant.html</code> (ADR 0001, satisfaz o R27) · plano aprovado em <code>.claude/plans/quero-que-voc-crie-enchanted-petal.md</code></p>
+  </header>
+
+  <div class="save-bar" data-skel="fixo">
+    <button type="button" class="btn" id="btn-save">💾 Salvar HTML</button>
+    <span class="toast" id="toast-save">salvo ✓</span>
+    <span class="save-hint">Autosave local ativo · Chrome/Edge: reescreve o arquivo · Firefox: baixa cópia · <kbd>Ctrl+S</kbd></span>
+  </div>
+
+  <div class="tabs" data-skel="fixo">
+    <div class="tab-strip" role="tablist" aria-label="Seções do PRD">
+      <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="p-prod">Produto</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-req">Requisitos</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-dec">Decisões &amp; Riscos</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-exp">Explicador</button>
+      <button class="tab-btn machine" role="tab" aria-selected="false" aria-controls="p-machine">Machine-Readable</button>
+    </div>
+
+    <!-- ===== PRODUTO ===== -->
+    <section class="tab-panel" id="p-prod" role="tabpanel">
+      <h2 data-skel="fixo">Problema &amp; contexto</h2>
+      <div class="measure" data-slot="problema">
+        <p>A auditoria de 2026-08-13 (lente de um avaliador padrão Surge AI) concluiu que o repositório <b>pensa</b> como padrão-ouro — proveniência e licença por linha, QC em duas passagens, agreement com instrumento nomeado, abstenção declarada — <b>mas não se apresenta</b> assim. Os achados: não há <code>LICENSE</code> (num projeto cuja tese é licença por linha); não há CI, embora a suíte seja hermética (1.116 testes <i>not-slow</i>, ~2 min, zero rede/modelo/dados); os notebooks de QC estão commitados mostrando <i>"0 of 155 batches done"</i> quando a campanha real está em <b>82/155 com agreement 0,913</b>; o README não menciona os marcos F1–F6, cita duas contagens de teste divergentes (1.287 na linha 93, 1.273 na linha 332 — a suíte tem ~1.466) e não tem uma única imagem; a porta de entrada é pt-BR para um público avaliador estrangeiro; a evidência estatística com humanos reais tem n=4 pares; e o desenho de escala não existia — agora existe (ADR 0001).</p>
+        <p>A exploração pré-PRD acrescentou um bloqueador que a auditoria não viu: <code>backups/bancada.sql</code> está <b>versionado</b> (commit <code>4598795</code>, presente nos 68 commits) com texto derivado do corpus — incluindo um nome próprio vindo de um prompt do WildChat — e os gabaritos escondidos (<code>gabarito_json</code>). Isso contradiz a política do próprio <code>.gitignore</code> e precisa sair do HEAD <b>e do histórico</b> antes de o repositório ir a público. E uma pegadinha de custo: o <code>uv.lock</code> puxa ~2,7 GB de torch+CUDA num runner Linux, para testes que nunca importam torch.</p>
+        <p>Este PRD sequencia o conserto em cinco camadas — C0 (vitrine, 1–2 dias) → C1 (embalagem internacional + repo público) → C2 (evidência estatística) → C3 (cardápio 2026) → C4 (escala, já satisfeita) — mais o grupo <b>meta</b>: os artefatos da rodada que produziu este documento.</p>
+      </div>
+      <h2 data-skel="fixo">Objetivos</h2>
+      <div data-slot="objetivos">
+        <ul>
+          <li><b>15 minutos para entender.</b> Um avaliador estrangeiro compreende o produto, o método e os números sem rodar nada (README EN + screenshots + amostras de artefatos de entrega).</li>
+          <li><b>CI público verde.</b> <code>ruff check</code> + 1.116 testes not-slow rodando em ubuntu-latest com badge no README.</li>
+          <li><b>Público sem passivo.</b> O repositório abre sem violar licença de terceiros, sem dados pessoais e sem os gabaritos versionados — verificado em clone limpo antes do flip.</li>
+          <li><b>Evidência com gente de verdade.</b> Alpha de Krippendorff com intervalo de confiança bootstrap sobre campanha com 2–3 anotadores humanos e overlap planejado; calibração do revisor medida contra as sintéticas de gabarito escondido.</li>
+          <li><b>Cardápio 2026 completo, em sequência de custo.</b> Red-team → fine-tune → qualification+dashboard → trajetórias de agente (decisão D8: as quatro, não "2 de 4").</li>
+          <li><b>Marco declarado:</b> ao fim da C1 o repositório está <i>shippable para candidatura</i> — C2/C3 são releases incrementais, nunca bloqueio da busca de emprego.</li>
+        </ul>
+      </div>
+      <h2 data-skel="fixo">Não-objetivos</h2>
+      <div data-slot="nao-objetivos"><div class="callout note"><span class="lbl">Fora de escopo</span>
+        <p>· <b>Implementar</b> a Bancada multi-tenant — o ADR 0001 registra o caminho; construir é outro projeto, condicionado a demanda real.<br>
+        · <b>Re-embedar o corpus</b> ou trocar o modelo de embeddings em produção — a invariante posicional dos <code>.npy</code> é contrato; o experimento R24 é offline e não toca produção.<br>
+        · <b>Rodar campanhas</b> dentro da rodada de documentos que produziu este PRD (a rodada entrega artefatos; execução é sprint futuro).<br>
+        · Monetização, hospedagem pública da interface, marketplace ou pagamento de anotadores.</p></div></div>
+    </section>
+
+    <!-- ===== REQUISITOS ===== -->
+    <section class="tab-panel" id="p-req" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Requisitos</h2>
+      <table class="grid" data-slot="requisitos">
+        <caption>R1–R8 = Camada 0 · R9–R16b = Camada 1 · R17–R21 = Camada 2 · R22–R26 = Camada 3 · R27 = Camada 4 · RM = a rodada atual (meta)</caption>
+        <tr><th>#</th><th>Requisito</th><th>Prioridade</th></tr>
+        <tr><td>R1</td><td><b>C0</b> — <code>LICENSE</code> (MIT) na raiz do repositório</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R2</td><td><b>C0</b> — Nota "código vs dados" no README: MIT cobre o código; os dados não são redistribuídos pelo repo — os exports carregam licença e atribuição <i>por linha</i></td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R3</td><td><b>C0</b> — Re-render dos notebooks <code>analysis/01</code> e <code>analysis/02</code> contra o estado real da campanha (82/155, agreement 0,913+), par .ipynb/.html no mesmo commit; <b>inclui atualizar a prosa de <code>analysis/README.md</code></b>, que ainda descreve o estado pré-campanha (emenda de 2026-08-13, achado da rodada de execução)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R4</td><td><b>C0</b> — CI GitHub Actions: <code>ruff check .</code> + <code>pytest -q -m "not slow"</code> em ubuntu-latest com índice pytorch-cpu (D2); sem <code>ruff format</code> (D3)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R5</td><td><b>C0</b> — Badge de CI no README, renderizando verde</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R6</td><td><b>C0</b> — Contagem de testes única, correta e com fonte única (D10: check que falha quando o README diverge de <code>pytest --collect-only</code>)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R7</td><td><b>C0</b> — README menciona a Central de Briefs e os marcos F1–F6 na seção de status</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R8</td><td><b>C0</b> — 4–6 screenshots em <code>docs/img/</code>, capturados exclusivamente do pacote demo/CC0 (D5)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R9</td><td><b>C1</b> — <code>README.md</code> em inglês como primário + <code>README.pt-BR.md</code> linkado</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R10</td><td><b>C1</b> — <code>docs/samples/</code> com dataset card + quality report + auditoria de item, gerados sobre dados demo/CC0</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R11</td><td><b>C1</b> — Vídeo demo de ~5 min linkado no README (mesma regra de conteúdo do R8)</td><td><span class="badge neutral">could</span></td></tr>
+        <tr><td>R12</td><td><b>C1</b> — <code>backups/bancada.sql</code> fora do HEAD <b>e do histórico</b> (<code>git filter-repo</code>); backup passa a viver fora do repo; correção dos SHAs citados em <code>CLAUDE.md</code> (2×) e <code>docs/central-de-briefs/PROMPT-HANDOFF-F4-2.md</code> (4×)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R13</td><td><b>C1</b> — Zero caminhos pessoais no HEAD (<code>Users\gigio</code>, <code>Ensino Medio</code>); e-mail de contato intencional permitido</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R14</td><td><b>C1</b> — Editoras anonimizadas ("Editora A/B/C") em <code>docs/central-de-briefs/</code> (D6)</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R15</td><td><b>C1</b> — Política escrita do ouro público (D9): manifest permanece versionado; ouro do manifest nunca reusado com anotadores externos; C2 sorteia ouro novo</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R16</td><td><b>C1</b> — Repositório público, com gate D11: R4+R12+R13 verificados em clone limpo do remoto ANTES do flip</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R16b</td><td><b>C1</b> — Extra opcional <code>[embed]</code> movendo torch/sentence-transformers para fora das dependências principais (hoje um clone Linux baixa ~2,7 GB)</td><td><span class="badge neutral">could</span></td></tr>
+        <tr><td>R17</td><td><b>C2</b> — Campanha com 2–3 anotadores humanos reais, overlap de 20–30% → alpha de Krippendorff com IC bootstrap 95% publicado</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R18</td><td><b>C2</b> — Calibração do revisor medida contra as ≥4 anotações sintéticas de gabarito escondido já na fila</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R19</td><td><b>C2</b> — Notebook 03: curva de calibração do <code>label_confidence</code> + matriz de confusão por eixo + erros de fronteira + IC bootstrap dos macro-F1</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R20</td><td><b>C2</b> — Precisão e recall da varredura de PII, medidos sobre amostra auditada à mão (n declarado)</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R21</td><td><b>C2</b> — Limiar anti-cópia calibrado com a distribuição real de overlap (hoje: chute declarado de 60 caracteres)</td><td><span class="badge neutral">could</span></td></tr>
+        <tr><td>R22</td><td><b>C3</b> — Meta da camada (D8): as quatro iniciativas em sequência de custo — red-team → fine-tune → qualification+dashboard → trajetórias; a seguinte não começa antes de a anterior fechar</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>R23</td><td><b>C3.1</b> — Fluxo red-team/safety: brief versionado + rubrica de severidade + catálogo de harm + campanha demo exportada com manifesto (o instrumental do P8 já dá ~70%)</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R24</td><td><b>C3.2</b> — Experiment report do fine-tune de task_type (macro-F1 0,58 → meta 0,65): antes/depois, seed e config reprodutíveis; offline, sem tocar os embeddings de produção</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R25</td><td><b>C3.3</b> — Qualification test bloqueando a fila + dashboard temporal por anotador</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R26</td><td><b>C3.4</b> — Tipo de tarefa "trajetória de agente" ponta a ponta (payload, tela, export, ≥1 tarefa demo)</td><td><span class="badge warn">should</span></td></tr>
+        <tr><td>R27</td><td><b>C4</b> — ADR "Bancada multi-tenant" existe e está linkado — <b>satisfeito</b> por <code>docs/artefatos/adr-bancada-multi-tenant.html</code> (2026-08-13)</td><td><span class="badge ok">feito</span></td></tr>
+        <tr><td>RM1</td><td><b>meta</b> — Templates Tier 2 <code>guia-estudo.html</code> e <code>playbook.html</code> materializados na Central via Skill A</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>RM2</td><td><b>meta</b> — Guia de estudo do papel de administração de anotação, em pasta pessoal fora do repo (D7)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>RM3</td><td><b>meta</b> — Guia de estudo do papel de ciência de dados, em pasta pessoal fora do repo (D7)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>RM4</td><td><b>meta</b> — Playbook de operações em inglês, ≤2 páginas A4 impressas, em pasta pessoal fora do repo (D7)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>RM5</td><td><b>meta</b> — Playbook de preparação pessoal, em pasta pessoal fora do repo (D7)</td><td><span class="badge danger">must</span></td></tr>
+        <tr><td>RM6</td><td><b>meta</b> — Os quatro documentos pessoais publicados como artifacts privados + memória de sessão atualizada com as URLs</td><td><span class="badge warn">should</span></td></tr>
+      </table>
+      <h2 data-skel="fixo">Critérios de aceite</h2>
+      <ul class="check" data-slot="criterios">
+        <li><input type="checkbox" id="a1"><label for="a1">R1 — <code>LICENSE</code> existe, 1ª linha "MIT License"; após push, <code>gh repo view --json licenseInfo</code> reconhece MIT.</label></li>
+        <li><input type="checkbox" id="a2"><label for="a2">R2 — Seção de licença do README contém a frase "por linha" e afirma que os dados não são redistribuídos; <code>grep -i "por linha" README.md</code> não-vazio.</label></li>
+        <li><input type="checkbox" id="a3"><label for="a3">R3 — <code>grep -r "0 of 155" analysis/</code> retorna vazio; <code>grep -r "155 batches are pending" analysis/</code> retorna vazio; os pares .ipynb/.html dos notebooks 01 e 02 e o <code>analysis/README.md</code> atualizado entram no mesmo commit.</label></li>
+        <li><input type="checkbox" id="a4"><label for="a4">R4 — <code>.github/workflows/ci.yml</code> contém <code>ruff check</code> e <code>-m "not slow"</code> e NÃO contém <code>ruff format</code>; <code>gh run list --workflow ci.yml -L1</code> = success.</label></li>
+        <li><input type="checkbox" id="a5"><label for="a5">R5 — Badge aponta para <code>workflows/ci.yml/badge</code> e renderiza verde no README público.</label></li>
+        <li><input type="checkbox" id="a6"><label for="a6">R6 — <code>grep -E "1\.287|1\.273" README.md</code> vazio; o número citado é igual à última linha de <code>uv run pytest --collect-only -q</code>, com data da medição; o check de divergência (D10) existe e falha quando os dois diferem.</label></li>
+        <li><input type="checkbox" id="a7"><label for="a7">R7 — <code>grep -q "Central de Briefs" README.md</code> verdadeiro e os marcos F1–F6 aparecem na tabela de status.</label></li>
+        <li><input type="checkbox" id="a8"><label for="a8">R8 — Contagem de <code>![</code> no README entre 4 e 6; todos os arquivos existem em <code>docs/img/</code>; checklist "zero texto de corpus" conferido imagem a imagem no commit.</label></li>
+        <li><input type="checkbox" id="a9"><label for="a9">R9 — As primeiras 30 linhas de <code>README.md</code> estão em inglês; o link para <code>README.pt-BR.md</code> resolve.</label></li>
+        <li><input type="checkbox" id="a10"><label for="a10">R10 — <code>docs/samples/</code> lista ≥3 arquivos (um de cada tipo); nenhum contém texto de corpus.</label></li>
+        <li><input type="checkbox" id="a11"><label for="a11">R11 — Link do vídeo no README responde (unlisted ok); duração ≤6 min; conteúdo só demo/CC0.</label></li>
+        <li><input type="checkbox" id="a12"><label for="a12">R12 — <code>git log --all --oneline -- backups/bancada.sql</code> retorna vazio no repositório publicado; o script de backup documenta o destino externo; nenhuma citação de SHA morto sobra em <code>CLAUDE.md</code> nem em <code>docs/central-de-briefs/</code>.</label></li>
+        <li><input type="checkbox" id="a13"><label for="a13">R13 — <code>git grep -iE "Users[/\\]gigio|Ensino Medio"</code> retorna vazio no HEAD.</label></li>
+        <li><input type="checkbox" id="a14"><label for="a14">R14 — <code>git grep -E "Ática|Scipione|Saraiva"</code> retorna vazio no HEAD.</label></li>
+        <li><input type="checkbox" id="a15"><label for="a15">R15 — O documento de metodologia contém a regra do ouro público ("nunca reusado com anotadores externos" ou equivalente), verificável por grep.</label></li>
+        <li><input type="checkbox" id="a16"><label for="a16">R16 — <code>gh repo view --json visibility -q .visibility</code> = "PUBLIC"; checklist do gate D11 executado em clone limpo e anexado ao commit do flip.</label></li>
+        <li><input type="checkbox" id="a17"><label for="a17">R16b — <code>uv sync</code> sem o extra instala sem torch; <code>uv sync --extra embed</code> instala com; suíte not-slow verde nos dois modos.</label></li>
+        <li><input type="checkbox" id="a18"><label for="a18">R17 — Notebook/HTML commitado imprime alpha + IC 95% + n do overlap ≥ 20% dos itens; consentimento dos anotadores registrado (D12).</label></li>
+        <li><input type="checkbox" id="a19"><label for="a19">R18 — Relatório imprime a acurácia do revisor contra o gabarito escondido (exato, ±1 e erro médio absoluto) com n declarado.</label></li>
+        <li><input type="checkbox" id="a20"><label for="a20">R19 — <code>analysis/03_*.html</code> commitado contém as 4 seções nomeadas: calibração de confiança, confusões por eixo, erros de fronteira, IC bootstrap.</label></li>
+        <li><input type="checkbox" id="a21"><label for="a21">R20 — O relatório de PII imprime precisão E recall com o n da amostra auditada.</label></li>
+        <li><input type="checkbox" id="a22"><label for="a22">R21 — A análise do anti-cópia está commitada e o valor final em config carrega o comentário "medido em &lt;data&gt;, n=&lt;n&gt;".</label></li>
+        <li><input type="checkbox" id="a23"><label for="a23">R22 — Nenhuma iniciativa C3 posterior começa com a anterior aberta (ordem: R23 → R24 → R25 → R26); a ordem consta no README de status.</label></li>
+        <li><input type="checkbox" id="a24"><label for="a24">R23 — Campanha demo red-team exportada com manifesto; <code>pytest -q -m "not slow"</code> verde.</label></li>
+        <li><input type="checkbox" id="a25"><label for="a25">R24 — Report commitado com antes/depois, seed e config reprodutíveis; macro-F1 final ≥ 0,65 OU análise honesta do porquê não.</label></li>
+        <li><input type="checkbox" id="a26"><label for="a26">R25 — Teste automatizado prova que anotador sem qualificação não recebe item da fila; o dashboard renderiza série temporal por anotador.</label></li>
+        <li><input type="checkbox" id="a27"><label for="a27">R26 — Novo tipo de tarefa com ≥1 tarefa demo ponta a ponta e export num dos perfis de entrega; testes verdes.</label></li>
+        <li><input type="checkbox" id="a28"><label for="a28">R27 — <code>docs/artefatos/adr-bancada-multi-tenant.html</code> existe; o link daqui e o do README resolvem. <b>[já satisfeito em 2026-08-13]</b></label></li>
+        <li><input type="checkbox" id="a29"><label for="a29">RM1 — Os dois templates existem em <code>html-central/templates/</code> e a lista de Tiers da skill foi atualizada.</label></li>
+        <li><input type="checkbox" id="a30"><label for="a30">RM2+RM3 — Os dois guias existem na pasta pessoal, instanciam o template <code>guia-estudo</code> e as referências bibliográficas foram conferidas link a link.</label></li>
+        <li><input type="checkbox" id="a31"><label for="a31">RM4 — O playbook de operações imprime em ≤2 páginas A4 (pré-visualização de impressão conferida).</label></li>
+        <li><input type="checkbox" id="a32"><label for="a32">RM5 — O playbook de preparação contém as seções de pitch, casos narrados e perguntas &amp; respostas, nomeadas.</label></li>
+        <li><input type="checkbox" id="a33"><label for="a33">RM6 — As 4 URLs de artifact estão registradas na memória de sessão e cada uma abre logado.</label></li>
+      </ul>
+    </section>
+
+    <!-- ===== DECISÕES & RISCOS ===== -->
+    <section class="tab-panel" id="p-dec" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Decisões</h2>
+      <p class="measure" data-skel="fixo">Decisão firme com trade-off real é promovível a ADR.</p>
+      <table class="grid" data-slot="decisoes">
+        <tr><th>#</th><th>Decisão</th><th>Motivo</th><th></th></tr>
+        <tr><td>D1</td><td>Licença MIT + nota código-vs-dados</td><td>MIT é a convenção de portfólio Python; o sinal de sofisticação já está na licença por linha dos DADOS — a nota é o diferencial, não a licença rara</td><td><button class="btn ghost" data-adr="D1">promover a ADR</button></td></tr>
+        <tr><td>D2</td><td>CI em ubuntu-latest + <code>[[tool.uv.index]]</code> pytorch-cpu com <code>[tool.uv.sources]</code> marker linux; fallback documentado: windows-latest</td><td>Corta ~2,7 GB → ~190 MB; ubuntu é o sinal de mercado e prova a hermeticidade de verdade; o lock muda só para Linux, dev Windows intacto</td><td><button class="btn ghost" data-adr="D2">promover a ADR</button></td></tr>
+        <tr><td>D3</td><td>Gate de CI = <code>ruff check</code> + <code>pytest -m "not slow"</code>; sem <code>ruff format --check</code></td><td>Format falharia hoje em 98/146 arquivos; reformatação em massa polui blame — vira could futuro, nunca gate inicial</td><td><button class="btn ghost" data-adr="D3">promover a ADR</button></td></tr>
+        <tr><td>D4</td><td><code>backups/bancada.sql</code>: remover do HEAD + <code>git filter-repo</code> no histórico; backup vive fora do repo</td><td>PII de terceiro (nome real vindo de prompt do WildChat) + gabaritos versionados contradizem o próprio <code>.gitignore</code>; o rewrite é barato AGORA (1 usuário, 68 commits) e impossível depois de público</td><td><button class="btn ghost" data-adr="D4">promover a ADR</button></td></tr>
+        <tr><td>D5</td><td>Screenshots e vídeo capturados exclusivamente do pacote demo/CC0, com checklist por imagem</td><td>Política da casa (HTML commitado nunca imprime corpo de prompt) + licenças de terceiros; verificável imagem a imagem</td><td><button class="btn ghost" data-adr="D5">promover a ADR</button></td></tr>
+        <tr><td>D6</td><td>Editoras → "Editora A/B/C" no HEAD; opcional <code>--replace-text</code> no mesmo passe do filter-repo</td><td>Repo público não deve nomear titulares de material com copyright processado localmente; os nomes não agregam sinal técnico</td><td><button class="btn ghost" data-adr="D6">promover a ADR</button></td></tr>
+        <tr><td>D7</td><td>Entregáveis da rodada atual no PRD como grupo meta (fatia-00 pré-satisfeita); itens de carreira com título neutro e destino "pasta pessoal fora do repo"</td><td>Este PRD será público junto com o repo; listar demonstra método, detalhar vazaria estratégia de candidatura</td><td><button class="btn ghost" data-adr="D7">promover a ADR</button></td></tr>
+        <tr><td>D8</td><td>C3 cobre as QUATRO iniciativas em sequência de custo: red-team → fine-tune → qualification+dashboard → trajetórias (decisão do dono, 2026-08-13)</td><td>Substituiu o "escolher 2 de 4" da auditoria; nada é descartado, tudo é sequenciado do mais barato ao mais complexo</td><td><button class="btn ghost" data-adr="D8">promover a ADR</button></td></tr>
+        <tr><td>D9</td><td><code>labeling/manifest.json</code> permanece versionado; regra escrita: ouro público nunca reusado com anotadores externos; C2 sorteia ouro novo</td><td>Transparência de metodologia &gt; sigilo retroativo (o histórico já teria os uids); o risco de integridade se neutraliza por rotação</td><td><button class="btn ghost" data-adr="D9">promover a ADR</button></td></tr>
+        <tr><td>D10</td><td>Números do README com fonte única: check que falha quando o README diverge de <code>pytest --collect-only</code></td><td>A causa-raiz do 1.287/1.273 é processo manual; corrigir o número sem corrigir o processo defasa de novo</td><td><button class="btn ghost" data-adr="D10">promover a ADR</button></td></tr>
+        <tr><td>D11</td><td>R16 (público) gated por verificação em clone limpo do remoto</td><td>Histórico público não se apaga; o gate custa 10 minutos</td><td><button class="btn ghost" data-adr="D11">promover a ADR</button></td></tr>
+        <tr><td>D12</td><td>Anotadores humanos da C2: consentimento explícito; cada um decide se aparece nomeado ou anônimo; canal de trabalho sem o link do repo até o fim da campanha</td><td>Pessoas reais num repo público exigem consentimento; o canal fechado impede contato com o ouro público (interage com D9)</td><td><button class="btn ghost" data-adr="D12">promover a ADR</button></td></tr>
+      </table>
+      <h2 data-skel="fixo">Riscos</h2>
+      <div data-slot="riscos">
+        <div class="callout danger"><span class="lbl">Risco RK1 — CI nunca rodou em Linux</span><p>A suíte pode quebrar por path/encoding no primeiro run. <b>Mitigação:</b> rodar o workflow em branch antes do badge; se a falha for estrutural, cair para windows-latest (fallback da D2) sem bloquear a Camada 0.</p></div>
+        <div class="callout danger"><span class="lbl">Risco RK2 — filter-repo invalida SHAs citados</span><p>O rewrite muda os 68 SHAs e as citações em <code>CLAUDE.md</code> (2×) e <code>PROMPT-HANDOFF-F4-2.md</code> (4×) passam a apontar para commits mortos. <b>Mitigação:</b> espelho pré-rewrite em backup externo + passe de correção/remoção das citações no mesmo commit.</p></div>
+        <div class="callout danger"><span class="lbl">Risco RK3 — recrutamento de anotadores atrasa a C2</span><p>Ou o alpha sai baixo. <b>Mitigação:</b> piloto de 20 itens com diretriz revisada antes do overlap completo; alpha baixo vira análise de causa publicada — que também é evidência de método.</p></div>
+        <div class="callout danger"><span class="lbl">Risco RK4 — ouro público contamina a campanha humana</span><p><b>Mitigação:</b> D9 + D12 — ouro novo sorteado para a C2 e anotadores sem o link do repo até o fim da campanha.</p></div>
+        <div class="callout danger"><span class="lbl">Risco RK5 — screenshot/vídeo vaza texto de corpus licenciado</span><p><b>Mitigação:</b> D5 + revisão imagem a imagem com checklist binário nos critérios do R8/R11.</p></div>
+        <div class="callout danger"><span class="lbl">Risco RK6 — C2/C3 seguram as candidaturas</span><p>Camadas de 2 semanas a 2 meses viram bloqueio implícito da busca de emprego. <b>Mitigação:</b> o marco declarado nos Objetivos — ao fim da C1 o repositório está shippable para candidatura; o que vem depois é release incremental.</p></div>
+      </div>
+    </section>
+
+    <!-- ===== MACHINE-READABLE (resumo p/ prd-to-issues, D4) ===== -->
+    <!-- ===== FACE LEIGA (ADR 0007/0009): mesmos fatos, outra linguagem, PT/EN ===== -->
+    <section class="tab-panel" id="p-exp" role="tabpanel" data-lang="pt" hidden>
+      <div class="lang-bar" data-skel="fixo">
+        <span class="lang-lbl">Idioma</span>
+        <button type="button" class="lang-btn" data-set-lang="pt" aria-pressed="true">Português</button>
+        <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="false">English</button>
+      </div>
+      <div class="callout note" data-skel="fixo"><span class="lbl">Regra desta aba</span>
+        <p>Linguagem leiga, nos dois idiomas: zero sigla sem expansão, zero jargão sem
+        definição na primeira ocorrência, números com a escala explicada. <b>Nenhum fato
+        novo</b> — tudo aqui existe nas outras abas, e as duas versões dizem o mesmo.</p></div>
+      <h2 data-skel="fixo">O que é isto, em 30 segundos</h2>
+      <div data-slot="exp-resumo">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-resumo-pt"><p>Este documento é o plano de produto para transformar o Prompt Factory — um banco de 159.733 prompts humanos com uma plataforma de anotação acoplada — de "projeto excelente que só o dono entende" em "portfólio que um avaliador estrangeiro compreende em 15 minutos e que resiste a escrutínio público". Ele organiza o trabalho em cinco camadas, das correções de um dia (licença, integração contínua, capturas de tela) até os acréscimos de meses (campanha com anotadores reais, novos tipos de tarefa).</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-resumo-en"><p>This document is the product plan to turn Prompt Factory — a bank of 159,733 human-written prompts with an annotation platform attached — from "an excellent project only its owner understands" into "a portfolio a foreign evaluator grasps in 15 minutes, able to withstand public scrutiny". It organizes the work into five layers, from one-day fixes (license, continuous integration, screenshots) to months-long additions (a campaign with real annotators, new task types).</p></div>
+      </div>
+      <h2 data-skel="fixo">Por que isto existe</h2>
+      <div data-slot="exp-porque">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-porque-pt"><p>Uma auditoria independente (13 de agosto de 2026) concluiu que o conteúdo do projeto é forte, mas a vitrine falha: não há arquivo de licença (ironia, num projeto cujo tema é licenciamento de dados), não há verificação automática do código a cada mudança, os relatórios de qualidade publicados mostram "0 de 155 lotes" quando a campanha real chegou a 82 de 155 com concordância de 0,913 (numa régua que vai de 0 a 1), e um arquivo com dados que não deveriam ser publicados está gravado no histórico do repositório. Este plano lista cada conserto com um critério de aceite que qualquer pessoa pode verificar.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-porque-en"><p>An independent audit (August 13, 2026) concluded that the project's substance is strong but its storefront fails: there is no license file (ironic, in a project about data licensing), no automated code checks on every change, the published quality reports show "0 of 155 batches" when the real campaign reached 82 of 155 with 0.913 agreement (on a scale from 0 to 1), and a file containing data that should not be published is recorded in the repository's history. This plan lists every fix with an acceptance criterion anyone can verify.</p></div>
+      </div>
+      <h2 data-skel="fixo">O que muda daqui pra frente</h2>
+      <div data-slot="exp-muda">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-muda-pt"><p>O trabalho passa a ter ordem e portões: primeiro a vitrine (um a dois dias), depois a tradução para o inglês e a limpeza que permite abrir o repositório ao público — com uma regra dura: nada vai a público antes de o arquivo problemático sair do histórico e de a verificação rodar limpa numa cópia recém-baixada. Em seguida vêm as provas estatísticas com gente de verdade e, por fim, quatro acréscimos de produto em ordem de custo. Um marco importante fica declarado: ao fim da segunda camada, o repositório já serve para candidaturas — o resto melhora, não bloqueia.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-muda-en"><p>The work now has order and gates: first the storefront (one to two days), then the English translation and the cleanup that allows opening the repository to the public — with a hard rule: nothing goes public before the problematic file leaves the history and the checks run clean on a freshly downloaded copy. Then come the statistical proofs with real people and, finally, four product additions in cost order. One milestone is declared: by the end of the second layer, the repository is ready for job applications — everything after improves, never blocks.</p></div>
+      </div>
+      <h2 data-skel="fixo">O que isto NÃO diz</h2>
+      <div data-slot="exp-nao_diz">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-nao_diz-pt"><p>Este plano não promete construir a versão multiusuário da plataforma (essa decisão tem documento próprio, o ADR 0001), não troca o modelo de embeddings em produção, não cobre monetização — e não executa nada sozinho: cada camada ainda precisa ser feita, e os critérios desta página é que dirão quando cada uma está pronta de verdade.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-nao_diz-en"><p>This plan does not promise to build the multi-user version of the platform (that decision has its own document, ADR 0001), does not swap the production embedding model, does not cover monetization — and it executes nothing by itself: each layer still has to be done, and the criteria on this page are what will tell when each one is truly finished.</p></div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="p-machine" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Resumo estruturado para issues</h2>
+      <p class="measure" data-skel="fixo">Schema fixo, ingerível por
+      <code>prd-to-issues</code>/<code>to-issues</code> — fatias verticais.</p>
+      <div class="machine-block" id="mr" data-slot="machine-readable">PRD:
+  titulo:     Prompt Factory — padrão-ouro SOTA em Data Annotation
+  problema:   O repo pensa como padrão-ouro mas não se apresenta assim (sem LICENSE/CI/screenshots, notebooks defasados, pt-BR como porta, backups/bancada.sql versionado com texto derivado do corpus e gabaritos) — a auditoria de 2026-08-13 sequenciou o conserto em 5 camadas.
+OBJETIVOS:
+  - Avaliador estrangeiro entende o produto em <=15 min sem rodar nada
+  - CI publico verde (ruff check + 1.116 testes not-slow em ubuntu-latest)
+  - Repo publico sem violar licenca de terceiros nem expor dados pessoais (gate em clone limpo)
+  - Alpha de Krippendorff com IC bootstrap sobre campanha humana real + calibracao do revisor medida
+  - Cardapio 2026 completo em sequencia de custo (red-team -> fine-tune -> qualification -> trajetorias)
+  - Fim da C1 = repo shippable para candidatura; C2/C3 sao releases incrementais
+REQUISITOS:
+  - id: R1   prioridade: must    texto: LICENSE (MIT) na raiz
+  - id: R2   prioridade: must    texto: Nota codigo-vs-dados no README (dados nao redistribuidos; licenca/atribuicao por linha)
+  - id: R3   prioridade: must    texto: Re-render dos notebooks analysis/01 e 02 com o estado real (82/155, agreement 0,913+) + atualizar a prosa de analysis/README.md (estado velho)
+  - id: R4   prioridade: must    texto: CI GitHub Actions ruff check + pytest -m "not slow" em ubuntu-latest com indice pytorch-cpu
+  - id: R5   prioridade: must    texto: Badge de CI verde no README
+  - id: R6   prioridade: must    texto: Contagem de testes unica com fonte unica (check de divergencia D10)
+  - id: R7   prioridade: must    texto: README menciona Central de Briefs e marcos F1-F6
+  - id: R8   prioridade: must    texto: 4-6 screenshots demo/CC0 em docs/img/
+  - id: R9   prioridade: must    texto: README.md em ingles primario + README.pt-BR.md linkado
+  - id: R10  prioridade: should  texto: docs/samples/ com dataset card + quality report + auditoria de item (demo/CC0)
+  - id: R11  prioridade: could   texto: Video demo ~5 min linkado
+  - id: R12  prioridade: must    texto: backups/bancada.sql fora do HEAD e do historico (filter-repo) + correcao dos SHAs citados
+  - id: R13  prioridade: must    texto: Zero caminhos pessoais no HEAD
+  - id: R14  prioridade: should  texto: Editoras anonimizadas em docs/central-de-briefs/
+  - id: R15  prioridade: should  texto: Politica escrita do ouro publico (nunca reusado; C2 sorteia ouro novo)
+  - id: R16  prioridade: must    texto: Repo publico com gate D11 (R4+R12+R13 em clone limpo)
+  - id: R16b prioridade: could   texto: Extra opcional [embed] tirando torch das dependencias principais
+  - id: R17  prioridade: should  texto: Campanha humana 2-3 anotadores, overlap 20-30%, alpha com IC bootstrap 95%
+  - id: R18  prioridade: should  texto: Calibracao do revisor contra as >=4 sinteticas de gabarito escondido
+  - id: R19  prioridade: should  texto: Notebook 03 (calibracao label_confidence + confusoes + fronteiras + IC dos F1)
+  - id: R20  prioridade: should  texto: Precisao/recall da varredura de PII com amostra auditada
+  - id: R21  prioridade: could   texto: Anti-copia calibrado com distribuicao real
+  - id: R22  prioridade: must    texto: C3 em sequencia de custo, sem paralelismo entre iniciativas (D8)
+  - id: R23  prioridade: should  texto: C3.1 fluxo red-team/safety (brief + rubrica de severidade + catalogo de harm + campanha demo)
+  - id: R24  prioridade: should  texto: C3.2 experiment report do fine-tune de task_type (0,58 -> meta 0,65; offline)
+  - id: R25  prioridade: should  texto: C3.3 qualification test bloqueando a fila + dashboard temporal por anotador
+  - id: R26  prioridade: should  texto: C3.4 tipo de tarefa trajetoria de agente ponta a ponta
+  - id: R27  prioridade: must    texto: ADR multi-tenant linkado [SATISFEITO em 2026-08-13 por docs/artefatos/adr-bancada-multi-tenant.html]
+  - id: RM1  prioridade: must    texto: Templates Tier 2 guia-estudo + playbook na Central [rodada atual]
+  - id: RM2  prioridade: must    texto: Guia de estudo (papel de administracao de anotacao) em pasta pessoal [rodada atual]
+  - id: RM3  prioridade: must    texto: Guia de estudo (papel de ciencia de dados) em pasta pessoal [rodada atual]
+  - id: RM4  prioridade: must    texto: Playbook de operacoes EN <=2 paginas em pasta pessoal [rodada atual]
+  - id: RM5  prioridade: must    texto: Playbook de preparacao pessoal em pasta pessoal [rodada atual]
+  - id: RM6  prioridade: should  texto: 4 artifacts privados publicados + memoria atualizada [rodada atual]
+CRITERIOS_DE_ACEITE:
+  - R1: LICENSE existe com 1a linha "MIT License"; gh repo view --json licenseInfo reconhece MIT
+  - R2: grep -i "por linha" README.md nao-vazio na secao de licenca
+  - R3: grep -r "0 of 155" analysis/ vazio; grep -r "155 batches are pending" analysis/ vazio; pares ipynb/html + analysis/README.md no mesmo commit
+  - R4: ci.yml contem ruff check e -m "not slow", nao contem ruff format; gh run list -L1 = success
+  - R5: badge workflows/ci.yml/badge renderiza verde
+  - R6: greps de 1.287/1.273 vazios; numero == pytest --collect-only; check de divergencia existe
+  - R7: grep "Central de Briefs" README.md nao-vazio; F1-F6 na tabela de status
+  - R8: 4-6 imagens em docs/img/; checklist zero-texto-de-corpus por imagem
+  - R9: primeiras 30 linhas do README em EN; link pt-BR resolve
+  - R10: >=3 arquivos em docs/samples/, um por tipo, sem texto de corpus
+  - R11: link responde; <=6 min; conteudo demo/CC0
+  - R12: git log --all -- backups/bancada.sql vazio no repo publicado; SHAs citados corrigidos
+  - R13: git grep -iE "Users[/\\]gigio|Ensino Medio" vazio
+  - R14: git grep -E "Atica|Scipione|Saraiva" vazio no HEAD
+  - R15: regra do ouro publico presente no doc de metodologia (grep)
+  - R16: visibility PUBLIC; gate D11 executado em clone limpo
+  - R16b: uv sync sem extra instala sem torch; suite not-slow verde nos dois modos
+  - R17: alpha + IC 95% + n do overlap impressos em HTML commitado; consentimento registrado (D12)
+  - R18: acuracia do revisor (exato, +-1, MAE) com n declarado
+  - R19: analysis/03 com as 4 secoes nomeadas
+  - R20: precisao E recall com n da amostra
+  - R21: valor em config com comentario "medido em <data>, n=<n>"
+  - R22: nenhuma iniciativa C3 comeca com a anterior aberta
+  - R23: campanha demo red-team exportada com manifesto; testes verdes
+  - R24: report com antes/depois, seed e config; F1 >= 0,65 ou analise honesta
+  - R25: teste automatizado do bloqueio de fila; dashboard com serie temporal
+  - R26: tipo novo ponta a ponta com demo e export; testes verdes
+  - R27: ADR existe e os links resolvem [feito]
+  - RM1-RM6: templates na Central; guias/playbooks na pasta pessoal; playbook ops <=2 A4; 4 URLs na memoria
+FATIAS_VERTICAIS_SUGERIDAS:
+  - fatia-00-rodada-atual [pre-satisfeita: R27+RM1-RM6 — orquestrador ignora]
+  - fatia-01-licenca (S: R1,R2 — LICENSE, README.md)
+  - fatia-02-ci-verde (M: R4,R5 — .github/workflows/ci.yml, pyproject.toml, uv.lock, README.md)
+  - fatia-03-notebooks-frescos (M: R3 — analysis/01*, analysis/02*, analysis/README.md)
+  - fatia-04-readme-vivo (M: R6,R7,R8 — README.md, docs/img/)
+  - fatia-05-sanitizacao-pre-publico (L: R12,R13,R14 — filter-repo + correcao de SHAs; pre-condicao: espelho externo)
+  - fatia-06-embalagem-en (M: R9,R10 — README EN, README.pt-BR.md, docs/samples/; apos fatia-04)
+  - fatia-07-go-public (S: R15,R16 — gate D11 em clone limpo; apos fatias 01-06)
+  - fatia-08-video (S: R11; apos fatia-07)
+  - fatia-09-alpha-humano (L: R17,R18 — analysis/04 novo + campanha; pre-condicao: anotadores recrutados, ouro novo D9)
+  - fatia-10-notebook-classificador (M: R19 — analysis/03 novo)
+  - fatia-11-pii-medida (M: R20)
+  - fatia-12-anticopia-calibrado (S: R21)
+  - fatia-13-c3-redteam (M: R23) [sequencial apos C2 iniciada; 1a da C3]
+  - fatia-14-c3-finetune (L: R24) [2a da C3]
+  - fatia-15-c3-qualification-dashboard (L: R25) [3a da C3]
+  - fatia-16-c3-trajetorias (L: R26) [4a da C3]
+NAO_OBJETIVOS:
+  - Implementar a Bancada multi-tenant (ADR 0001 registra o caminho)
+  - Re-embedar o corpus / trocar embeddings de producao (invariante posicional)
+  - Rodar campanhas dentro da rodada de documentos
+  - Monetizacao, hospedagem publica, marketplace/pagamento de anotadores</div>
+      <div class="btn-row" data-skel="fixo">
+        <button class="btn" id="btn-json">Copiar como JSON</button>
+        <span class="toast" id="toast">copiado ✓</span>
+      </div>
+    </section>
+  </div>
+
+  <footer class="doc-foot" data-skel="fixo">
+    Artefato durável derivado do rascunho /to-prd (D10) · single-file, zero rede (D5) ·
+    aba Machine-Readable para prd-to-issues (D4).
+  </footer>
+</div>
+
+<script data-skel="fixo">
+(function(){"use strict";
+  document.querySelectorAll(".tabs").forEach(function(tabs){
+    var btns=tabs.querySelectorAll(".tab-btn"),panels=tabs.querySelectorAll(".tab-panel");
+    btns.forEach(function(btn){btn.addEventListener("click",function(){
+      btns.forEach(function(b){b.setAttribute("aria-selected","false")});
+      panels.forEach(function(p){p.hidden=true});
+      btn.setAttribute("aria-selected","true");
+      var pn=document.getElementById(btn.getAttribute("aria-controls"));
+      if(pn)pn.hidden=false;});});});
+  document.querySelectorAll("[data-lang]").forEach(function(root){
+    root.querySelectorAll(".lang-btn").forEach(function(btn){btn.addEventListener("click",function(){
+      var lang=btn.getAttribute("data-set-lang");
+      root.setAttribute("data-lang",lang);
+      root.querySelectorAll(".lang-btn").forEach(function(b){
+        b.setAttribute("aria-pressed",String(b.getAttribute("data-set-lang")===lang));});});});});
+  document.querySelectorAll("ul.check input[type=checkbox]").forEach(function(cb){
+    cb.addEventListener("change",function(){cb.closest("li").classList.toggle("done",cb.checked)});});
+  function flash(id){var t=document.getElementById(id||"toast");if(!t)return;t.classList.add("show");setTimeout(function(){t.classList.remove("show")},1400);}
+  function copy(txt){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){flash();},function(){flash();});}else{var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy")}catch(e){}document.body.removeChild(ta);flash();}}
+  // ---- Estado persistente: autosave localStorage + inlineState p/ save durável (ADR 0006) ----
+  var SKEY="artefato:"+location.pathname;
+  function stEls(){return document.querySelectorAll(".wrap input, .wrap select, .wrap textarea, .wrap .pasta");}
+  function stKey(el,i){return el.id?("#"+el.id):(el.tagName+"|"+(el.type||"")+"|"+i);}
+  function captureState(){var s={};stEls().forEach(function(el,i){var k=stKey(el,i);
+    if(el.classList&&el.classList.contains("pasta")) s[k]={p:Array.prototype.map.call(el.querySelectorAll("img"),function(im){return im.src;})};
+    else if(el.type==="checkbox"||el.type==="radio") s[k]={c:el.checked};
+    else s[k]={v:el.value};});return s;}
+  function restoreState(s){if(!s)return;stEls().forEach(function(el,i){var o=s[stKey(el,i)];if(!o)return;
+    if(el.classList&&el.classList.contains("pasta")){el.innerHTML="";(o.p||[]).forEach(function(src){var im=document.createElement("img");im.src=src;el.appendChild(im);});}
+    else if(el.type==="checkbox"||el.type==="radio"){if("c" in o){el.checked=o.c;var li=el.closest("li");if(li&&li.parentNode&&li.parentNode.classList&&li.parentNode.classList.contains("check"))li.classList.toggle("done",el.checked);}}
+    else{if("v" in o)el.value=o.v;}});}
+  function autosave(){try{localStorage.setItem(SKEY,JSON.stringify(captureState()));}catch(e){}}
+  function inlineState(){
+    document.querySelectorAll(".wrap input").forEach(function(el){if(el.type==="checkbox"||el.type==="radio"){if(el.checked)el.setAttribute("checked","checked");else el.removeAttribute("checked");}else el.setAttribute("value",el.value||"");});
+    document.querySelectorAll(".wrap select").forEach(function(el){Array.prototype.forEach.call(el.options,function(o){if(o.value===el.value)o.setAttribute("selected","selected");else o.removeAttribute("selected");});});
+    document.querySelectorAll(".wrap textarea").forEach(function(el){el.textContent=el.value||"";});}
+  var _fsa=null;
+  function saveHtml(){
+    inlineState();
+    var html="<!DOCTYPE html>\n"+document.documentElement.outerHTML;
+    var nm=(document.title||"artefato").replace(/[^\w\-.]+/g,"_")+".html";
+    function blobFallback(){
+      var blob=new Blob([html],{type:"text/html;charset=utf-8"});
+      var url=URL.createObjectURL(blob); var a=document.createElement("a");
+      a.href=url; a.download=nm; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(url);},100);
+      flash("toast-save");}
+    if(_fsa){
+      _fsa.createWritable().then(function(w){return w.write(html).then(function(){return w.close();});}).then(function(){flash("toast-save");}).catch(function(){blobFallback();});
+    } else if(window.showSaveFilePicker){
+      window.showSaveFilePicker({suggestedName:nm,types:[{description:"HTML",accept:{"text/html":[".html"]}}]}).then(function(h){_fsa=h;return h.createWritable();}).then(function(w){return w.write(html).then(function(){return w.close();});}).then(function(){flash("toast-save");}).catch(function(e){if(e.name!=="AbortError") blobFallback();});
+    } else {blobFallback();}}
+  stEls().forEach(function(el){el.addEventListener("input",autosave);el.addEventListener("change",autosave);});
+  try{var _raw=localStorage.getItem(SKEY);if(_raw)restoreState(JSON.parse(_raw));}catch(e){}
+  var bj=document.getElementById("btn-json");
+  if(bj)bj.addEventListener("click",function(){var el=document.getElementById("mr");copy(JSON.stringify({prd_resumo:el?el.textContent:""},null,2));});
+  var bs=document.getElementById("btn-save"); if(bs) bs.addEventListener("click",saveHtml);
+  document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();saveHtml();}});
+})();
+</script>
+</body>
+</html>

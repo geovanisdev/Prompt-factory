@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-slot="titulo">ADR — 0001 · Bancada single-user local-first, com o caminho multi-tenant desenhado</title>
+<!--
+  TEMPLATE CANÔNICO: ADR / Registro de Decisão de Arquitetura (Tier 1).
+  Herda DESIGN_SYSTEM.html. Single-file, zero rede (D5).
+  Espelha a forma minimalista dos adr/0001..0003 desta skill (D7):
+   decisão em 1-3 frases no topo · Opções consideradas · Consequências.
+  Aba Machine-Readable = resumo fixo da decisão p/ indexação / navegação
+  de agente (ADR repassa contexto -> invariante #5 do SKILL.md).
+  <style data-skel="fixo"> = base invariante verbatim (sem componente extra:
+  ADR não usa timeline/diff/scorecard).
+  data-skel="fixo" = esqueleto; data-slot = preenchido pela Skill B (D9).
+-->
+<style data-skel="fixo">
+  :root{--paper:#faf8f4;--paper-sunk:#f1eee7;--ink:#1c1b18;--ink-soft:#4a4843;--ink-faint:#8a877f;--rule:#d9d4c8;--rule-strong:#b8b2a3;--accent:#2f5d57;--accent-soft:#e4ece9;--ok:#3f6b3a;--ok-bg:#e8efe5;--warn:#8a6d1f;--warn-bg:#f4ecd6;--danger:#9c3a32;--danger-bg:#f3e0dd;--info:#355c7a;--info-bg:#e1e9ef;--neutral:#5c5a53;--neutral-bg:#eceae3;--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,Cambria,"Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"Cascadia Code","Source Code Pro",Menlo,Consolas,"DejaVu Sans Mono",monospace;--t-xs:.75rem;--t-sm:.875rem;--t-base:1rem;--t-md:1.25rem;--t-lg:1.5625rem;--t-xl:1.953rem;--t-xxl:2.441rem;--s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.5rem;--s6:2rem;--s7:3rem;--s8:4rem;--measure:74ch;--radius:3px}
+  @media (prefers-color-scheme:dark){:root{--paper:#16150f;--paper-sunk:#1f1d16;--ink:#ece8df;--ink-soft:#b9b4a6;--ink-faint:#807c70;--rule:#33302a;--rule-strong:#4a463c;--accent:#7fb3aa;--accent-soft:#1d2b29;--ok:#8fb886;--ok-bg:#1b251a;--warn:#cdae6a;--warn-bg:#2a2415;--danger:#d28a82;--danger-bg:#2c1916;--info:#8fb2cc;--info-bg:#15222b;--neutral:#a8a59c;--neutral-bg:#23211b}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:var(--t-base);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:var(--s6) var(--s5) var(--s8)}
+  .measure{max-width:var(--measure)}
+  .doc-head{border-bottom:2px solid var(--ink);padding-bottom:var(--s4);margin-bottom:var(--s5)}
+  .doc-kicker{font-family:var(--sans);font-size:var(--t-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 var(--s2)}
+  .doc-title{font-size:var(--t-xxl);line-height:1.15;margin:0 0 var(--s3);font-weight:600}
+  .doc-meta{font-family:var(--sans);font-size:var(--t-sm);color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:0}
+  .doc-meta b{color:var(--ink);font-weight:600}
+  .canon{font-family:var(--sans);font-size:var(--t-sm);margin-top:var(--s3)}
+  .canon a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
+  .canon a:hover{border-bottom-color:var(--accent)}
+  h2{font-size:var(--t-xl);font-weight:600;margin:var(--s7) 0 var(--s3);line-height:1.2}
+  h3{font-size:var(--t-lg);font-weight:600;margin:var(--s5) 0 var(--s3)}
+  h4{font-family:var(--sans);font-size:var(--t-base);font-weight:700;margin:var(--s4) 0 var(--s2)}
+  p{margin:0 0 var(--s4)}
+  code,kbd{font-family:var(--mono);font-size:.92em;background:var(--paper-sunk);padding:.1em .35em;border-radius:var(--radius)}
+  .tabs{margin:var(--s5) 0}
+  .tab-strip{display:flex;flex-wrap:wrap;gap:var(--s1);border-bottom:1px solid var(--rule-strong);font-family:var(--sans)}
+  .tab-btn{appearance:none;background:none;border:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;color:var(--ink-faint);padding:var(--s2) var(--s4);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab-btn:hover{color:var(--ink)}
+  .tab-btn[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-btn.machine{margin-left:auto;color:var(--neutral)}
+  .tab-btn.machine[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+  .tab-panel{padding:var(--s5) 0}
+  .tab-panel[hidden]{display:none}
+  .lang-bar{display:flex;align-items:center;gap:var(--s2);margin:0 0 var(--s4);font-family:var(--sans)}
+  .lang-bar .lang-lbl{color:var(--ink-faint);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .lang-btn{appearance:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;background:none;color:var(--ink-faint);border:1px solid var(--rule);border-radius:100px;padding:.2em .9em}
+  .lang-btn:hover{color:var(--ink);border-color:var(--rule-strong)}
+  .lang-btn[aria-pressed="true"]{color:#fff;background:var(--accent);border-color:var(--accent)}
+  [data-lang="pt"] .lang-en,[data-lang="en"] .lang-pt{display:none}
+  .badge{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.15em .6em;border-radius:100px;display:inline-block;line-height:1.6}
+  .badge.ok{color:var(--ok);background:var(--ok-bg)}.badge.warn{color:var(--warn);background:var(--warn-bg)}.badge.danger{color:var(--danger);background:var(--danger-bg)}.badge.info{color:var(--info);background:var(--info-bg)}.badge.neutral{color:var(--neutral);background:var(--neutral-bg)}
+  table.grid{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:var(--t-sm);margin:var(--s4) 0}
+  table.grid caption{text-align:left;font-size:var(--t-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:var(--s2)}
+  table.grid th{text-align:left;font-weight:700;color:var(--ink);border-bottom:2px solid var(--rule-strong);padding:var(--s2) var(--s3)}
+  table.grid td{border-bottom:1px solid var(--rule);padding:var(--s2) var(--s3);vertical-align:top}
+  table.grid tr:hover td{background:var(--paper-sunk)}
+  .callout{border-left:3px solid var(--rule-strong);background:var(--paper-sunk);padding:var(--s3) var(--s4);margin:var(--s4) 0;border-radius:0 var(--radius) var(--radius) 0}
+  .callout .lbl{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:var(--s1)}
+  .callout.note{border-color:var(--info)}.callout.note .lbl{color:var(--info)}
+  .callout.warn{border-color:var(--warn)}.callout.warn .lbl{color:var(--warn)}
+  .callout.danger{border-color:var(--danger)}.callout.danger .lbl{color:var(--danger)}
+  .callout p:last-child{margin-bottom:0}
+  ul.check{list-style:none;padding:0;font-family:var(--sans);font-size:var(--t-sm)}
+  ul.check li{display:flex;gap:var(--s2);align-items:flex-start;padding:var(--s2) 0;border-bottom:1px solid var(--rule)}
+  ul.check input{margin-top:.25em;accent-color:var(--accent)}
+  ul.check li.done label{color:var(--ink-faint);text-decoration:line-through}
+  .btn{font-family:var(--sans);font-size:var(--t-sm);font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:var(--s2) var(--s4);cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:none;color:var(--accent);border:1px solid var(--accent)}
+  .btn-row{display:flex;gap:var(--s2);flex-wrap:wrap;margin:var(--s4) 0}
+  .toast{font-family:var(--sans);font-size:var(--t-sm);color:var(--ok);margin-left:var(--s2);opacity:0;transition:opacity .2s}
+  .toast.show{opacity:1}
+  .machine-block{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:var(--t-sm);line-height:1.6;padding:var(--s5);border-radius:var(--radius);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  @media (prefers-color-scheme:dark){.machine-block{background:#000}}
+  footer.doc-foot{margin-top:var(--s8);padding-top:var(--s4);border-top:1px solid var(--rule);font-family:var(--sans);font-size:var(--t-xs);color:var(--ink-faint)}
+  @media print{.tab-btn{display:none}.lang-bar{display:none}.tab-panel[hidden]{display:block!important}.btn,.btn-row{display:none}body{background:#fff;color:#000}a{color:#000}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc-head" data-skel="fixo">
+    <p class="doc-kicker">ADR · Decisão de Arquitetura</p>
+    <h1 class="doc-title" data-slot="titulo">0001 — Bancada single-user local-first, com o caminho multi-tenant desenhado</h1>
+    <p class="doc-meta">
+      <span><b>ADR:</b> <span data-slot="numero">0001</span></span>
+      <span><b>Status:</b> <span data-slot="status"><span class="badge ok">aceita</span></span></span>
+      <span><b>Data:</b> <span data-slot="data">2026-08-13</span></span>
+      <span><b>Relação:</b> <span data-slot="relacao">—</span></span>
+    </p>
+    <p class="canon" data-slot="canon">Links canônicos: <code>CLAUDE.md</code> (seção Bancada) · <code>src/prompt_factory/annotate/db.py</code> (schema v7, <code>TRANSICOES</code>, vocabulário fechado) · <code>docs/artefatos/prd-padrao-ouro.html</code> (requisito R27) · auditoria de portfólio de 2026-08-13 (artifact privado, Camada 4 do roadmap)</p>
+  </header>
+
+  <div class="tabs" data-skel="fixo">
+    <div class="tab-strip" role="tablist" aria-label="Seções do ADR">
+      <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="p-dec">Decisão</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-exp">Explicador</button>
+      <button class="tab-btn machine" role="tab" aria-selected="false" aria-controls="p-machine">Machine-Readable</button>
+    </div>
+
+    <!-- ===== DECISÃO (humano) — espelha forma dos adr/0001..0003 ===== -->
+    <section class="tab-panel" id="p-dec" role="tabpanel">
+      <h2 data-skel="fixo">Decisão</h2>
+      <div class="measure" data-slot="decisao"><p>A Bancada permanece <b>single-user, local-first, sobre SQLite</b> — e o caminho para multiusuário fica <b>registrado neste documento</b> em vez de implementado: Postgres com isolamento por projeto, autenticação OIDC, RBAC real e claim transacional, a construir apenas quando existir um segundo usuário de verdade. Adotado porque o produto atual é demonstração de método (portfólio de operações e QC de anotação), e cada camada de infraestrutura sem usuário real seria custo sem evidência — enquanto a pergunta "isso escala?" merece resposta escrita, não improvisada.</p></div>
+
+      <h2 data-skel="fixo">Opções consideradas</h2>
+      <table class="grid" data-slot="opcoes">
+        <caption>Veredito por opção</caption>
+        <tr><th>Opção</th><th>Veredito</th><th>Motivo</th></tr>
+        <tr><td><b>A.</b> Local-first + este ADR desenhando o caminho</td><td><span class="badge ok">escolhido</span></td><td>Zero custo de infraestrutura agora; a demonstrabilidade offline permanece (clone → <code>pf annotate</code> → funciona, sem deploy, sem conta); a migração futura fica barata <i>enquanto os invariantes da seção Consequências forem preservados</i> — e a resposta de arquitetura para entrevista/cliente existe por escrito.</td></tr>
+        <tr><td><b>B.</b> Migrar já para Postgres multi-tenant (auth, RBAC, deploy)</td><td><span class="badge danger">rejeitado</span></td><td>Semanas de plano de controle (autenticação, papéis, provisionamento, observabilidade, backups gerenciados) para atender zero usuário adicional. Mata a propriedade mais demonstrável do produto — rodar inteiro numa máquina local, offline — e desloca o portfólio de "método provado" para "infraestrutura genérica".</td></tr>
+        <tr><td><b>C.</b> SQLite replicado (Litestream / LiteFS)</td><td><span class="badge danger">rejeitado</span></td><td>Resolve durabilidade e réplicas de <i>leitura</i>, que não são o problema: multiusuário real exige escrita concorrente, autenticação e papéis — o plano de <i>controle</i>. Acrescentaria um plano de dados distribuído a um sistema que continuaria single-writer, com a complexidade nova e o teto antigo.</td></tr>
+      </table>
+
+      <h2 data-skel="fixo">Consequências</h2>
+      <div class="measure" data-slot="consequencias">
+        <p><b>O que fica mais fácil.</b> O produto local continua exatamente como está — nenhuma linha muda por causa deste ADR. A resposta de escala passa a existir por escrito, com os trade-offs nomeados, e qualquer avaliador pode conferi-la contra o código.</p>
+        <p><b>O que este ADR impõe: os seis invariantes de migração.</b> O desenho abaixo só é barato enquanto estes invariantes — todos já em vigor no schema v7 — forem preservados por qualquer mudança futura:</p>
+        <table class="grid">
+          <tr><th>#</th><th>Invariante</th><th>Por que a migração depende dele</th></tr>
+          <tr><td>1</td><td>A máquina de status é <b>dado</b> (<code>db.TRANSICOES</code>), não uma sequência de <code>if</code></td><td>Migra como INSERT numa tabela de transições; reescrevê-la em código de aplicação obrigaria a portar lógica, não dados</td></tr>
+          <tr><td>2</td><td>Instrumento, diretriz e brief <b>versionados e pinados</b> por anotação (<code>versao_diretriz</code>, <code>versao_brief</code>, <code>payload_schema</code>)</td><td>Nenhum passe de migração pode "achatar" versões: a trilha de auditoria responde <i>sob qual regra</i> cada item foi anotado — achatar apagaria a resposta</td></tr>
+          <tr><td>3</td><td>Evento gravado na <b>mesma transação</b> da mudança que registra</td><td>Em Postgres isso continua verdade de graça; quebrá-lo (fila de eventos assíncrona) faria a trilha mentir exatamente nos casos interessantes</td></tr>
+          <tr><td>4</td><td>Cruzamento corpus↔anotação por <b><code>uid</code></b>, nunca por rowid/id</td><td>O corpus troca por swap de arquivo e os ids renascem a cada carga; o <code>uid</code> é a única chave estável entre os dois bancos — em qualquer motor</td></tr>
+          <tr><td>5</td><td>Vocabulário fechado espelhado <b>banco↔API</b> (cada <code>CHECK</code> sai de uma tupla Python que o Pydantic também valida)</td><td>Em Postgres os CHECKs viram <code>ENUM</code> ou <code>CHECK</code> — a fonte única em código é o que impede as duas pontas de divergirem na migração</td></tr>
+          <tr><td>6</td><td>Sinal <b>único</b> de anotação sintética: <code>gabarito_avaliacao_json IS NOT NULL</code></td><td>Toda métrica, export e política de entrega deriva dele; uma segunda marca criada "de passagem" na migração produziria duas verdades</td></tr>
+        </table>
+        <p><b>O mapa técnico do caminho</b> (quando houver demanda): o claim sob <code>BEGIN IMMEDIATE</code> vira <code>SELECT … FOR UPDATE SKIP LOCKED</code>; a expiração preguiçosa (UPDATE antes de cada claim/listagem) migra sem thread de fundo; os papéis atuais — hoje <i>teatro de autorização declarado na tela</i> — viram RBAC com OIDC, mantendo o servidor como única autoridade sobre o papel; o carimbo de tempo <code>strftime('%Y-%m-%dT%H:%M:%fZ','now')</code> vira <code>now()</code> UTC <b>no mesmo formato lexicograficamente ordenável</b> (a comparação de prazo depende disso); isolamento por projeto via RLS (row-level security) com <code>projeto_id</code> já presente nas tabelas; dados migram por export/import lógico preservando ids e o histórico de eventos.</p>
+        <p><b>O que não pode ser revertido sem novo ADR.</b> A honestidade do modo atual: os papéis sem senha existem <i>declarados como demonstração</i> na própria tela. Remover a declaração sem instalar autenticação real seria transformar uma limitação honesta numa mentira de interface.</p>
+        <p><b>Custo assumido.</b> Este ADR envelhece com o schema — foi escrito contra a <b>v7</b>. Cada bump de schema que tocar claim, papéis, versionamento de instrumento ou eventos deve reler a tabela de invariantes e, se algum cair, substituir este ADR em vez de remendá-lo.</p>
+      </div>
+    </section>
+
+    <!-- ===== MACHINE-READABLE (resumo fixo da decisão p/ indexação) ===== -->
+    <!-- ===== FACE LEIGA (ADR 0007/0009): mesmos fatos, outra linguagem, PT/EN ===== -->
+    <section class="tab-panel" id="p-exp" role="tabpanel" data-lang="pt" hidden>
+      <div class="lang-bar" data-skel="fixo">
+        <span class="lang-lbl">Idioma</span>
+        <button type="button" class="lang-btn" data-set-lang="pt" aria-pressed="true">Português</button>
+        <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="false">English</button>
+      </div>
+      <div class="callout note" data-skel="fixo"><span class="lbl">Regra desta aba</span>
+        <p>Linguagem leiga, nos dois idiomas: zero sigla sem expansão, zero jargão sem
+        definição na primeira ocorrência, números com a escala explicada. <b>Nenhum fato
+        novo</b> — tudo aqui existe nas outras abas, e as duas versões dizem o mesmo.</p></div>
+      <h2 data-skel="fixo">O que é isto, em 30 segundos</h2>
+      <div data-slot="exp-resumo">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-resumo-pt"><p>A Bancada é a plataforma de anotação deste projeto — hoje ela roda inteira no computador de uma pessoa só, sem senha e sem servidor na internet. Este documento decide, por escrito, que ela vai <b>continuar assim</b> por enquanto — e desenha, passo a passo, como ela viraria um sistema para muitas pessoas (com banco de dados de servidor, login e permissões) no dia em que isso for necessário. Importa para quem avalia o projeto e pergunta "e se cem pessoas usassem isso ao mesmo tempo?".</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-resumo-en"><p>The Bancada is this project's annotation platform — today it runs entirely on one person's computer, with no passwords and no internet server. This document decides, in writing, that it will <b>stay that way</b> for now — and lays out, step by step, how it would become a system for many people (with a server database, login, and permissions) the day that becomes necessary. It matters to anyone evaluating the project who asks "what if a hundred people used this at once?".</p></div>
+      </div>
+      <h2 data-skel="fixo">Por que isto existe</h2>
+      <div data-slot="exp-porque">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-porque-pt"><p>Uma auditoria do projeto (13 de agosto de 2026) apontou um risco de narrativa: chamar a Bancada de "plataforma" sem saber explicar como ela cresceria pode soar como promessa vazia numa entrevista. Construir a versão para muitas pessoas agora custaria semanas — para zero usuário adicional. A saída madura é a que os times de engenharia usam há décadas: um ADR (Architecture Decision Record, registro de decisão de arquitetura) — um documento curto que registra o que foi decidido, o que foi rejeitado e por quê.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-porque-en"><p>An audit of the project (August 13, 2026) flagged a narrative risk: calling the Bancada a "platform" without being able to explain how it would grow can sound like an empty promise in an interview. Building the many-people version now would cost weeks — for zero additional users. The mature way out is what engineering teams have used for decades: an ADR (Architecture Decision Record) — a short document recording what was decided, what was rejected, and why.</p></div>
+      </div>
+      <h2 data-skel="fixo">O que muda daqui pra frente</h2>
+      <div data-slot="exp-muda">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-muda-pt"><p>No produto, nada — nenhuma linha de código muda por causa desta decisão. O que muda é que agora existe uma lista de <b>seis regras de construção</b> (os "invariantes") que qualquer mudança futura precisa respeitar para que a migração continue barata: por exemplo, as regras de fluxo de trabalho ficam guardadas como <i>dados</i> numa tabela, e cada anotação registra <i>qual versão</i> das instruções estava valendo quando ela foi feita. Enquanto essas seis regras valerem, trocar o banco local por um servidor é um projeto previsível, não uma reescrita.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-muda-en"><p>In the product, nothing — no line of code changes because of this decision. What changes is that there is now a list of <b>six construction rules</b> (the "invariants") that any future change must respect so migration stays cheap: for example, workflow rules are stored as <i>data</i> in a table, and each annotation records <i>which version</i> of the instructions was in force when it was made. As long as those six rules hold, swapping the local database for a server is a predictable project, not a rewrite.</p></div>
+      </div>
+      <h2 data-skel="fixo">O que isto NÃO diz</h2>
+      <div data-slot="exp-nao_diz">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-nao_diz-pt"><p>Este documento <b>não</b> promete que a versão multiusuário será construída, não estima prazo nem custo para ela, e não cobre cobrança, pagamento de anotadores ou detecção de fraude — esses são problemas de outro capítulo. Ele também envelhece: foi escrito contra a versão 7 do banco da Bancada, e uma mudança grande de estrutura pede a revisão da lista de regras.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-nao_diz-en"><p>This document does <b>not</b> promise the multi-user version will be built, does not estimate its schedule or cost, and does not cover billing, annotator payment, or fraud detection — those belong to another chapter. It also ages: it was written against version 7 of the Bancada's database, and a major structural change calls for revisiting the list of rules.</p></div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="p-machine" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Resumo indexável da decisão</h2>
+      <p class="measure" data-skel="fixo">Schema fixo. Um agente que varre os ADRs
+      <b>levanta</b> este bloco para saber o que não reverter — não infere do texto.</p>
+      <div class="machine-block" id="mr" data-slot="machine-readable">ADR:
+  numero:   0001
+  titulo:   Bancada single-user local-first, com o caminho multi-tenant desenhado
+  status:   aceita
+  data:     2026-08-13
+DECISAO:
+  A Bancada permanece single-user local-first sobre SQLite; o caminho multi-tenant (Postgres+RLS, OIDC, RBAC, FOR UPDATE SKIP LOCKED) fica desenhado neste ADR e só se constrói com demanda real.
+OPCAO_ESCOLHIDA:
+  Local-first + caminho desenhado por escrito (opção A)
+OPCOES_REJEITADAS:
+  - Migrar já para Postgres multi-tenant — semanas de plano de controle para zero usuário adicional; mata a demonstrabilidade offline
+  - SQLite replicado (Litestream/LiteFS) — resolve leitura/durabilidade, não escrita concorrente nem auth/RBAC; complexidade nova, teto antigo
+CONSEQUENCIAS_CHAVE:
+  - Seis invariantes de migração passam a ser contrato: TRANSICOES como dado; instrumento/diretriz/brief pinados por anotação; evento na mesma transação; cruzamento por uid; vocabulário fechado banco↔API; sinal único de sintética
+  - Mapa técnico registrado: BEGIN IMMEDIATE → FOR UPDATE SKIP LOCKED; expiração preguiçosa preservada; strftime → now() UTC no mesmo formato ordenável; RLS por projeto_id; export/import lógico
+  - ADR escrito contra o schema v7; bump de schema que toque claim/papéis/versionamento/eventos deve reler os invariantes
+NAO_REVERTER:
+  - A máquina de status como dado (db.TRANSICOES) — portar para ifs de aplicação quebraria a migração barata
+  - O pin de versões por anotação (versao_diretriz, versao_brief, payload_schema) — achatar apaga a resposta de auditoria
+  - O uid como única chave de cruzamento corpus↔anotação — ids renascem a cada pf load-db
+  - A declaração de "papéis sem senha = demonstração" na tela — removê-la sem auth real transforma limitação honesta em mentira de interface
+RELACAO:
+  substitui:        —
+  substituida_por:  —</div>
+      <div class="btn-row" data-skel="fixo">
+        <button class="btn" id="btn-prompt">Copiar como resumo</button>
+        <button class="btn ghost" id="btn-json">Copiar como JSON</button>
+        <span class="toast" id="toast">copiado ✓</span>
+      </div>
+    </section>
+  </div>
+
+  <footer class="doc-foot" data-skel="fixo">
+    Registro de decisão durável · forma minimalista (espelha adr/0001..0003) ·
+    single-file, zero rede (D5) · aba Machine-Readable de schema fixo (invariante #5).
+  </footer>
+</div>
+
+<script data-skel="fixo">
+(function(){"use strict";
+  document.querySelectorAll(".tabs").forEach(function(tabs){
+    var btns=tabs.querySelectorAll(".tab-btn"),panels=tabs.querySelectorAll(".tab-panel");
+    btns.forEach(function(btn){btn.addEventListener("click",function(){
+      btns.forEach(function(b){b.setAttribute("aria-selected","false")});
+      panels.forEach(function(p){p.hidden=true});
+      btn.setAttribute("aria-selected","true");
+      var pn=document.getElementById(btn.getAttribute("aria-controls"));
+      if(pn)pn.hidden=false;});});});
+  document.querySelectorAll("[data-lang]").forEach(function(root){
+    root.querySelectorAll(".lang-btn").forEach(function(btn){btn.addEventListener("click",function(){
+      var lang=btn.getAttribute("data-set-lang");
+      root.setAttribute("data-lang",lang);
+      root.querySelectorAll(".lang-btn").forEach(function(b){
+        b.setAttribute("aria-pressed",String(b.getAttribute("data-set-lang")===lang));});});});});
+  function flash(){var t=document.getElementById("toast");if(!t)return;t.classList.add("show");setTimeout(function(){t.classList.remove("show")},1400);}
+  function copy(txt){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(flash,flash);}else{var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy")}catch(e){}document.body.removeChild(ta);flash();}}
+  function mr(){var el=document.getElementById("mr");return el?el.textContent:"";}
+  var bp=document.getElementById("btn-prompt");
+  if(bp)bp.addEventListener("click",function(){copy("RESUMO DO ADR (decisão a não reverter):\n\n"+mr());});
+  var bj=document.getElementById("btn-json");
+  if(bj)bj.addEventListener("click",function(){copy(JSON.stringify({adr_resumo:mr()},null,2));});
+})();
+</script>
+</body>
+</html>
