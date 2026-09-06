@@ -95,7 +95,7 @@
     <p class="doc-meta">
       <span><b>Origem:</b> <span data-slot="origem">PRD padrão-ouro (aprovado), fatias 05–07; a fatia-08 (vídeo) fica fora — ver Backlog</span></span>
       <span><b>Esforço total:</b> <span data-slot="esforco-total">~7–9 h em 3 sprints, mais três ações suas na interface do GitHub</span></span>
-      <span><b>Estado:</b> <span data-slot="estado"><span class="badge info">em execução</span> <span class="badge ok">S05 e S06 concluídos 2026-09-06</span> <span class="badge ok">espelho feito 2026-09-05</span></span></span>
+      <span><b>Estado:</b> <span data-slot="estado"><span class="badge ok">concluída</span> <span class="badge ok">repositório público 2026-09-06</span> <span class="badge ok">espelho feito 2026-09-05</span></span></span>
     </p>
     <p class="canon" data-slot="canon">Links canônicos: <code>docs/artefatos/prd-padrao-ouro.html</code> (R9–R16, D4, D6, D9, D11, RK2) · <code>docs/artefatos/plano-sprint-camada-0.html</code> (fechado em <code>37b385b</code>) · espelho pré-reescrita em <code>F:\backups\prompt-factory\pre-filter-repo-2026-09-05\</code> (mirror git + bundle + os dois <code>annotate.sqlite</code> + <code>destilacao/</code> + semente e lotes; 35 MB, <code>fsck</code> limpo)</p>
   </header>
@@ -192,7 +192,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
           <line x1="80" y1="35" x2="560" y2="35" stroke-width="2"/>
           <circle class="done" cx="80"  cy="35" r="8"/><text class="node-label" x="80"  y="20" text-anchor="middle">S05</text><text x="80"  y="56" text-anchor="middle">sanitizar</text>
           <circle class="done" cx="320" cy="35" r="8"/><text class="node-label" x="320" y="20" text-anchor="middle">S06</text><text x="320" y="56" text-anchor="middle">inglês + samples</text>
-          <circle class="now"  cx="560" cy="35" r="8"/><text class="node-label" x="560" y="20" text-anchor="middle">S07</text><text x="560" y="56" text-anchor="middle">gate + público</text>
+          <circle class="done" cx="560" cy="35" r="8"/><text class="node-label" x="560" y="20" text-anchor="middle">S07</text><text x="560" y="56" text-anchor="middle">gate + público</text>
         </svg>
       </div>
       <h2 data-skel="fixo">Sprints</h2>
@@ -236,7 +236,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
           entra no commit que registra o flip.<br>
           <i>Toca:</i> <code>labeling/README.md</code>, o plano (fechamento). Ação sua: visibilidade → Public.</td>
           <td>~1 h + a sua ação<br><span class="badge neutral">S</span></td>
-          <td><span class="badge neutral">pendente</span></td>
+          <td><span class="badge ok">concluído</span></td>
         </tr>
       </table>
 
@@ -252,7 +252,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
         <li class="done"><input type="checkbox" id="s1" checked><label for="s1"><b>S05-A</b> — <code>git grep</code> de R13 e R14 vazios no HEAD (fora do PRD); <code>PF_MATERIAL_DIR</code> com teste; <code>backup_bancada.py</code> grava em <code>data/backups/</code>; <code>backups/bancada.sql</code> fora do HEAD; suíte verde; mergeado em <code>main</code>.</label></li>
         <li class="done"><input type="checkbox" id="s2" checked><label for="s2"><b>S05-B</b> — <code>git log --all -- backups/bancada.sql</code> vazio no clone filtrado; os 10 SHAs citados resolvem para commits vivos; remoto atualizado conforme PC1; cada worktree em <code>reset --hard</code> no ref novo com os dados não rastreados intactos; branches remotas absorvidas apagadas.</label></li>
         <li class="done"><input type="checkbox" id="s3" checked><label for="s3"><b>S06</b> — primeiras 30 linhas do <code>README.md</code> em inglês; <code>README.pt-BR.md</code> linkado e resolvendo; <code>test_readme.py</code> cobrindo os dois; <code>docs/samples/</code> com ≥3 arquivos de tipos distintos e zero texto de corpus.</label></li>
-        <li><input type="checkbox" id="s4"><label for="s4"><b>S07</b> — frase da política do ouro em <code>labeling/README.md</code>; gate D11 executado em clone limpo com saída colada; visibilidade PUBLIC confirmada pela API; badge respondendo 200 sem autenticação.</label></li>
+        <li class="done"><input type="checkbox" id="s4" checked><label for="s4"><b>S07</b> — frase da política do ouro em <code>labeling/README.md</code>; gate D11 executado em clone limpo com saída colada; visibilidade PUBLIC confirmada pela API; badge respondendo 200 sem autenticação.</label></li>
       </ul>
     </section>
 
@@ -396,7 +396,16 @@ FECHAMENTO_S06 (2026-09-06, f6a394c):
   a quebra de linha e lia "1 tests" em `run_pipeline.ps1`/`tests/`) e o numero lido DA coleta (o check reprovou o proprio
   sprint quando um teste novo moveu a coleta de 1.470 para 1.471).
   docs/samples/: dataset-card, quality-report, audit (+ manifestos) de uma Bancada com corpus VAZIO; a anotacao de
-  exemplo (A/B) foi levada a `avaliada` pela API — a submissao pela tela e fragil para automacao.</div>
+  exemplo (A/B) foi levada a `avaliada` pela API — a submissao pela tela e fragil para automacao.
+FECHAMENTO_S07 (2026-09-06, d3f21b9): GATE D11 VERDE em clone limpo do remoto, 15 verificacoes.
+  R12 dump fora da historia (0 commits, 0 objetos) · R12 zero citacoes de SHA mortas · R13 e R14 zero arquivos
+  (com o pathspec do PRD) · R9 README.md em ingles + README.pt-BR.md linkado · R10 tres samples · R15 a frase
+  do ouro · R4 ci.yml com ruff check e sem ruff format · R8 5 imagens, todas em docs/img
+  uv sync --locked OK · ruff OK · 1.465 passed, 1 skipped, 5 deselected — a suite reproduz em terreno virgem.
+  FLIP feito pelo dono na interface. Verificado SEM autenticacao: private=false, visibility=public, license=MIT,
+  default_branch=main, 84 commits, 1 branch; badge.svg 200 (R5 enfim publico); raw de backups/bancada.sql 404 e
+  LICENSE 200; clone anonimo OK. `Prompt-factory-prepublic` (a historia antiga) segue 404 — privado.
+  CAMADA 1 CONCLUIDA.</div>
       <div class="btn-row" data-skel="fixo">
         <button class="btn" id="btn-prompt">Copiar como prompt de handoff</button>
         <span class="toast" id="toast">copiado ✓</span>
