@@ -95,7 +95,7 @@
     <p class="doc-meta">
       <span><b>Origem:</b> <span data-slot="origem">PRD padrão-ouro (aprovado 2026-08-13, emenda no R3), fatias 01–04</span></span>
       <span><b>Esforço total:</b> <span data-slot="esforco-total">~6–8 h em 4 sprints</span></span>
-      <span><b>Estado:</b> <span data-slot="estado"><span class="badge info">aguardando aprovação</span></span></span>
+      <span><b>Estado:</b> <span data-slot="estado"><span class="badge ok">concluída</span> <span class="badge neutral">2026-09-05 · commits c30b7b4 · 59343a2 · eebd4b0 · c4446d6</span></span></span>
     </p>
     <p class="canon" data-slot="canon">Links canônicos: <code>docs/artefatos/prd-padrao-ouro.html</code> (R1–R8, critérios de aceite) · <code>docs/artefatos/adr-bancada-multi-tenant.html</code> (ADR 0001, satisfaz o R27) · <code>CLAUDE.md</code> (pegadinhas de ambiente) · <code>analysis/README.md</code> (política de disclosure dos notebooks) · commit <code>d85fefa</code></p>
   </header>
@@ -196,6 +196,14 @@
           A fatia-03 renderiza o estado real, seja ele qual for no dia.</li>
           <li><b>Camadas 2–4</b>: alpha de Krippendorff com anotadores humanos, notebook 03, red-team, fine-tune.
           A C4 já nasceu satisfeita pelo ADR 0001.</li>
+          <li><b>Prosa defasada no Overview do admin da Bancada</b> (achado do S04, fora do escopo): as chaves
+          <code>admin.roteiro</code>, <code>admin.roteiro_nota</code> e <code>admin.card_criacoes_nota</code> de
+          <code>annotate/static/index.html</code>, nas duas línguas, listam modo criar e ingestão como pendentes —
+          prontos desde P4/P6. A tela do admin ficou fora das capturas do R8 por isso. Corrigir com a suíte de
+          paridade i18n rodando; sem migração, sem risco.</li>
+          <li><b>Verificação de disclosure só à mão fora do checkout com dados.</b> <code>analysis/check_disclosure.py</code>
+          precisa do corpus e da semente, que são gitignorados — em clone limpo ele reporta cobertura parcial, e é
+          isso mesmo. Um CI que quisesse rodá-lo teria de carregar fixtures, o que é decisão de outra camada.</li>
         </ul>
       </div>
     </section>
@@ -206,10 +214,10 @@
       <div data-slot="timeline">
         <svg class="timeline" viewBox="0 0 640 70" role="img" aria-label="Linha do tempo: quatro sprints da Camada 0, todos pendentes">
           <line x1="60" y1="35" x2="580" y2="35" stroke-width="2"/>
-          <circle class="now"  cx="60"  cy="35" r="8"/><text class="node-label" x="60"  y="20" text-anchor="middle">S01</text><text x="60"  y="56" text-anchor="middle">licença</text>
-          <circle class="todo" cx="233" cy="35" r="8"/><text class="node-label" x="233" y="20" text-anchor="middle">S02</text><text x="233" y="56" text-anchor="middle">CI verde</text>
-          <circle class="todo" cx="406" cy="35" r="8"/><text class="node-label" x="406" y="20" text-anchor="middle">S03</text><text x="406" y="56" text-anchor="middle">notebooks</text>
-          <circle class="todo" cx="580" cy="35" r="8"/><text class="node-label" x="580" y="20" text-anchor="middle">S04</text><text x="580" y="56" text-anchor="middle">README vivo</text>
+          <circle class="done" cx="60"  cy="35" r="8"/><text class="node-label" x="60"  y="20" text-anchor="middle">S01</text><text x="60"  y="56" text-anchor="middle">licença</text>
+          <circle class="done" cx="233" cy="35" r="8"/><text class="node-label" x="233" y="20" text-anchor="middle">S02</text><text x="233" y="56" text-anchor="middle">CI verde</text>
+          <circle class="done" cx="406" cy="35" r="8"/><text class="node-label" x="406" y="20" text-anchor="middle">S03</text><text x="406" y="56" text-anchor="middle">notebooks</text>
+          <circle class="done" cx="580" cy="35" r="8"/><text class="node-label" x="580" y="20" text-anchor="middle">S04</text><text x="580" y="56" text-anchor="middle">README vivo</text>
         </svg>
       </div>
       <h2 data-skel="fixo">Sprints</h2>
@@ -225,7 +233,7 @@
           linha", mas não existe seção de licença nem a frase que o critério R2 procura.<br>
           <i>Toca:</i> <code>LICENSE</code> (novo), <code>README.md</code>.</td>
           <td>~30 min<br><span class="badge neutral">S</span></td>
-          <td><span class="badge neutral">pendente</span></td>
+          <td><span class="badge ok">concluído</span></td>
         </tr>
         <tr>
           <td><b>S02</b><br><span class="badge neutral">fatia-02</span></td>
@@ -238,7 +246,7 @@
           <i>Toca:</i> <code>.github/workflows/ci.yml</code> (novo), <code>pyproject.toml</code>,
           <code>uv.lock</code>, <code>README.md</code> (badge).</td>
           <td>~2–3 h<br><span class="badge warn">M</span></td>
-          <td><span class="badge neutral">pendente</span></td>
+          <td><span class="badge ok">concluído</span></td>
         </tr>
         <tr>
           <td><b>S03</b><br><span class="badge neutral">fatia-03</span></td>
@@ -251,7 +259,7 @@
           <i>Toca:</i> <code>analysis/01_annotation_qc.{ipynb,html}</code>,
           <code>analysis/02_labeling_campaign_qc.{ipynb,html}</code>, <code>analysis/README.md</code>.</td>
           <td>~1,5 h<br><span class="badge warn">M</span></td>
-          <td><span class="badge neutral">pendente</span></td>
+          <td><span class="badge ok">concluído</span></td>
         </tr>
         <tr>
           <td><b>S04</b><br><span class="badge neutral">fatia-04</span></td>
@@ -263,7 +271,7 @@
           CC0, com checklist imagem a imagem.<br>
           <i>Toca:</i> <code>README.md</code>, <code>docs/img/</code> (novo), <code>tests/</code> (o check D10).</td>
           <td>~2–3 h<br><span class="badge warn">M</span></td>
-          <td><span class="badge neutral">pendente</span></td>
+          <td><span class="badge ok">concluído</span></td>
         </tr>
       </table>
 
@@ -277,11 +285,11 @@
 
       <h2 data-skel="fixo">Checklist de progresso</h2>
       <ul class="check" data-slot="checklist-sprints">
-        <li><input type="checkbox" id="s1"><label for="s1"><b>S01</b> — <code>LICENSE</code> existe e a primeira linha é "MIT License"; <code>grep -i "por linha" README.md</code> não-vazio, dentro de uma seção de licença que afirma que os dados não são redistribuídos pelo repositório.</label></li>
-        <li><input type="checkbox" id="s2"><label for="s2"><b>S02</b> — <code>ci.yml</code> contém <code>ruff check</code> e <code>-m "not slow"</code> e NÃO contém <code>ruff format</code>; o primeiro run no remoto termina em sucesso; o badge aponta para <code>workflows/ci.yml/badge</code>; o <code>uv.lock</code> mudou só em entradas de Linux e <code>uv run pytest -q -m "not slow"</code> segue verde no Windows.</label></li>
-        <li><input type="checkbox" id="s3"><label for="s3"><b>S03</b> — <code>grep -r "0 of 155" analysis/</code> vazio; <code>grep -r "155 batches are pending" analysis/</code> vazio; os dois pares .ipynb/.html e o <code>analysis/README.md</code> entram no mesmo commit; os <code>.ipynb</code> seguem sem outputs; a verificação de disclosure passa com o canário provando que a busca funciona.</label></li>
-        <li><input type="checkbox" id="s4"><label for="s4"><b>S04</b> — <code>grep -E "1\.287|1\.273" README.md</code> vazio; o número citado bate com a coleta real e o check da D10 falha quando alguém os separa; "Central de Briefs" e os marcos F1–F6 presentes; entre 4 e 6 imagens existentes em <code>docs/img/</code>, todas conferidas como livres de texto do corpus.</label></li>
-        <li><input type="checkbox" id="s5"><label for="s5"><b>Fechamento da Camada 0</b> — <code>ruff check .</code> limpo e <code>pytest -q -m "not slow"</code> verde com a contagem de linha de base (1.462), sem regressão introduzida pela camada.</label></li>
+        <li class="done"><input type="checkbox" id="s1" checked><label for="s1"><b>S01</b> — <code>LICENSE</code> existe e a primeira linha é "MIT License"; <code>grep -i "por linha" README.md</code> não-vazio, dentro de uma seção de licença que afirma que os dados não são redistribuídos pelo repositório.</label></li>
+        <li class="done"><input type="checkbox" id="s2" checked><label for="s2"><b>S02</b> — <code>ci.yml</code> contém <code>ruff check</code> e <code>-m "not slow"</code> e NÃO contém <code>ruff format</code>; o primeiro run no remoto termina em sucesso; o badge aponta para <code>workflows/ci.yml/badge</code>; o <code>uv.lock</code> mudou só em entradas de Linux e <code>uv run pytest -q -m "not slow"</code> segue verde no Windows.</label></li>
+        <li class="done"><input type="checkbox" id="s3" checked><label for="s3"><b>S03</b> — <code>grep -r "0 of 155" analysis/</code> vazio; <code>grep -r "155 batches are pending" analysis/</code> vazio; os dois pares .ipynb/.html e o <code>analysis/README.md</code> entram no mesmo commit; os <code>.ipynb</code> seguem sem outputs; a verificação de disclosure passa com o canário provando que a busca funciona.</label></li>
+        <li class="done"><input type="checkbox" id="s4" checked><label for="s4"><b>S04</b> — <code>grep -E "1\.287|1\.273" README.md</code> vazio; o número citado bate com a coleta real e o check da D10 falha quando alguém os separa; "Central de Briefs" e os marcos F1–F6 presentes; entre 4 e 6 imagens existentes em <code>docs/img/</code>, todas conferidas como livres de texto do corpus.</label></li>
+        <li class="done"><input type="checkbox" id="s5" checked><label for="s5"><b>Fechamento da Camada 0</b> — <code>ruff check .</code> limpo e <code>pytest -q -m "not slow"</code> verde com a contagem de linha de base (1.462), sem regressão introduzida pela camada.</label></li>
       </ul>
     </section>
 
@@ -414,7 +422,15 @@ PEGADINHAS_TRANSVERSAIS:
   - uv.lock: conferir que o indice pytorch-cpu mudou SO as entradas de Linux. O ambiente Windows do dono
     nao pode se mexer — rodar a suite depois do sync para provar.
   - Push para o remoto e acao externa: so com aprovacao explicita no checkpoint.
-  - Camada 1 (filter-repo, repo publico) NAO comeca aqui: destrutiva, plano proprio, espelho antes.</div>
+  - Camada 1 (filter-repo, repo publico) NAO comeca aqui: destrutiva, plano proprio, espelho antes.
+FECHAMENTO_MEDIDO (2026-09-05):
+  S01 c30b7b4 · S02 59343a2 · S03 eebd4b0 · S04 c4446d6 — os 8 criterios verdes:
+  R1 "MIT License" · R2 2x "por linha" · R3 0 e 0 · R4 1/2/0 · R5 badge ok, run verde (publico fica p/ C1, PS2)
+  R6 0 velhos, 1.469 = 1.469 com check · R7 3x + linha F1-F6 · R8 5 imagens, todas demo pack
+  ruff limpo · 1.463 passed, 1 skipped, 5 deselected
+  Descobertas que mudaram o plano: gabarito da campanha vazaria no re-render (S03, retido); criterio literal
+  "155 batches are pending" nao mordia (a frase real tinha quebra de linha) — os greps reais foram conferidos;
+  check_disclosure.py nao existia como arquivo — foi escrito; badge `![` colidia com a contagem do R8 — virou <img>.</div>
       <div class="btn-row" data-skel="fixo">
         <button class="btn" id="btn-prompt">Copiar como prompt de handoff</button>
         <span class="toast" id="toast">copiado ✓</span>
