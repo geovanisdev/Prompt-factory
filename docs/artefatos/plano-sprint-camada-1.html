@@ -95,7 +95,7 @@
     <p class="doc-meta">
       <span><b>Origem:</b> <span data-slot="origem">PRD padrão-ouro (aprovado), fatias 05–07; a fatia-08 (vídeo) fica fora — ver Backlog</span></span>
       <span><b>Esforço total:</b> <span data-slot="esforco-total">~7–9 h em 3 sprints, mais três ações suas na interface do GitHub</span></span>
-      <span><b>Estado:</b> <span data-slot="estado"><span class="badge info">aguardando aprovação</span> <span class="badge ok">espelho feito 2026-09-05</span></span></span>
+      <span><b>Estado:</b> <span data-slot="estado"><span class="badge info">em execução</span> <span class="badge ok">S05 concluído 2026-09-05</span> <span class="badge ok">espelho feito 2026-09-05</span></span></span>
     </p>
     <p class="canon" data-slot="canon">Links canônicos: <code>docs/artefatos/prd-padrao-ouro.html</code> (R9–R16, D4, D6, D9, D11, RK2) · <code>docs/artefatos/plano-sprint-camada-0.html</code> (fechado em <code>37b385b</code>) · espelho pré-reescrita em <code>F:\backups\prompt-factory\pre-filter-repo-2026-09-05\</code> (mirror git + bundle + os dois <code>annotate.sqlite</code> + <code>destilacao/</code> + semente e lotes; 35 MB, <code>fsck</code> limpo)</p>
   </header>
@@ -190,8 +190,8 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
       <div data-slot="timeline">
         <svg class="timeline" viewBox="0 0 640 70" role="img" aria-label="Linha do tempo: três sprints da Camada 1, todos pendentes">
           <line x1="80" y1="35" x2="560" y2="35" stroke-width="2"/>
-          <circle class="now"  cx="80"  cy="35" r="8"/><text class="node-label" x="80"  y="20" text-anchor="middle">S05</text><text x="80"  y="56" text-anchor="middle">sanitizar</text>
-          <circle class="todo" cx="320" cy="35" r="8"/><text class="node-label" x="320" y="20" text-anchor="middle">S06</text><text x="320" y="56" text-anchor="middle">inglês + samples</text>
+          <circle class="done" cx="80"  cy="35" r="8"/><text class="node-label" x="80"  y="20" text-anchor="middle">S05</text><text x="80"  y="56" text-anchor="middle">sanitizar</text>
+          <circle class="now"  cx="320" cy="35" r="8"/><text class="node-label" x="320" y="20" text-anchor="middle">S06</text><text x="320" y="56" text-anchor="middle">inglês + samples</text>
           <circle class="todo" cx="560" cy="35" r="8"/><text class="node-label" x="560" y="20" text-anchor="middle">S07</text><text x="560" y="56" text-anchor="middle">gate + público</text>
         </svg>
       </div>
@@ -213,7 +213,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
           push conforme PC1 → <code>fetch</code> + <code>reset --hard</code> em cada worktree → apagar branches remotas absorvidas (PC6).<br>
           <i>Toca:</i> 9 arquivos de conteúdo, <code>destilacao.py</code> + teste, <code>backup_bancada.py</code>, <code>.gitignore</code>, e a história inteira a partir de <code>840d537</code>.</td>
           <td>~4 h<br><span class="badge danger">L</span></td>
-          <td><span class="badge neutral">pendente</span></td>
+          <td><span class="badge ok">concluído</span></td>
         </tr>
         <tr>
           <td><b>S06</b><br><span class="badge neutral">fatia-06</span></td>
@@ -249,8 +249,8 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
 
       <h2 data-skel="fixo">Checklist de progresso</h2>
       <ul class="check" data-slot="checklist-sprints">
-        <li><input type="checkbox" id="s1"><label for="s1"><b>S05-A</b> — <code>git grep</code> de R13 e R14 vazios no HEAD (fora do PRD); <code>PF_MATERIAL_DIR</code> com teste; <code>backup_bancada.py</code> grava em <code>data/backups/</code>; <code>backups/bancada.sql</code> fora do HEAD; suíte verde; mergeado em <code>main</code>.</label></li>
-        <li><input type="checkbox" id="s2"><label for="s2"><b>S05-B</b> — <code>git log --all -- backups/bancada.sql</code> vazio no clone filtrado; os 10 SHAs citados resolvem para commits vivos; remoto atualizado conforme PC1; cada worktree em <code>reset --hard</code> no ref novo com os dados não rastreados intactos; branches remotas absorvidas apagadas.</label></li>
+        <li class="done"><input type="checkbox" id="s1" checked><label for="s1"><b>S05-A</b> — <code>git grep</code> de R13 e R14 vazios no HEAD (fora do PRD); <code>PF_MATERIAL_DIR</code> com teste; <code>backup_bancada.py</code> grava em <code>data/backups/</code>; <code>backups/bancada.sql</code> fora do HEAD; suíte verde; mergeado em <code>main</code>.</label></li>
+        <li class="done"><input type="checkbox" id="s2" checked><label for="s2"><b>S05-B</b> — <code>git log --all -- backups/bancada.sql</code> vazio no clone filtrado; os 10 SHAs citados resolvem para commits vivos; remoto atualizado conforme PC1; cada worktree em <code>reset --hard</code> no ref novo com os dados não rastreados intactos; branches remotas absorvidas apagadas.</label></li>
         <li><input type="checkbox" id="s3"><label for="s3"><b>S06</b> — primeiras 30 linhas do <code>README.md</code> em inglês; <code>README.pt-BR.md</code> linkado e resolvendo; <code>test_readme.py</code> cobrindo os dois; <code>docs/samples/</code> com ≥3 arquivos de tipos distintos e zero texto de corpus.</label></li>
         <li><input type="checkbox" id="s4"><label for="s4"><b>S07</b> — frase da política do ouro em <code>labeling/README.md</code>; gate D11 executado em clone limpo com saída colada; visibilidade PUBLIC confirmada pela API; badge respondendo 200 sem autenticação.</label></li>
       </ul>
@@ -379,7 +379,17 @@ PEGADINHAS_TRANSVERSAIS:
   - Force-push no mesmo repo deixa objetos antigos alcancaveis por SHA no GitHub ate a GC (PC1 opcao a).
   - Depois do push, o CI roda sobre SHAs novos: o badge muda de alvo sem aviso — e o esperado.
   - Nao abrir outra janela do Prompt-factory durante o S05-B (janela de divergencia).
-  - PowerShell corrompe encoding em redirecionamento; uv pelo caminho completo.</div>
+  - PowerShell corrompe encoding em redirecionamento; uv pelo caminho completo.
+FECHAMENTO_S05 (2026-09-05):
+  Repo publico-a-ser: geovanisdev/Prompt-factory, NOVO, so `main` = e8801ce (78 commits reescritos: dump fora + mailmap;
+  34 citacoes de SHA reescritas pelo commit-map; arvore do topo byte a byte igual a de 34b15e7).
+  Arquivo privado com a historia antiga: geovanisdev/Prompt-factory-prepublic — NUNCA tornar publico.
+  Repo vazio criado por engano na outra conta: HenriqueCaetanoGomes/Prompt-factory-prepublic — apagar.
+  Contas: geovanisdev e a dona (acoes de rename/criar/flip sao dela, na interface);
+  a credencial git desta maquina e HenriqueCaetanoGomes, collaborator (write) no repo novo.
+  Licao: o GitHub serve o nome antigo de um repo renomeado como APELIDO no protocolo git, sem redirect HTTP —
+  `http.followRedirects=false` nao detecta; o sinal e a contagem de refs (repo novo vazio = 0).
+  Worktrees em reset --hard para origin/main, dados nao rastreados intactos; reflog expirado + gc local.</div>
       <div class="btn-row" data-skel="fixo">
         <button class="btn" id="btn-prompt">Copiar como prompt de handoff</button>
         <span class="toast" id="toast">copiado ✓</span>
