@@ -12,7 +12,7 @@ o resto do projeto. Histórico de git não se apaga, e este repositório é
 público: o arquivo saiu do HEAD e da história na Camada 1 (R12). O destino
 padrão é `data/backups/`, que o `.gitignore` cobre; a durabilidade vem de
 copiar o dump para OUTRO DISCO (nesta máquina, a convenção é
-`F:\backups\prompt-factory`), não de um remoto.
+`F:/backups/prompt-factory`), não de um remoto.
 
 O caminho é backup API → :memory: → iterdump, e não iterdump direto na
 conexão do arquivo: a Bancada pode estar NO AR durante o dump, e a backup

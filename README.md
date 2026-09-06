@@ -97,7 +97,7 @@ git clone <url> Prompt-factory
 cd Prompt-factory
 & "$env:USERPROFILE\.local\bin\uv.exe" sync          # cria o .venv a partir do uv.lock
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf --help # lista os comandos
-& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 1.469 testes, ~2 min (medido em 2026-08-13)
+& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 1.470 testes, ~2 min (medido em 2026-09-05)
 & "$env:USERPROFILE\.local\bin\uv.exe" run ruff check .
 ```
 
@@ -366,7 +366,7 @@ analysis/           camada de data science: notebooks de QC + o HTML renderizado
                      dedup próximo). Só LEEM; ver analysis/README.md
 docs/               manual-bancada.html (o manual dos três papéis) + artefatos
 scripts/            smoke_test.ps1, run_pipeline.ps1
-tests/              1.469 testes, ~110 s (5 marcados `slow` ficam fora do CI)
+tests/              1.470 testes, ~110 s (5 marcados `slow` ficam fora do CI)
 data/               gitignorado; NÃO tudo regenerável: annotate.sqlite guarda
                     trabalho humano — o resto, sim, um `pf run` refaz
 ```
