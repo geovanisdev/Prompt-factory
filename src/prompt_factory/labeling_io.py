@@ -294,7 +294,12 @@ def montar_lotes(
     lp = lp or LabelingPaths()
     lp.preparar()
     if truncate_chars is None:
-        truncate_chars = int(get("labeling", "truncate_chars", default=1500))
+        # 1900 = a janela do CLASSIFICADOR (512 tokens do e5 ≈ 1.879 chars em pt,
+        # ~2.117 em en), não um número de gosto — o porquê inteiro está em
+        # `[labeling] truncate_chars` do settings.toml. Este default só entra em
+        # jogo se a chave sumir de lá, e um 1.500 aqui faria o rotulador ver
+        # MENOS texto que o classificador, em silêncio.
+        truncate_chars = int(get("labeling", "truncate_chars", default=1900))
     if tamanho_calibracao is None:
         tamanho_calibracao = int(get("labeling", "calibration_size", default=100))
     if rng is None:
