@@ -6,7 +6,7 @@ mais. Um teste que gerasse a v1 a partir do ``db.py`` de hoje testaria a
 migração contra um alvo móvel — e passaria justamente no dia em que alguém
 mudasse os dois lados juntos, que é o dia em que ela quebraria de verdade.
 
-Este arquivo é uma FOTOGRAFIA do commit ``599d083`` (P2). Ele nunca deve ser
+Este arquivo é uma FOTOGRAFIA do commit ``ae531c8`` (P2). Ele nunca deve ser
 "atualizado": uma v3 futura ganha o próprio congelado, ao lado deste.
 """
 

@@ -97,7 +97,7 @@
       <span><b>Esforço total:</b> <span data-slot="esforco-total">~7–9 h em 3 sprints, mais três ações suas na interface do GitHub</span></span>
       <span><b>Estado:</b> <span data-slot="estado"><span class="badge info">aguardando aprovação</span> <span class="badge ok">espelho feito 2026-09-05</span></span></span>
     </p>
-    <p class="canon" data-slot="canon">Links canônicos: <code>docs/artefatos/prd-padrao-ouro.html</code> (R9–R16, D4, D6, D9, D11, RK2) · <code>docs/artefatos/plano-sprint-camada-0.html</code> (fechado em <code>472fb7f</code>) · espelho pré-reescrita em <code>F:\backups\prompt-factory\pre-filter-repo-2026-09-05\</code> (mirror git + bundle + os dois <code>annotate.sqlite</code> + <code>destilacao/</code> + semente e lotes; 35 MB, <code>fsck</code> limpo)</p>
+    <p class="canon" data-slot="canon">Links canônicos: <code>docs/artefatos/prd-padrao-ouro.html</code> (R9–R16, D4, D6, D9, D11, RK2) · <code>docs/artefatos/plano-sprint-camada-0.html</code> (fechado em <code>37b385b</code>) · espelho pré-reescrita em <code>F:\backups\prompt-factory\pre-filter-repo-2026-09-05\</code> (mirror git + bundle + os dois <code>annotate.sqlite</code> + <code>destilacao/</code> + semente e lotes; 35 MB, <code>fsck</code> limpo)</p>
   </header>
 
   <div class="save-bar" data-skel="fixo">
@@ -126,7 +126,7 @@
         <p>O que sai da história é <code>backups/bancada.sql</code>: um dump do banco da Bancada com texto derivado do
         corpus (inclusive um nome próprio vindo de um prompt do WildChat) e os gabaritos escondidos das sintéticas. Ele
         contradiz a política do próprio <code>.gitignore</code>, que mantém fora do git tudo o que carrega corpo de prompt.
-        O recon corrigiu a premissa do PRD: o arquivo está em <b>um</b> commit (<code>4598795</code>, 2026-08-12), não em
+        O recon corrigiu a premissa do PRD: o arquivo está em <b>um</b> commit (<code>840d537</code>, 2026-08-12), não em
         68 — o PRD contou os commits do repositório. Esse commit também criou <code>scripts/backup_bancada.py</code>, então
         ele <b>não</b> fica vazio depois do filtro: sobrevive com outro SHA. Todo commit posterior contém o blob na árvore
         e será reescrito — inclusive os 4 SHAs que o handoff da Central cita e os 5 que o plano da Camada 0 cita. O
@@ -211,7 +211,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
           <b>Fase B (o filtro):</b> clone fresco → <code>uvx --system-certs git-filter-repo --invert-paths --path backups/bancada.sql</code> →
           ler <code>.git/filter-repo/commit-map</code> → corrigir os 10 SHAs citados (handoff F4-2 ×4, plano C0 ×5, PRD ×1) → commit →
           push conforme PC1 → <code>fetch</code> + <code>reset --hard</code> em cada worktree → apagar branches remotas absorvidas (PC6).<br>
-          <i>Toca:</i> 9 arquivos de conteúdo, <code>destilacao.py</code> + teste, <code>backup_bancada.py</code>, <code>.gitignore</code>, e a história inteira a partir de <code>4598795</code>.</td>
+          <i>Toca:</i> 9 arquivos de conteúdo, <code>destilacao.py</code> + teste, <code>backup_bancada.py</code>, <code>.gitignore</code>, e a história inteira a partir de <code>840d537</code>.</td>
           <td>~4 h<br><span class="badge danger">L</span></td>
           <td><span class="badge neutral">pendente</span></td>
         </tr>
@@ -241,7 +241,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
       </table>
 
       <div class="callout danger" data-skel="fixo"><span class="lbl">Por que o S05 tem duas fases e o filtro vem no meio</span>
-        <p>O <code>filter-repo</code> reescreve todo commit a partir de <code>4598795</code>. Conteúdo antes, filtro uma vez, SHAs depois
+        <p>O <code>filter-repo</code> reescreve todo commit a partir de <code>840d537</code>. Conteúdo antes, filtro uma vez, SHAs depois
         pelo mapa: é a única ordem em que cada citação é corrigida exatamente uma vez — um segundo filtro geraria um segundo mapa e
         invalidaria as citações já corrigidas. E o clone fresco não é preciosismo: o <code>filter-repo</code> recusa rodar num
         repositório que não seja clone fresco, e com razão — as worktrees deste repositório guardam dados humanos não rastreados.</p>
@@ -268,7 +268,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
         <tr><td><b>D11</b><br><span class="badge neutral">do PRD</span></td><td>Flip público só depois do gate em clone limpo</td><td>Histórico público não se apaga; o gate custa dez minutos</td><td><button class="btn ghost" data-adr="D11">promover a ADR</button></td></tr>
         <tr><td><b>PC1</b><br><span class="badge warn">pendente — sua</span></td><td><b>Para onde vai a história limpa:</b> (a) <code>force-push</code> no repositório atual, ou (b) renomear o atual para arquivo privado, criar um novo com o mesmo nome e empurrar só a história filtrada</td><td>Em (a), o GitHub mantém os objetos antigos alcançáveis por SHA até a coleta de lixo — o dump continuaria acessível a quem tivesse o hash, e a purga exige chamado ao suporte. Em (b) o repositório novo nunca viu o blob. Mesmo nome ⇒ URL, badge e links do README continuam válidos. <b>Recomendação: (b).</b></td><td><button class="btn ghost" data-adr="PC1">promover a ADR</button></td></tr>
         <tr><td><b>PC2</b><br><span class="badge warn">pendente — sua</span></td><td><b>Identidade dos commits:</b> 51 em <code>gigio.professor@gmail.com</code>, 25 em <code>geovani.henrique@ifsc.edu.br</code>. Unificar via <code>--mailmap</code> no mesmo filtro, ou manter as duas</td><td>O R13 permite e-mail de contato <i>intencional</i>; o institucional em 25 commits é intencional? É a pendência que a memória registra como não decidida — e o filtro é o único momento barato para unificar</td><td><button class="btn ghost" data-adr="PC2">promover a ADR</button></td></tr>
-        <tr><td><b>PC3</b><br><span class="badge warn">pendente — sua</span></td><td>Os critérios R13 e R14 do PRD passam a excluir o próprio PRD por pathspec (<code>':!docs/artefatos/prd-padrao-ouro.html'</code>); o PRD também recebe o SHA novo de <code>4598795</code> após o filtro</td><td>Um critério que cita a string proibida não pode passar num arquivo que contém o critério. Excluir só o PRD é mecânico e honesto; reescrever as strings dentro dele em forma que não casa consigo mesma seria ofuscação</td><td><button class="btn ghost" data-adr="PC3">promover a ADR</button></td></tr>
+        <tr><td><b>PC3</b><br><span class="badge warn">pendente — sua</span></td><td>Os critérios R13 e R14 do PRD passam a excluir o próprio PRD por pathspec (<code>':!docs/artefatos/prd-padrao-ouro.html'</code>); o PRD também recebe o SHA novo de <code>840d537</code> após o filtro</td><td>Um critério que cita a string proibida não pode passar num arquivo que contém o critério. Excluir só o PRD é mecânico e honesto; reescrever as strings dentro dele em forma que não casa consigo mesma seria ofuscação</td><td><button class="btn ghost" data-adr="PC3">promover a ADR</button></td></tr>
         <tr><td><b>PC4</b><br><span class="badge info">deste plano</span></td><td><code>[pedidos] material_dir</code> fica vazio no <code>settings.toml</code> versionado; <code>destilacao.material_dir()</code> lê <code>PF_MATERIAL_DIR</code> antes do arquivo</td><td>O código só lia a configuração versionada. Sem a variável, o único jeito de apontar para a pasta local seria sujar um arquivo rastreado — e o primeiro commit distraído devolveria o caminho pessoal ao HEAD</td><td><button class="btn ghost" data-adr="PC4">promover a ADR</button></td></tr>
         <tr><td><b>PC5</b><br><span class="badge info">deste plano</span></td><td><code>"Identidade Saraiva"</code> → <code>"Identidade"</code> na tabela de coleções e nos testes; ISBNs saem dos docs; os nomes de arquivo em MAIÚSCULAS nos testes ficam</td><td>A coleção se chama Identidade — Saraiva é a editora, e as outras duas coleções já não carregam a delas. Os nomes de arquivo são identificadores dos arquivos locais que o parser precisa reconhecer, e o critério (sensível a caixa) não os alcança. Nenhum pedido gravado usa o rótulo antigo (37 Biologia + 5 Filosofia)</td><td><button class="btn ghost" data-adr="PC5">promover a ADR</button></td></tr>
         <tr><td><b>PC6</b><br><span class="badge info">deste plano</span></td><td>Branches remotas <code>claude/bold-blackburn-da41ab</code> e <code>central-de-briefs</code> apagadas no remoto; a local <code>central-de-briefs</code> fica pelo worktree de briefs</td><td>Ambas estão absorvidas em <code>main</code>. Uma branch remota com a história velha manteria o blob alcançável mesmo depois do filtro</td><td><button class="btn ghost" data-adr="PC6">promover a ADR</button></td></tr>
@@ -351,10 +351,10 @@ COMANDOS_DE_TESTE:
   git log --all --oneline -- backups/bancada.sql   # VAZIO
   # gate D11 (S07), em outro clone limpo do REMOTO: os greps da aba Plano + uv sync --locked + ruff + pytest
 LINHA_DE_BASE_MEDIDA (2026-09-05):
-  - backups/bancada.sql: 1 commit (4598795, que tambem criou scripts/backup_bancada.py -> NAO fica vazio), 676 KB
-  - SHAs citados que serao reescritos: PROMPT-HANDOFF-F4-2.md x4 (ccb7893 0938e9f 4fe590c 4801ca9),
-    plano-sprint-camada-0.html x5 (d85fefa c30b7b4 59343a2 eebd4b0 c4446d6), prd-padrao-ouro.html x1 (4598795)
-  - NAO e commit do repo: c827c6df (CLAUDE.md, revisao do Hub) — nada a corrigir la; 599d083 (tests/fixtures_annotate_v1.py) e ancestral, fica
+  - backups/bancada.sql: 1 commit (840d537, que tambem criou scripts/backup_bancada.py -> NAO fica vazio), 676 KB
+  - SHAs citados que serao reescritos: PROMPT-HANDOFF-F4-2.md x4 (f311552 5e85840 024abb2 4a252f3),
+    plano-sprint-camada-0.html x5 (98e591a 18729a0 8f423b1 51bd0d6 7f9c220), prd-padrao-ouro.html x1 (840d537)
+  - NAO e commit do repo: c827c6df (CLAUDE.md, revisao do Hub) — nada a corrigir la; ae531c8 (tests/fixtures_annotate_v1.py; era 599d083) e ancestral do dump, mas o mailmap da PC2 reescreveu a historia INTEIRA — os 78 commits mudaram de SHA, nao so os posteriores ao dump
   - caminhos pessoais no HEAD: CLAUDE.md:7,88 · README.md:91 · config/settings.toml:560 (material_dir) · prd-redesign-bancada.html:91
     · docs/central-de-briefs/HANDOFF.md:171 · PLANO.md:15,50 · (prd-padrao-ouro.html:154,191,341 — e o proprio criterio: PC3)
   - editoras no HEAD: .gitignore:36-37 · HANDOFF.md:179-181,188 · PLANO.md:59-60,63,85,391,423 · PROMPT-HANDOFF-F4-2.md:99

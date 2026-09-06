@@ -40,10 +40,10 @@ Feito até aqui (commits nesta branch):
 
 | marco | commit | o que entregou |
 | --- | --- | --- |
-| F1 | `ccb7893` | schema **v7**: tabela `pedidos`, `criacoes.pedido_id`/`material_json`, `ORIGENS_RUBRICA + 'criacao'`, `migracao._da_v6` |
-| F2 | `0938e9f` | `annotate/destilacao.py` + `pf annotate pedidos preparar/importar/status` |
-| F3 | `4fe590c` | skill `destilar-pedidos` (headless) + a primeira rodada real: 42 pedidos, 2 disciplinas |
-| F4-1 | `4801ca9` | `annotate/pedidos.py` (fila/reserva) + contrato `material_criacao@1` + 3 rotas |
+| F1 | `f311552` | schema **v7**: tabela `pedidos`, `criacoes.pedido_id`/`material_json`, `ORIGENS_RUBRICA + 'criacao'`, `migracao._da_v6` |
+| F2 | `5e85840` | `annotate/destilacao.py` + `pf annotate pedidos preparar/importar/status` |
+| F3 | `024abb2` | skill `destilar-pedidos` (headless) + a primeira rodada real: 42 pedidos, 2 disciplinas |
+| F4-1 | `4a252f3` | `annotate/pedidos.py` (fila/reserva) + contrato `material_criacao@1` + 3 rotas |
 
 Suíte: **1.424 testes passando**, ruff limpo. Mantenha assim.
 
