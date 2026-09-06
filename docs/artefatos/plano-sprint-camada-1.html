@@ -137,7 +137,7 @@
         arquivos, e um deles é <b>configuração</b>: <code>[pedidos] material_dir</code> aponta para a pasta local do
         material didático, e o código a lê só do <code>settings.toml</code> — tirar o caminho de lá exige dar a você outro
         lugar para pô-lo. As editoras aparecem em prosa dos docs da Central, num comentário do <code>.gitignore</code>, e em
-        <b>código</b>: a tabela que deriva o nome da coleção do nome do arquivo mapeia <code>"Identidade Saraiva"</code>.
+        <b>código</b>: a tabela que deriva o nome da coleção do nome do arquivo mapeava a coleção com o nome da editora junto.
         E há um detalhe que o PRD não previu sobre si: os critérios R13 e R14 citam as strings proibidas <i>literalmente</i>,
         então o <code>git grep</code> do critério acha o próprio PRD, para sempre.</p>
       </div>
@@ -160,8 +160,8 @@
         <p>A Camada 1 fecha quando os critérios abaixo passam <b>num clone limpo do remoto</b> (gate D11), e só então você muda a visibilidade:</p>
         <pre class="machine-block"># no clone limpo (git clone https://github.com/geovanisdev/Prompt-factory.git)
 git log --all --oneline -- backups/bancada.sql        # R12: VAZIO
-git grep -iE "Users[/\\]gigio|Ensino Medio" -- . ':!docs/artefatos/prd-padrao-ouro.html'   # R13: VAZIO
-git grep -E "Ática|Scipione|Saraiva"      -- . ':!docs/artefatos/prd-padrao-ouro.html'   # R14: VAZIO
+git grep -iE "<padrão do R13 no PRD>" -- . ':!docs/artefatos/prd-padrao-ouro.html'   # R13: VAZIO
+git grep -E "<padrão do R14 no PRD>"      -- . ':!docs/artefatos/prd-padrao-ouro.html'   # R14: VAZIO
 for s in $(git grep -hoE '\b[0-9a-f]{7,10}\b' -- '*.md' '*.html'); do git cat-file -e $s^{commit} 2>/dev/null || true; done   # R12: nenhum SHA citado esta morto
 head -30 README.md                                      # R9: ingles; o link README.pt-BR.md resolve
 ls docs/samples/                                        # R10: >= 3 arquivos, um por tipo
@@ -205,7 +205,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
           <b>Fase A (conteúdo, antes do filtro):</b> caminhos pessoais fora do HEAD — <code>CLAUDE.md</code> (2), <code>README.md</code> (1),
           <code>prd-redesign-bancada.html</code> (1), docs da Central (3) e <code>settings.toml</code>, onde <code>material_dir</code> fica vazio e
           <code>destilacao.material_dir()</code> passa a aceitar <code>PF_MATERIAL_DIR</code> (PC4); editoras → "Editora A/B/C" nos docs e no
-          <code>.gitignore</code>, ISBNs fora, <code>"Identidade Saraiva"</code> → <code>"Identidade"</code> no código e nos testes (PC5);
+          <code>.gitignore</code>, ISBNs fora, o rótulo com a editora → <code>"Identidade"</code> no código e nos testes (PC5);
           <code>scripts/backup_bancada.py</code> passa a gravar em <code>data/backups/</code> com <code>--destino</code> e documenta o espelho
           externo; <code>backups/</code> entra no <code>.gitignore</code>; <code>git rm backups/bancada.sql</code>. Suíte verde, merge em <code>main</code>.<br>
           <b>Fase B (o filtro):</b> clone fresco → <code>uvx --system-certs git-filter-repo --invert-paths --path backups/bancada.sql</code> →
@@ -270,7 +270,7 @@ curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/
         <tr><td><b>PC2</b><br><span class="badge warn">pendente — sua</span></td><td><b>Identidade dos commits:</b> 51 em <code>gigio.professor@gmail.com</code>, 25 em <code>geovani.henrique@ifsc.edu.br</code>. Unificar via <code>--mailmap</code> no mesmo filtro, ou manter as duas</td><td>O R13 permite e-mail de contato <i>intencional</i>; o institucional em 25 commits é intencional? É a pendência que a memória registra como não decidida — e o filtro é o único momento barato para unificar</td><td><button class="btn ghost" data-adr="PC2">promover a ADR</button></td></tr>
         <tr><td><b>PC3</b><br><span class="badge warn">pendente — sua</span></td><td>Os critérios R13 e R14 do PRD passam a excluir o próprio PRD por pathspec (<code>':!docs/artefatos/prd-padrao-ouro.html'</code>); o PRD também recebe o SHA novo de <code>840d537</code> após o filtro</td><td>Um critério que cita a string proibida não pode passar num arquivo que contém o critério. Excluir só o PRD é mecânico e honesto; reescrever as strings dentro dele em forma que não casa consigo mesma seria ofuscação</td><td><button class="btn ghost" data-adr="PC3">promover a ADR</button></td></tr>
         <tr><td><b>PC4</b><br><span class="badge info">deste plano</span></td><td><code>[pedidos] material_dir</code> fica vazio no <code>settings.toml</code> versionado; <code>destilacao.material_dir()</code> lê <code>PF_MATERIAL_DIR</code> antes do arquivo</td><td>O código só lia a configuração versionada. Sem a variável, o único jeito de apontar para a pasta local seria sujar um arquivo rastreado — e o primeiro commit distraído devolveria o caminho pessoal ao HEAD</td><td><button class="btn ghost" data-adr="PC4">promover a ADR</button></td></tr>
-        <tr><td><b>PC5</b><br><span class="badge info">deste plano</span></td><td><code>"Identidade Saraiva"</code> → <code>"Identidade"</code> na tabela de coleções e nos testes; ISBNs saem dos docs; os nomes de arquivo em MAIÚSCULAS nos testes ficam</td><td>A coleção se chama Identidade — Saraiva é a editora, e as outras duas coleções já não carregam a delas. Os nomes de arquivo são identificadores dos arquivos locais que o parser precisa reconhecer, e o critério (sensível a caixa) não os alcança. Nenhum pedido gravado usa o rótulo antigo (37 Biologia + 5 Filosofia)</td><td><button class="btn ghost" data-adr="PC5">promover a ADR</button></td></tr>
+        <tr><td><b>PC5</b><br><span class="badge info">deste plano</span></td><td>o rótulo de coleção que carregava o nome da editora → <code>"Identidade"</code> na tabela de coleções e nos testes; ISBNs saem dos docs; os nomes de arquivo em MAIÚSCULAS nos testes ficam</td><td>A coleção se chama Identidade — o outro termo era a editora, e as outras duas coleções já não carregam a delas. Os nomes de arquivo são identificadores dos arquivos locais que o parser precisa reconhecer, e o critério (sensível a caixa) não os alcança. Nenhum pedido gravado usa o rótulo antigo (37 Biologia + 5 Filosofia)</td><td><button class="btn ghost" data-adr="PC5">promover a ADR</button></td></tr>
         <tr><td><b>PC6</b><br><span class="badge info">deste plano</span></td><td>Branches remotas <code>claude/bold-blackburn-da41ab</code> e <code>central-de-briefs</code> apagadas no remoto; a local <code>central-de-briefs</code> fica pelo worktree de briefs</td><td>Ambas estão absorvidas em <code>main</code>. Uma branch remota com a história velha manteria o blob alcançável mesmo depois do filtro</td><td><button class="btn ghost" data-adr="PC6">promover a ADR</button></td></tr>
         <tr><td><b>PC7</b><br><span class="badge info">deste plano</span></td><td>Conteúdo antes, filtro uma vez, SHAs depois pelo <code>commit-map</code></td><td>Cada citação corrigida exatamente uma vez — ver o callout da aba Sprints</td><td><button class="btn ghost" data-adr="PC7">promover a ADR</button></td></tr>
       </table>
@@ -356,9 +356,9 @@ LINHA_DE_BASE_MEDIDA (2026-09-05):
     plano-sprint-camada-0.html x5 (98e591a 18729a0 8f423b1 51bd0d6 7f9c220), prd-padrao-ouro.html x1 (840d537)
   - NAO e commit do repo: c827c6df (CLAUDE.md, revisao do Hub) — nada a corrigir la; ae531c8 (tests/fixtures_annotate_v1.py; era 599d083) e ancestral do dump, mas o mailmap da PC2 reescreveu a historia INTEIRA — os 78 commits mudaram de SHA, nao so os posteriores ao dump
   - caminhos pessoais no HEAD: CLAUDE.md:7,88 · README.md:91 · config/settings.toml:560 (material_dir) · prd-redesign-bancada.html:91
-    · docs/central-de-briefs/HANDOFF.md:171 · PLANO.md:15,50 · (prd-padrao-ouro.html:154,191,341 — e o proprio criterio: PC3)
+    · docs/central-de-briefs/HANDOFF.md:171 · PLANO.md:15,50 · (o PRD cita o padrao no proprio criterio: PC3)
   - editoras no HEAD: .gitignore:36-37 · HANDOFF.md:179-181,188 · PLANO.md:59-60,63,85,391,423 · PROMPT-HANDOFF-F4-2.md:99
-    · src/prompt_factory/annotate/destilacao.py:199 · tests/test_central_destilacao.py:131-146 · (prd-padrao-ouro.html:192,342 — PC3)
+    · src/prompt_factory/annotate/destilacao.py:199 · tests/test_central_destilacao.py:131-146 · (o PRD cita o padrao no proprio criterio: PC3)
   - material_dir: lido SO de settings.toml (destilacao.material_dir); sem flag, sem env — PC4 cria PF_MATERIAL_DIR
   - identidades: 51 gigio.professor@gmail.com + 25 geovani.henrique@ifsc.edu.br (PC2)
   - remoto: refs/heads/{main, central-de-briefs, claude/bold-blackburn-da41ab}; gh NAO instalado
@@ -374,7 +374,7 @@ PEGADINHAS_TRANSVERSAIS:
   - reset --hard nas worktrees NAO toca arquivo nao rastreado: annotate.sqlite e destilacao/ da briefs ficam. Nunca `worktree remove` ali.
   - filter-repo reescreve SHAs abreviados dentro de MENSAGENS de commit sozinho; nos ARQUIVOS nao — dai o commit-map.
   - O PRD cita as strings proibidas nos criterios R13/R14: sem o pathspec de exclusao (PC3), o gate reprova o PRD para sempre.
-  - "Identidade Saraiva" e rotulo DERIVADO do nome do arquivo (destilacao.py:199); mudar exige mudar o esperado nos testes.
+  - O rotulo de colecao com a editora e DERIVADO do nome do arquivo (destilacao.py:199); mudar exige mudar o esperado nos testes.
   - test_readme.py casa `N testes` (pt, ponto de milhar); o README EN escreve `1,469 tests` — o check tem de cobrir os dois arquivos.
   - Force-push no mesmo repo deixa objetos antigos alcancaveis por SHA no GitHub ate a GC (PC1 opcao a).
   - Depois do push, o CI roda sobre SHAs novos: o badge muda de alvo sem aviso — e o esperado.
