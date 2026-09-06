@@ -134,4 +134,16 @@ def escrever(tabela: pa.Table, destino: Path) -> Path:
     return destino
 
 
-__all__ = ["DEFAULTS", "escrever"]
+# Itens que um filtro de marcador tirou desta execução. `test_readme.py` precisa
+# do TOTAL da suíte, e `session.items` só tem os selecionados: sob o `-m "not
+# slow"` que o CI roda, ele veria 1.462 e cobraria do README um número que não é
+# o da suíte. Somar os dois é o que faz o check dizer a mesma coisa nas duas
+# execuções — que é a única forma de ele não virar um teste que só passa local.
+DESELECIONADOS: list[pytest.Item] = []
+
+
+def pytest_deselected(items: Sequence[pytest.Item]) -> None:
+    DESELECIONADOS.extend(items)
+
+
+__all__ = ["DEFAULTS", "DESELECIONADOS", "escrever"]

@@ -1,6 +1,6 @@
 # Prompt Factory
 
-[![ci](https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/badge.svg)](https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml)
+<a href="https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/badge.svg"></a>
 
 Banco de **prompts escritos por pessoas reais** — o primeiro turno de usuário em conversas com LLMs, nunca texto sintético — em **português brasileiro e inglês**, deduplicado, limpo de PII e navegável numa interface local. Serve para curar coleções e exportar JSONL/CSV **com licença e atribuição em cada linha**, para alimentar plataformas de data annotation.
 
@@ -13,6 +13,9 @@ Tudo roda **offline depois da ingestão**: a interface é um SQLite mais um arqu
 prompts de 1 a 981.656 caracteres · 541 MB de texto
 task_type e domain em 100% das linhas: 6.560 rótulos humanos/agente + classificador próprio, com abstenção declarada
 ```
+
+![A matriz de severidade da Bancada: quatro critérios com escala ancorada, uma nota por linha e o rail à direita cobrando a frase que justifica a nota abaixo do topo](docs/img/bancada-matriz-severidade.png)
+*A Bancada, tela do anotador: a rubrica como matriz de severidade — 51 px por critério, a âncora no ⓘ, e o rail que só destrava quando a nota abaixo do topo vem com a frase que a explica. Conteúdo do pacote de demonstração.*
 
 ---
 
@@ -94,7 +97,7 @@ git clone <url> Prompt-factory
 cd Prompt-factory
 & "$env:USERPROFILE\.local\bin\uv.exe" sync          # cria o .venv a partir do uv.lock
 & "$env:USERPROFILE\.local\bin\uv.exe" run pf --help # lista os comandos
-& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 1.287 testes, ~2 min
+& "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q # 1.469 testes, ~2 min (medido em 2026-08-13)
 & "$env:USERPROFILE\.local\bin\uv.exe" run ruff check .
 ```
 
@@ -251,6 +254,20 @@ Quem abre escolhe um papel na barra superior — sem senha; é demonstração e 
 * **Revisor** — duas passagens: a **triagem** (aprova ou devolve, com comentário obrigatório na devolução) e o **Rate and Review** (avalia o trabalho como chegou, corrige no lugar com um motivo por mudança, avalia o resultado). Item borderline sobe para a fila de escalação do admin; prompt escrito no modo criar tem fila própria.
 * **Admin** — métricas por anotador, **agreement ponderado** entre anotadores (a concordância observada e o kappa sempre lado a lado — os dois respondem perguntas diferentes), calibração do revisor contra anotações sintéticas de gabarito escondido, o funil de criações e as decisões de escalação.
 
+Todas as capturas deste README saem do **pacote de demonstração** — prompts escritos à mão para a plataforma, licença `fixture`, nenhum do corpus. Não é um cuidado, é uma regra da casa: imagem e HTML commitados nunca carregam texto sob licença de terceiros, e a etiqueta de proveniência aparece na própria tela para quem quiser conferir.
+
+![Fila do anotador com o brief do projeto aberto em abas](docs/img/bancada-fila-e-brief.png)
+*Fila do anotador. O brief do projeto — versionado, em abas — fica acima da tarefa: o **quê** antes do **como**.*
+
+![Comparação A/B às cegas, com a etiqueta de proveniência do prompt](docs/img/bancada-comparar-ab.png)
+*Comparação A/B: duas respostas sem identificação, e a etiqueta `demo pack · license: fixture · hand-written for the Bancada demo` dizendo de onde veio o prompt.*
+
+![Triagem do revisor com um item aguardando revisão](docs/img/bancada-triagem-revisor.png)
+*Primeira passagem do QC: o revisor lê a anotação no mesmo layout em que ela foi produzida e aprova ou devolve — com um comentário que chega a quem anotou.*
+
+![Modo criar com a fila de pedidos da Central de Briefs acima do formulário](docs/img/bancada-modo-criar.png)
+*Modo criar: o pedido pedagógico em cima, o prompt embaixo. É o único modo que alimenta o corpus em vez de consumi-lo.*
+
 A interface é **inglês por padrão, com toggle pt-BR** — o portfólio é lido por avaliadores estrangeiros. A convenção de língua vale para o dado também: metadado (justificativa, critério, comentário) em inglês; o dado produzido (resposta de referência, conversa) na língua do prompt.
 
 **O ciclo que fecha o projeto**: um prompt escrito no modo criar atravessa a revisão e entra no corpus de verdade — `pf ingest plataforma` → `pf run s01-s06` → `pf load-db` — com **CC0 1.0** declarada no envio e o uid prometido já na aprovação. Quando a linha chega lá, o badge **"no corpus ✓"** acende no cartão da criação; se o texto era cópia de um prompt que já existia, a tela diz que o dedup o colapsou no original — resultado, não erro.
@@ -258,6 +275,21 @@ A interface é **inglês por padrão, com toggle pt-BR** — o portfólio é lid
 O trabalho aprovado sai por `pf annotate export`: **seis perfis** (anotações com a trilha de QC inteira, pares de SFT, pares de preferência, relatório de qualidade, dataset card e a auditoria completa de um item), cada um com manifesto ao lado. Anotação sintética fica **fora dos exports de dado por padrão**, e o dataset card declara a composição humano/sintético.
 
 O manual de uso dos três papéis, passo a passo, está em **[`docs/manual-bancada.html`](docs/manual-bancada.html)** — pt-BR, um arquivo só, abre direto no navegador.
+
+### A Central de Briefs Pedagógicos
+
+O modo criar responde *como* escrever um prompt na plataforma. A Central responde **sobre o quê** — e é o que separa "escreva um prompt" de um pedido com endereço.
+
+Um **pedido** é um recorte de material didático mais o que se quer escrito a partir dele: tema, objetivo, papel (professor ou aluno), série, dificuldade, disciplina e o código da habilidade. Eles não são inventados à mão: uma campanha de destilação varre o material em janelas com sobreposição e despacha agentes que devolvem pedidos em JSON, com o recorte copiado **verbatim** — e a CLI recusa a importação se o trecho não existir, caractere a caractere, no arquivo de origem.
+
+Quem anota puxa um pedido da fila e devolve uma **tríade**: o prompt humano, a rubrica que o mede e uma *gold* descritiva (o que a resposta precisa conter, o que não pode, as armadilhas). A gold é a régua, não a resposta — escrever a resposta ideal seria produzir o dado de SFT, que é outro trabalho.
+
+Duas regras que valem a pena conhecer antes de olhar a tela:
+
+* **O recorte nunca sai desta máquina.** O material é de editoras, integralmente protegido, sem concessão de licença. Ele é insumo de leitura local: não entra em perfil de entrega nenhum, não viaja no metadado da ingestão, e a tabela que o guarda é a única do projeto com essa restrição escrita no schema. O prompt escrito a partir dele é expressão de quem escreveu — por isso pode ser dedicado em CC0.
+* **O servidor recusa o prompt que copia o recorte.** Um anti-cópia mede a maior sobreposição literal entre o prompt e o material e barra acima do limite, comparando com espaços e maiúsculas normalizados — porque achatar quebras de linha "zeraria" a medida de um texto colado. O limite atual (60 caracteres) é um **chute declarado**, a calibrar contra submissões reais; a tela mostra a medida e a régua lado a lado.
+
+A entrega tem perfil próprio (`triads`): prompt em CC0, rubrica e gold nas chaves do contrato, o pedido em inglês, e a sobreposição anti-cópia como número **e** régua — sem nunca reproduzir o recorte.
 
 ---
 
@@ -288,11 +320,12 @@ O manual de uso dos três papéis, passo a passo, está em **[`docs/manual-banca
 | P4c | campanha de geração de material e de anotações sintéticas por agentes | infra pronta e testada em miniatura — **falta rodar em volume** |
 | P4d | conversa e duelo com modelo local (Ollama) | telas prontas — depende do Ollama instalado |
 | P7 | acabamento: badge "no corpus ✓", este README, o manual | ✅ |
+| **F1–F6** | **[Central de Briefs Pedagógicos](#a-central-de-briefs-pedagógicos)** — schema v7 e a tabela `pedidos` (F1) · campanha de destilação (F2) · a skill e a primeira rodada real, 42 pedidos (F3) · fila de pedidos e a tríade (F4-1) · a tela da vista criar (F4-2) · anti-cópia no servidor e a rubrica materializada (F5) · a tríade na entrega, perfil `triads` (F6) | ✅ — o limiar anti-cópia é um chute declarado, a calibrar contra submissões reais |
 
 ### Pendente de **decisão humana** (não de código)
 
 1. **Os limiares do near-dup.** O s06 colapsou 27.139 linhas com `near_cosine = 0.985`, `near_jaccard = 0.65` e `near_len_ratio = 2.0`. Aceitar esses números é uma escolha, não um resultado: apertar recupera texto legítimo, afrouxar limpa mais robô. `pf report dedup-sample` grava `data/final/dedup_sample_50.txt` com 50 pares reais **exatamente para essa leitura**. Os limiares moram em `config/settings.toml`, nunca no código — mudá-los é replayar o s06.
-2. **A calibração da rotulagem.** `pf make-seed` já sorteou os 12.000 itens da semente (6k pt + 6k en, estratificados por fonte × faixa de tamanho) e fatiou em **155 lotes**. O `labeling/manifest.json` está com os 155 em `pending` e a calibração (`batch_0000`, 100 itens) em `gold_pending`. O próximo passo é humano: revisar esses 100 itens à mão e importar com `pf labels gold`. Sem esse ouro não há como medir a concordância dos agentes — e um `agreement = None` ("não medido") é deliberadamente diferente de `0.0` ("errou tudo").
+2. **Terminar (ou não) os 73 lotes restantes.** A campanha rodou **82 dos 155 lotes**, com o ouro revisado à mão e importado, e nenhum lote reprovado no portão. Os 73 que sobram são opcionais por medição, não por cansaço: dobrar os rótulos moveu o macro-F1 do `task_type` em **+0,01**, então o teto é da receita (embeddings maiores, fine-tune) e não do volume. Terminar vale pela semente completa; não vale pelo classificador. O que a campanha **não** produziu é concordância entre anotadores: cada nota compara um anotador com um gabarito humano, o que é outra afirmação — e é o que a rodada com anotadores reais existiria para medir.
 3. **A taxonomia v1.1.** `task_type` e `domain` não têm `CHECK` no DDL justamente para poderem evoluir sem migração. A v1.0 tem 16 tarefas e 16 domínios, em `labeling/taxonomy.json`.
 
 ### Trabalho futuro documentado (não implementado)
@@ -333,7 +366,7 @@ analysis/           camada de data science: notebooks de QC + o HTML renderizado
                      dedup próximo). Só LEEM; ver analysis/README.md
 docs/               manual-bancada.html (o manual dos três papéis) + artefatos
 scripts/            smoke_test.ps1, run_pipeline.ps1
-tests/              1.273 testes, ~110 s
+tests/              1.469 testes, ~110 s (5 marcados `slow` ficam fora do CI)
 data/               gitignorado; NÃO tudo regenerável: annotate.sqlite guarda
                     trabalho humano — o resto, sim, um `pf run` refaz
 ```
