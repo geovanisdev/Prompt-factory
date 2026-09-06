@@ -96,7 +96,7 @@ ruff limpo.
 ## 4. Regras que não se negociam
 
 1. **O recorte é de terceiros.** O material são 35 apostilas do PNLD com
-   copyright integral de Ática, Scipione e Saraiva. Ele pode aparecer na TELA
+   copyright integral de três editoras comerciais (Editora A, B e C). Ele pode aparecer na TELA
    (quem escreve precisa lê-lo) e **nunca** entra no prompt, no corpus, no git
    ou em export. `destilacao/lotes/**` e `respostas/**` são gitignorados; não os
    abra "só para ver". A §6 do `PLANO.md` é a análise inteira.

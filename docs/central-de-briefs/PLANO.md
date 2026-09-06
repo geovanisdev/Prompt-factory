@@ -12,7 +12,7 @@ mecanismos que já existem. Contexto do projeto e das peças citadas:
 ## 1. Conceito e fluxo ponta a ponta
 
 ```
-material didático (G:\Github\Ensino Medio_txt, 35 arquivos, FORA do repo)
+material didático (pasta local, 35 arquivos, FORA do repo)
         │
         │  pf annotate pedidos preparar --arquivo <nome> -n <janelas>
         │  (CLI fatia o arquivo em janelas e grava o lote; manifest = livro-caixa)
@@ -47,21 +47,19 @@ ver a seção 6 (licença), que é a razão de ser desse desenho.
 
 ## 2. O levantamento do material (a base de evidência)
 
-Medido em 2026-08-12 sobre `G:\Github\Ensino Medio_txt`:
+Medido em 2026-08-12 sobre a pasta local do material (`[pedidos] material_dir`):
 
 - **35 arquivos `.txt`**, **52.805.785 bytes** (~52,8 MB), **1.242.152
   linhas**; cada arquivo entre 1.034.265 e 2.032.254 bytes.
 - **Origem**: extração linear de PDF das apostilas do **PNLD 2026** (Ensino
   Médio), todas na edição **Manual do Professor** — as respostas do professor
   estão intercaladas no corpo do texto.
-- **Três coleções, três editoras do mesmo grupo**, verificadas na página de
-  créditos de cada arquivo: *Ciência Viva* ("Todos os direitos reservados por
-  Editora Scipione S.A.", 3 arquivos), *Do Seu Jeito* ("… Editora Ática
-  S.A.", 16 arquivos), *Identidade Saraiva / Síntesis* ("… Saraiva Educação
-  S.A.", 16 arquivos). Autores nomeados (Sílvio Gallo na Filosofia, Gelson
-  Iezzi et al. na Matemática, Danusa Munford et al. na Biologia…), ficha CIP,
-  ISBN (ex.: 978-65-267-0282-6 / 978-65-267-0283-3, Filosofia, Ática, 2024),
-  código de coleção PNLD (ex.: 0080P260101203815) e o carimbo "PNLD EM
+- **Três coleções, três editoras do mesmo grupo** (anonimizadas neste
+  documento como Editora A, B e C — o repositório é público e os nomes não
+  agregam sinal técnico), verificadas na página de créditos de cada arquivo:
+  *Ciência Viva* (Editora B, 3 arquivos), *Do Seu Jeito* (Editora A, 16
+  arquivos), *Identidade / Síntesis* (Editora C, 16 arquivos). Autores
+  nomeados, ficha CIP, ISBN, código de coleção PNLD e o carimbo "PNLD EM
   2026–2029 — CATEGORIA 1 − MATERIAL DE DIVULGAÇÃO".
 - **Disciplinas**: Biologia, Física, Química, Matemática (2 coleções × 3
   volumes), Língua Portuguesa (3 volumes), Redação (2), História, Geografia,
@@ -82,7 +80,7 @@ Medido em 2026-08-12 sobre `G:\Github\Ensino Medio_txt`:
   extração pontuais mas reais: mojibake de ligadura ("Portf—lio",
   "Autoavalia•‹o", "Ci•ncia", "ﬁ " com espaço) — o caractere "•" aparece de
   766 a 1.634 vezes nos oito arquivos mais afetados (concentrados nas
-  coleções Identidade Saraiva e Síntesis) e "ﬁ " aparece em 9 arquivos;
+  coleções Identidade e Síntesis) e "ﬁ " aparece em 9 arquivos;
   hifenização de PDF quebrando palavra no fim de linha ("huma-\nna"); colunas
   intercaladas (a resposta do professor invade o parágrafo do aluno); créditos
   de imagem no meio do fluxo ("Mark Green;Alamy/Fotoarena"); a marca d'água
@@ -388,7 +386,7 @@ público o que é seu.
 
 **(a) Material de autoria do próprio dono.** Resolveria tudo — mas o
 levantamento (§2) mostra que NÃO é o caso desta pasta: os créditos são de
-Ática, Scipione e Saraiva. A opção fica registrada para um futuro em que o
+três editoras comerciais (Editora A, B e C). A opção fica registrada para um futuro em que o
 dono aponte a campanha para material próprio (o desenho aceita: `[pedidos]
 material_dir` é configuração); aí, e só aí, recorte embutido seria discutível.
 
@@ -420,7 +418,7 @@ line is enough to break the claim"* — `fixtures/briefs.json`, seção
 **(d) Campo de licença por criação** (distinto do `criacoes.LICENCA` fixo).
 Daria à plataforma como ingerir prompts com material de terceiros embutido sob
 outra licença. Recusada por três razões: (1) não há licença que nós possamos
-declarar sobre o texto da Ática — o campo só poderia dizer `unknown`, e linha
+declarar sobre o texto da Editora A — o campo só poderia dizer `unknown`, e linha
 `unknown` é linha que o export exclui e o pool bloqueia (política default
 fechada); (2) infraestrutura convida uso — um campo de licença "flexível" no
 formulário é um convite permanente a colar texto alheio "porque dá para

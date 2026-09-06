@@ -33,8 +33,8 @@ geracao/respostas/**
 
 # Campanha de DESTILAÇÃO (Central de Briefs Pedagógicos). Mesma forma das duas
 # acima e a regra MAIS DURA das três: nas outras o texto é do corpus (licenciado,
-# com atribuição por linha); aqui é material didático de TERCEIROS — Ática,
-# Scipione e Saraiva, copyright integral, sem concessão de licença nenhuma, e
+# com atribuição por linha); aqui é material didático de TERCEIROS — três
+# editoras comerciais, copyright integral, sem concessão de licença nenhuma, e
 # ainda com citações de outros titulares dentro dele. Histórico de git não se
 # apaga, então nem uma linha desse texto pode entrar. Versionado é só o
 # `manifest.json` — o livro-caixa, que guarda estado e cursor, nunca conteúdo.
@@ -66,3 +66,10 @@ dist/
 *.tmp
 .DS_Store
 Thumbs.db
+
+# Dump do annotate.sqlite (scripts/backup_bancada.py). Já foi versionado e saiu
+# do HEAD e da história na Camada 1: carrega texto derivado do corpus e os
+# gabaritos escondidos das sintéticas. O padrão do script é data/backups/ (já
+# coberto por data/); esta linha fecha a porta a quem apontar --destino para
+# a pasta antiga.
+backups/

@@ -88,7 +88,7 @@ Tudo nesta seção é sobre a licença dos **dados**. A do **código** é outra,
 ### Pré-requisitos reais
 
 * **Python 3.12** (o `pyproject` fixa `>=3.12,<3.13`).
-* **[uv](https://docs.astral.sh/uv/)**. Nesta máquina ele está em `C:\Users\gigio\.local\bin\uv.exe` e **não entra no PATH** até você abrir um terminal novo — daí o caminho completo em todos os comandos abaixo. Se `uv` já funciona no seu shell, ignore o prefixo.
+* **[uv](https://docs.astral.sh/uv/)**. Nesta máquina ele está em `%USERPROFILE%\.local\bin\uv.exe` e **não entra no PATH** até você abrir um terminal novo — daí o caminho completo em todos os comandos abaixo. Se `uv` já funciona no seu shell, ignore o prefixo.
 * **~8 GB de disco livre**: `data/` fica com 3,8 GB (raw 700 MB · interim 1,8 GB · final 288 MB · emb 261 MB · db 875 MB), mais ~2,5 GB de cache do HuggingFace para as fontes pequenas (só o `arena140k` são 1,6 GB) e ~470 MB do modelo de embeddings.
 * **Rede** para a ingestão — e paciência: os dois passes do WildChat baixam ~9–11,5 GB **cada**, em *streaming*, sem guardar nada em disco. Depois disso nada mais sai da máquina.
 

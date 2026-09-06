@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 import unicodedata
@@ -117,11 +118,20 @@ def material_dir() -> Path:
     mudar de disco, e o que identifica um recorte é o NOME do arquivo. É também
     o parafuso que permite apontar a campanha para material de autoria própria
     um dia — o caso em que a §6 do plano admitiria embutir o recorte.
+
+    A variável de ambiente ``PF_MATERIAL_DIR`` vence o ``settings.toml``. O
+    arquivo versionado deixa a chave VAZIA de propósito: o material é de
+    terceiros e a pasta é da máquina de quem roda a campanha — um caminho
+    pessoal num arquivo rastreado voltaria ao HEAD no primeiro commit distraído
+    (R13 da Camada 1). Apontar pela variável não suja arquivo nenhum.
     """
-    bruto = str(_cfg("pedidos", "material_dir", default="")).strip()
+    bruto = os.environ.get("PF_MATERIAL_DIR", "").strip() or str(
+        _cfg("pedidos", "material_dir", default="")
+    ).strip()
     if not bruto:
         raise ValueError(
-            "[pedidos] material_dir não está configurado em config/settings.toml — "
+            "[pedidos] material_dir não está configurado — defina a variável de "
+            "ambiente PF_MATERIAL_DIR (recomendado) ou a chave em config/settings.toml; "
             "a campanha não sabe onde procurar o material"
         )
     return Path(bruto)
@@ -192,11 +202,13 @@ def task_types_excluidos() -> tuple[str, ...]:
 # SARAIVA" aparece com espaço e com underscore, e um arquivo é inteiramente
 # minúsculo-hifenizado. Um `split("_")[2]` erraria em pelo menos três.
 
-#: Fragmento normalizado → nome legível da coleção.
+#: Fragmento normalizado → nome legível da coleção. O nome legível é o da
+#: COLEÇÃO, sem a editora: as outras duas já não carregam a delas, e num
+#: repositório público o titular do material não agrega sinal técnico (D6).
 COLECOES: dict[str, str] = {
     "CIENCIA_VIVA": "Ciência Viva",
     "DOSEUJEITO": "Do Seu Jeito",
-    "IDENTIDADE_SARAIVA": "Identidade Saraiva",
+    "IDENTIDADE_SARAIVA": "Identidade",
     "SINTESIS": "Síntesis",
 }
 

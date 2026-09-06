@@ -84,7 +84,7 @@
     <p class="doc-kicker">PRD · Especificação</p>
     <h1 class="doc-title" data-slot="titulo">Prompt Factory — padrão-ouro SOTA em Data Annotation</h1>
     <p class="doc-meta">
-      <span><b>Estado:</b> <span data-slot="estado"><span class="badge ok">aprovado</span> <span class="badge neutral">2026-08-13, com emenda no R3</span></span></span>
+      <span><b>Estado:</b> <span data-slot="estado"><span class="badge ok">aprovado</span> <span class="badge neutral">2026-08-13, com emenda no R3 · 2026-09-05, emenda em R13/R14 (pathspec)</span></span></span>
       <span><b>Autor:</b> <span data-slot="autor">Geovani H. S. de Souza · redigido com Claude Code</span></span>
       <span><b>Data:</b> <span data-slot="data">2026-08-13</span></span>
     </p>
@@ -188,8 +188,8 @@
         <li><input type="checkbox" id="a10"><label for="a10">R10 — <code>docs/samples/</code> lista ≥3 arquivos (um de cada tipo); nenhum contém texto de corpus.</label></li>
         <li><input type="checkbox" id="a11"><label for="a11">R11 — Link do vídeo no README responde (unlisted ok); duração ≤6 min; conteúdo só demo/CC0.</label></li>
         <li><input type="checkbox" id="a12"><label for="a12">R12 — <code>git log --all --oneline -- backups/bancada.sql</code> retorna vazio no repositório publicado; o script de backup documenta o destino externo; nenhuma citação de SHA morto sobra em <code>CLAUDE.md</code> nem em <code>docs/central-de-briefs/</code>.</label></li>
-        <li><input type="checkbox" id="a13"><label for="a13">R13 — <code>git grep -iE "Users[/\\]gigio|Ensino Medio"</code> retorna vazio no HEAD.</label></li>
-        <li><input type="checkbox" id="a14"><label for="a14">R14 — <code>git grep -E "Ática|Scipione|Saraiva"</code> retorna vazio no HEAD.</label></li>
+        <li><input type="checkbox" id="a13"><label for="a13">R13 — <code>git grep -iE "Users[/\\]gigio|Ensino Medio" -- . ':!docs/artefatos/prd-padrao-ouro.html'</code> retorna vazio no HEAD (o próprio PRD, que cita a string no critério, fica fora do grep — emenda de 2026-09-05, decisão PC3 do plano da Camada 1).</label></li>
+        <li><input type="checkbox" id="a14"><label for="a14">R14 — <code>git grep -E "Ática|Scipione|Saraiva" -- . ':!docs/artefatos/prd-padrao-ouro.html'</code> retorna vazio no HEAD (mesma exclusão do R13, pela mesma razão).</label></li>
         <li><input type="checkbox" id="a15"><label for="a15">R15 — O documento de metodologia contém a regra do ouro público ("nunca reusado com anotadores externos" ou equivalente), verificável por grep.</label></li>
         <li><input type="checkbox" id="a16"><label for="a16">R16 — <code>gh repo view --json visibility -q .visibility</code> = "PUBLIC"; checklist do gate D11 executado em clone limpo e anexado ao commit do flip.</label></li>
         <li><input type="checkbox" id="a17"><label for="a17">R16b — <code>uv sync</code> sem o extra instala sem torch; <code>uv sync --extra embed</code> instala com; suíte not-slow verde nos dois modos.</label></li>
@@ -338,8 +338,8 @@ CRITERIOS_DE_ACEITE:
   - R10: >=3 arquivos em docs/samples/, um por tipo, sem texto de corpus
   - R11: link responde; <=6 min; conteudo demo/CC0
   - R12: git log --all -- backups/bancada.sql vazio no repo publicado; SHAs citados corrigidos
-  - R13: git grep -iE "Users[/\\]gigio|Ensino Medio" vazio
-  - R14: git grep -E "Atica|Scipione|Saraiva" vazio no HEAD
+  - R13: git grep -iE "Users[/\\]gigio|Ensino Medio" -- . ':!docs/artefatos/prd-padrao-ouro.html' vazio
+  - R14: git grep -E "Ática|Scipione|Saraiva" -- . ':!docs/artefatos/prd-padrao-ouro.html' vazio no HEAD
   - R15: regra do ouro publico presente no doc de metodologia (grep)
   - R16: visibility PUBLIC; gate D11 executado em clone limpo
   - R16b: uv sync sem extra instala sem torch; suite not-slow verde nos dois modos

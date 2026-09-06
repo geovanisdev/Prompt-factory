@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-slot="titulo">Plano de Execução — Camada 1 do padrão-ouro</title>
+<!--
+  TEMPLATE CANÔNICO: Plano/Sprint (Tier 0). Herda DESIGN_SYSTEM.html (D2).
+  Single-file, zero rede em runtime (D5). Engenharia-reversa do
+  00_PLANO_GERAL_*.md real do usuário (D7).
+  data-skel="fixo"  -> esqueleto: a Skill B NUNCA regenera.
+  data-slot="<nome>" -> a Skill B preenche do contexto real (git/specs/relatórios).
+  Aba Machine-Readable = conteúdo do GUIA_EXECUCAO_AGENTE (D4/D8) — schema fixo.
+-->
+<style data-skel="fixo">
+  :root{--paper:#faf8f4;--paper-sunk:#f1eee7;--ink:#1c1b18;--ink-soft:#4a4843;--ink-faint:#8a877f;--rule:#d9d4c8;--rule-strong:#b8b2a3;--accent:#2f5d57;--accent-soft:#e4ece9;--ok:#3f6b3a;--ok-bg:#e8efe5;--warn:#8a6d1f;--warn-bg:#f4ecd6;--danger:#9c3a32;--danger-bg:#f3e0dd;--info:#355c7a;--info-bg:#e1e9ef;--neutral:#5c5a53;--neutral-bg:#eceae3;--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,Cambria,"Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"Cascadia Code","Source Code Pro",Menlo,Consolas,"DejaVu Sans Mono",monospace;--t-xs:.75rem;--t-sm:.875rem;--t-base:1rem;--t-md:1.25rem;--t-lg:1.5625rem;--t-xl:1.953rem;--t-xxl:2.441rem;--s1:.25rem;--s2:.5rem;--s3:.75rem;--s4:1rem;--s5:1.5rem;--s6:2rem;--s7:3rem;--s8:4rem;--measure:74ch;--radius:3px}
+  @media (prefers-color-scheme:dark){:root{--paper:#16150f;--paper-sunk:#1f1d16;--ink:#ece8df;--ink-soft:#b9b4a6;--ink-faint:#807c70;--rule:#33302a;--rule-strong:#4a463c;--accent:#7fb3aa;--accent-soft:#1d2b29;--ok:#8fb886;--ok-bg:#1b251a;--warn:#cdae6a;--warn-bg:#2a2415;--danger:#d28a82;--danger-bg:#2c1916;--info:#8fb2cc;--info-bg:#15222b;--neutral:#a8a59c;--neutral-bg:#23211b}}
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:var(--t-base);line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:920px;margin:0 auto;padding:var(--s6) var(--s5) var(--s8)}
+  .measure{max-width:var(--measure)}
+  .doc-head{border-bottom:2px solid var(--ink);padding-bottom:var(--s4);margin-bottom:var(--s5)}
+  .doc-kicker{font-family:var(--sans);font-size:var(--t-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 var(--s2)}
+  .doc-title{font-size:var(--t-xxl);line-height:1.15;margin:0 0 var(--s3);font-weight:600}
+  .doc-meta{font-family:var(--sans);font-size:var(--t-sm);color:var(--ink-soft);display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);margin:0}
+  .doc-meta b{color:var(--ink);font-weight:600}
+  .canon{font-family:var(--sans);font-size:var(--t-sm);margin-top:var(--s3)}
+  .canon a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
+  .canon a:hover{border-bottom-color:var(--accent)}
+  h2{font-size:var(--t-xl);font-weight:600;margin:var(--s7) 0 var(--s3);line-height:1.2}
+  h3{font-size:var(--t-lg);font-weight:600;margin:var(--s5) 0 var(--s3)}
+  h4{font-family:var(--sans);font-size:var(--t-base);font-weight:700;margin:var(--s4) 0 var(--s2)}
+  p{margin:0 0 var(--s4)}
+  code,kbd{font-family:var(--mono);font-size:.92em;background:var(--paper-sunk);padding:.1em .35em;border-radius:var(--radius)}
+  .tabs{margin:var(--s5) 0}
+  .tab-strip{display:flex;flex-wrap:wrap;gap:var(--s1);border-bottom:1px solid var(--rule-strong);font-family:var(--sans)}
+  .tab-btn{appearance:none;background:none;border:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;color:var(--ink-faint);padding:var(--s2) var(--s4);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .tab-btn:hover{color:var(--ink)}
+  .tab-btn[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-btn.machine{margin-left:auto;color:var(--neutral)}
+  .tab-btn.machine[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+  .tab-panel{padding:var(--s5) 0}
+  .tab-panel[hidden]{display:none}
+  .lang-bar{display:flex;align-items:center;gap:var(--s2);margin:0 0 var(--s4);font-family:var(--sans)}
+  .lang-bar .lang-lbl{color:var(--ink-faint);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .lang-btn{appearance:none;cursor:pointer;font:inherit;font-size:var(--t-sm);font-weight:600;background:none;color:var(--ink-faint);border:1px solid var(--rule);border-radius:100px;padding:.2em .9em}
+  .lang-btn:hover{color:var(--ink);border-color:var(--rule-strong)}
+  .lang-btn[aria-pressed="true"]{color:#fff;background:var(--accent);border-color:var(--accent)}
+  [data-lang="pt"] .lang-en,[data-lang="en"] .lang-pt{display:none}
+  .badge{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:.15em .6em;border-radius:100px;display:inline-block;line-height:1.6}
+  .badge.ok{color:var(--ok);background:var(--ok-bg)}.badge.warn{color:var(--warn);background:var(--warn-bg)}.badge.danger{color:var(--danger);background:var(--danger-bg)}.badge.info{color:var(--info);background:var(--info-bg)}.badge.neutral{color:var(--neutral);background:var(--neutral-bg)}
+  table.grid{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:var(--t-sm);margin:var(--s4) 0}
+  table.grid caption{text-align:left;font-size:var(--t-xs);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:var(--s2)}
+  table.grid th{text-align:left;font-weight:700;color:var(--ink);border-bottom:2px solid var(--rule-strong);padding:var(--s2) var(--s3)}
+  table.grid td{border-bottom:1px solid var(--rule);padding:var(--s2) var(--s3);vertical-align:top}
+  table.grid tr:hover td{background:var(--paper-sunk)}
+  .callout{border-left:3px solid var(--rule-strong);background:var(--paper-sunk);padding:var(--s3) var(--s4);margin:var(--s4) 0;border-radius:0 var(--radius) var(--radius) 0}
+  .callout .lbl{font-family:var(--sans);font-size:var(--t-xs);font-weight:700;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:var(--s1)}
+  .callout.note{border-color:var(--info)}.callout.note .lbl{color:var(--info)}
+  .callout.warn{border-color:var(--warn)}.callout.warn .lbl{color:var(--warn)}
+  .callout.danger{border-color:var(--danger)}.callout.danger .lbl{color:var(--danger)}
+  .callout p:last-child{margin-bottom:0}
+  ul.check{list-style:none;padding:0;font-family:var(--sans);font-size:var(--t-sm)}
+  ul.check li{display:flex;gap:var(--s2);align-items:flex-start;padding:var(--s2) 0;border-bottom:1px solid var(--rule)}
+  ul.check input{margin-top:.25em;accent-color:var(--accent)}
+  ul.check li.done label{color:var(--ink-faint);text-decoration:line-through}
+  .btn{font-family:var(--sans);font-size:var(--t-sm);font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);padding:var(--s2) var(--s4);cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:none;color:var(--accent);border:1px solid var(--accent)}
+  .btn-row{display:flex;gap:var(--s2);flex-wrap:wrap;margin:var(--s4) 0}
+  .toast{font-family:var(--sans);font-size:var(--t-sm);color:var(--ok);margin-left:var(--s2);opacity:0;transition:opacity .2s}
+  .toast.show{opacity:1}
+  .machine-block{background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:var(--t-sm);line-height:1.6;padding:var(--s5);border-radius:var(--radius);overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  @media (prefers-color-scheme:dark){.machine-block{background:#000}}
+  .timeline{width:100%;height:auto;font-family:var(--sans);margin:var(--s4) 0}
+  .timeline text{fill:var(--ink-soft);font-size:11px}
+  .timeline .node-label{fill:var(--ink);font-weight:700}
+  .timeline line,.timeline circle{stroke:var(--rule-strong)}
+  .timeline circle.done{fill:var(--ok);stroke:var(--ok)}
+  .timeline circle.now{fill:var(--accent);stroke:var(--accent)}
+  .timeline circle.todo{fill:var(--paper)}
+  footer.doc-foot{margin-top:var(--s8);padding-top:var(--s4);border-top:1px solid var(--rule);font-family:var(--sans);font-size:var(--t-xs);color:var(--ink-faint)}
+  @media print{.tab-btn{display:none}.lang-bar{display:none}.tab-panel[hidden]{display:block!important}.btn,.btn-row{display:none}body{background:#fff;color:#000}a{color:#000}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+  .save-bar{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px solid var(--rule);padding:var(--s2) var(--s5);display:flex;align-items:center;gap:var(--s3);font-family:var(--sans);font-size:var(--t-sm);margin:0 calc(-1*var(--s5))}
+  .save-hint{font-size:var(--t-xs);color:var(--ink-faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc-head" data-skel="fixo">
+    <p class="doc-kicker">Plano de Execução</p>
+    <h1 class="doc-title" data-slot="titulo">Camada 1 — sanitizar, embalar em inglês, tornar público</h1>
+    <p class="doc-meta">
+      <span><b>Origem:</b> <span data-slot="origem">PRD padrão-ouro (aprovado), fatias 05–07; a fatia-08 (vídeo) fica fora — ver Backlog</span></span>
+      <span><b>Esforço total:</b> <span data-slot="esforco-total">~7–9 h em 3 sprints, mais três ações suas na interface do GitHub</span></span>
+      <span><b>Estado:</b> <span data-slot="estado"><span class="badge info">aguardando aprovação</span> <span class="badge ok">espelho feito 2026-09-05</span></span></span>
+    </p>
+    <p class="canon" data-slot="canon">Links canônicos: <code>docs/artefatos/prd-padrao-ouro.html</code> (R9–R16, D4, D6, D9, D11, RK2) · <code>docs/artefatos/plano-sprint-camada-0.html</code> (fechado em <code>472fb7f</code>) · espelho pré-reescrita em <code>F:\backups\prompt-factory\pre-filter-repo-2026-09-05\</code> (mirror git + bundle + os dois <code>annotate.sqlite</code> + <code>destilacao/</code> + semente e lotes; 35 MB, <code>fsck</code> limpo)</p>
+  </header>
+
+  <div class="save-bar" data-skel="fixo">
+    <button type="button" class="btn" id="btn-save">💾 Salvar HTML</button>
+    <span class="toast" id="toast-save">salvo ✓</span>
+    <span class="save-hint">Autosave local ativo · Chrome/Edge: reescreve o arquivo · Firefox: baixa cópia · <kbd>Ctrl+S</kbd></span>
+  </div>
+
+  <div class="tabs" data-skel="fixo">
+    <div class="tab-strip" role="tablist" aria-label="Seções do plano">
+      <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="p-plano">Plano</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-sprints">Sprints</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-decisoes">Decisões</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="p-exp">Explicador</button>
+      <button class="tab-btn machine" role="tab" aria-selected="false" aria-controls="p-machine">Machine-Readable</button>
+    </div>
+
+    <section class="tab-panel" id="p-plano" role="tabpanel">
+      <h2 data-skel="fixo">Contexto</h2>
+      <div class="measure" data-slot="contexto">
+        <p>A Camada 0 fez o repositório dizer a verdade sobre si mesmo. A Camada 1 o torna <b>público</b> — e histórico
+        público não se apaga. Por isso ela tem uma única operação destrutiva, o <code>git filter-repo</code>, cercada de
+        tudo o mais: espelho antes, verificação em clone limpo depois, e o flip de visibilidade como último ato, feito
+        por você na interface do GitHub.</p>
+
+        <p>O que sai da história é <code>backups/bancada.sql</code>: um dump do banco da Bancada com texto derivado do
+        corpus (inclusive um nome próprio vindo de um prompt do WildChat) e os gabaritos escondidos das sintéticas. Ele
+        contradiz a política do próprio <code>.gitignore</code>, que mantém fora do git tudo o que carrega corpo de prompt.
+        O recon corrigiu a premissa do PRD: o arquivo está em <b>um</b> commit (<code>4598795</code>, 2026-08-12), não em
+        68 — o PRD contou os commits do repositório. Esse commit também criou <code>scripts/backup_bancada.py</code>, então
+        ele <b>não</b> fica vazio depois do filtro: sobrevive com outro SHA. Todo commit posterior contém o blob na árvore
+        e será reescrito — inclusive os 4 SHAs que o handoff da Central cita e os 5 que o plano da Camada 0 cita. O
+        <code>c827c6df</code> do <code>CLAUDE.md</code>, que o PRD mandava corrigir, <b>não é commit deste repositório</b>
+        (é revisão do Hub): lá não há nada a mexer.</p>
+
+        <p>Os outros dois requisitos de sanitização são de conteúdo no HEAD. Caminhos pessoais aparecem em 11 linhas de 9
+        arquivos, e um deles é <b>configuração</b>: <code>[pedidos] material_dir</code> aponta para a pasta local do
+        material didático, e o código a lê só do <code>settings.toml</code> — tirar o caminho de lá exige dar a você outro
+        lugar para pô-lo. As editoras aparecem em prosa dos docs da Central, num comentário do <code>.gitignore</code>, e em
+        <b>código</b>: a tabela que deriva o nome da coleção do nome do arquivo mapeia <code>"Identidade Saraiva"</code>.
+        E há um detalhe que o PRD não previu sobre si: os critérios R13 e R14 citam as strings proibidas <i>literalmente</i>,
+        então o <code>git grep</code> do critério acha o próprio PRD, para sempre.</p>
+      </div>
+
+      <h2 data-skel="fixo">Regras invariantes</h2>
+      <div data-slot="regras-invariantes">
+        <ul>
+          <li><b>Nada é reescrito sem o espelho conferido.</b> Feito: mirror + bundle + dados humanos em <code>F:\backups</code>. O rollback do RK2 é <code>git clone F:\...\repo.mirror.git</code>.</li>
+          <li><b>Reescrever UMA vez.</b> Todo conteúdo (R13, R14, script de backup, <code>.gitignore</code>) entra em <code>main</code> ANTES do filtro; os SHAs citados são corrigidos DEPOIS, lendo o <code>commit-map</code> que o <code>filter-repo</code> grava. Dois filtros gerariam dois mapas e dobrariam o risco de citação morta.</li>
+          <li><b>O filtro roda num clone fresco</b>, nunca no checkout com worktrees; depois cada worktree faz <code>fetch</code> + <code>reset --hard</code> — que só toca arquivos rastreados, então os <code>annotate.sqlite</code> e a <code>destilacao/</code> da worktree de briefs ficam onde estão.</li>
+          <li><b>Toda ação no GitHub que muda visibilidade, nome ou existência de repositório é sua</b>, na interface — <code>gh</code> não está instalado, e essas ações são externas e de difícil reversão. Eu preparo, verifico e digo exatamente o que clicar.</li>
+          <li><b>Push com força só depois de você escolher a estratégia</b> (decisão PC1) e só com aprovação no checkpoint do S05.</li>
+          <li><b>PowerShell não redireciona dados</b>, <code>uv</code> pelo caminho completo, não editar PRD/ADR além do que a decisão PC3 autorizar — as regras da Camada 0 continuam valendo.</li>
+          <li><b>Zero texto de corpus</b> nos artefatos novos (<code>docs/samples/</code>): saem de uma Bancada com corpus vazio, como as capturas do R8.</li>
+        </ul>
+      </div>
+
+      <h2 data-skel="fixo">Verificação fim-a-fim</h2>
+      <div data-slot="verificacao">
+        <p>A Camada 1 fecha quando os critérios abaixo passam <b>num clone limpo do remoto</b> (gate D11), e só então você muda a visibilidade:</p>
+        <pre class="machine-block"># no clone limpo (git clone https://github.com/geovanisdev/Prompt-factory.git)
+git log --all --oneline -- backups/bancada.sql        # R12: VAZIO
+git grep -iE "Users[/\\]gigio|Ensino Medio" -- . ':!docs/artefatos/prd-padrao-ouro.html'   # R13: VAZIO
+git grep -E "Ática|Scipione|Saraiva"      -- . ':!docs/artefatos/prd-padrao-ouro.html'   # R14: VAZIO
+for s in $(git grep -hoE '\b[0-9a-f]{7,10}\b' -- '*.md' '*.html'); do git cat-file -e $s^{commit} 2>/dev/null || true; done   # R12: nenhum SHA citado esta morto
+head -30 README.md                                      # R9: ingles; o link README.pt-BR.md resolve
+ls docs/samples/                                        # R10: >= 3 arquivos, um por tipo
+grep -c "nunca reusado com anotadores externos" labeling/README.md   # R15: >= 1
+uv sync --locked &amp;&amp; uv run ruff check . &amp;&amp; uv run pytest -q -m "not slow"     # R4 no clone
+# depois do flip, sem autenticacao:
+curl -s https://api.github.com/repos/geovanisdev/Prompt-factory | grep '"private": false'   # R16
+curl -sI https://github.com/geovanisdev/Prompt-factory/actions/workflows/ci.yml/badge.svg | head -1   # R5, finalmente publico</pre>
+        <p>Linha de base medida em 2026-09-05: <code>bancada.sql</code> em 1 commit (676 KB); 11 linhas com caminho pessoal em 9 arquivos; editoras em 6 arquivos de docs, 1 de código, 1 de teste, 1 comentário do <code>.gitignore</code>; 3 branches no remoto; 76 commits com duas identidades de autor (51 + 25); <code>git-filter-repo a40bce548d2c</code> disponível via <code>uvx --system-certs</code>.</p>
+      </div>
+
+      <h2 data-skel="fixo">Backlog aberto</h2>
+      <div data-slot="backlog">
+        <ul>
+          <li><b>fatia-08, o vídeo (R11, <i>could</i>).</b> Precisa de você gravando, sobre o pacote demo. Fica para depois do flip.</li>
+          <li><b>R16b (extra <code>[embed]</code>).</b> <i>Could</i>; mexe na instalação de todo mundo. A D2 já resolveu o custo no CI.</li>
+          <li><b>Objetos pendentes no GitHub após um force-push.</b> Se a decisão PC1 for "mesmo repositório", os blobs antigos continuam alcançáveis por SHA no GitHub até a coleta de lixo deles — a documentação do GitHub manda abrir chamado ao suporte para purgar. Registrado como risco residual dessa opção; a opção "repositório novo" não o tem.</li>
+          <li><b>Prosa defasada do Overview do admin da Bancada</b> — herdado do backlog da Camada 0.</li>
+          <li><b>Camada 2</b> (anotadores humanos, alpha com IC, notebook 03) só começa com o repo público e o consentimento do D12.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="p-sprints" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Linha do tempo</h2>
+      <div data-slot="timeline">
+        <svg class="timeline" viewBox="0 0 640 70" role="img" aria-label="Linha do tempo: três sprints da Camada 1, todos pendentes">
+          <line x1="80" y1="35" x2="560" y2="35" stroke-width="2"/>
+          <circle class="now"  cx="80"  cy="35" r="8"/><text class="node-label" x="80"  y="20" text-anchor="middle">S05</text><text x="80"  y="56" text-anchor="middle">sanitizar</text>
+          <circle class="todo" cx="320" cy="35" r="8"/><text class="node-label" x="320" y="20" text-anchor="middle">S06</text><text x="320" y="56" text-anchor="middle">inglês + samples</text>
+          <circle class="todo" cx="560" cy="35" r="8"/><text class="node-label" x="560" y="20" text-anchor="middle">S07</text><text x="560" y="56" text-anchor="middle">gate + público</text>
+        </svg>
+      </div>
+      <h2 data-skel="fixo">Sprints</h2>
+      <table class="grid" data-slot="tabela-sprints">
+        <caption>Ordem de execução — serial, checkpoint humano entre cada um, um commit por passo</caption>
+        <tr><th>Sprint</th><th>Foco</th><th>Esforço</th><th>Status</th></tr>
+        <tr>
+          <td><b>S05</b><br><span class="badge neutral">fatia-05</span></td>
+          <td><b>Sanitização pré-público</b> — R12, R13, R14, em duas fases.<br>
+          <b>Fase A (conteúdo, antes do filtro):</b> caminhos pessoais fora do HEAD — <code>CLAUDE.md</code> (2), <code>README.md</code> (1),
+          <code>prd-redesign-bancada.html</code> (1), docs da Central (3) e <code>settings.toml</code>, onde <code>material_dir</code> fica vazio e
+          <code>destilacao.material_dir()</code> passa a aceitar <code>PF_MATERIAL_DIR</code> (PC4); editoras → "Editora A/B/C" nos docs e no
+          <code>.gitignore</code>, ISBNs fora, <code>"Identidade Saraiva"</code> → <code>"Identidade"</code> no código e nos testes (PC5);
+          <code>scripts/backup_bancada.py</code> passa a gravar em <code>data/backups/</code> com <code>--destino</code> e documenta o espelho
+          externo; <code>backups/</code> entra no <code>.gitignore</code>; <code>git rm backups/bancada.sql</code>. Suíte verde, merge em <code>main</code>.<br>
+          <b>Fase B (o filtro):</b> clone fresco → <code>uvx --system-certs git-filter-repo --invert-paths --path backups/bancada.sql</code> →
+          ler <code>.git/filter-repo/commit-map</code> → corrigir os 10 SHAs citados (handoff F4-2 ×4, plano C0 ×5, PRD ×1) → commit →
+          push conforme PC1 → <code>fetch</code> + <code>reset --hard</code> em cada worktree → apagar branches remotas absorvidas (PC6).<br>
+          <i>Toca:</i> 9 arquivos de conteúdo, <code>destilacao.py</code> + teste, <code>backup_bancada.py</code>, <code>.gitignore</code>, e a história inteira a partir de <code>4598795</code>.</td>
+          <td>~4 h<br><span class="badge danger">L</span></td>
+          <td><span class="badge neutral">pendente</span></td>
+        </tr>
+        <tr>
+          <td><b>S06</b><br><span class="badge neutral">fatia-06</span></td>
+          <td><b>Embalagem em inglês</b> — R9, R10.<br>
+          <code>README.md</code> vira a versão em inglês, completa (398 linhas, 12 seções — tradução, não resumo); o atual vira
+          <code>README.pt-BR.md</code> e os dois se linkam no topo. <code>tests/test_readme.py</code> passa a conferir os DOIS arquivos
+          (o inglês escreve "1,469 tests", com vírgula e outra palavra — o check atual só enxerga "N testes"). <code>docs/samples/</code>
+          ganha dataset card, quality report e auditoria de um item, gerados por <code>pf annotate export</code> sobre uma Bancada com corpus
+          vazio e uma anotação demo levada até <code>avaliada</code> pela API — a mesma montagem das capturas do R8.<br>
+          <i>Toca:</i> <code>README.md</code>, <code>README.pt-BR.md</code> (novo), <code>tests/test_readme.py</code>, <code>docs/samples/</code> (novo).</td>
+          <td>~3 h<br><span class="badge warn">M</span></td>
+          <td><span class="badge neutral">pendente</span></td>
+        </tr>
+        <tr>
+          <td><b>S07</b><br><span class="badge neutral">fatia-07</span></td>
+          <td><b>Gate e flip</b> — R15, R16.<br>
+          A política do ouro público (D9) entra em <code>labeling/README.md</code> com a frase verificável. Depois, o gate D11: clone limpo do
+          remoto, todos os greps da seção Verificação, <code>uv sync --locked</code> + ruff + suíte. Só com o gate verde eu te passo o
+          checklist e <b>você</b> muda a visibilidade na interface; eu confirmo pela API sem autenticação e pelo badge, e o resultado do gate
+          entra no commit que registra o flip.<br>
+          <i>Toca:</i> <code>labeling/README.md</code>, o plano (fechamento). Ação sua: visibilidade → Public.</td>
+          <td>~1 h + a sua ação<br><span class="badge neutral">S</span></td>
+          <td><span class="badge neutral">pendente</span></td>
+        </tr>
+      </table>
+
+      <div class="callout danger" data-skel="fixo"><span class="lbl">Por que o S05 tem duas fases e o filtro vem no meio</span>
+        <p>O <code>filter-repo</code> reescreve todo commit a partir de <code>4598795</code>. Conteúdo antes, filtro uma vez, SHAs depois
+        pelo mapa: é a única ordem em que cada citação é corrigida exatamente uma vez — um segundo filtro geraria um segundo mapa e
+        invalidaria as citações já corrigidas. E o clone fresco não é preciosismo: o <code>filter-repo</code> recusa rodar num
+        repositório que não seja clone fresco, e com razão — as worktrees deste repositório guardam dados humanos não rastreados.</p>
+      </div>
+
+      <h2 data-skel="fixo">Checklist de progresso</h2>
+      <ul class="check" data-slot="checklist-sprints">
+        <li><input type="checkbox" id="s1"><label for="s1"><b>S05-A</b> — <code>git grep</code> de R13 e R14 vazios no HEAD (fora do PRD); <code>PF_MATERIAL_DIR</code> com teste; <code>backup_bancada.py</code> grava em <code>data/backups/</code>; <code>backups/bancada.sql</code> fora do HEAD; suíte verde; mergeado em <code>main</code>.</label></li>
+        <li><input type="checkbox" id="s2"><label for="s2"><b>S05-B</b> — <code>git log --all -- backups/bancada.sql</code> vazio no clone filtrado; os 10 SHAs citados resolvem para commits vivos; remoto atualizado conforme PC1; cada worktree em <code>reset --hard</code> no ref novo com os dados não rastreados intactos; branches remotas absorvidas apagadas.</label></li>
+        <li><input type="checkbox" id="s3"><label for="s3"><b>S06</b> — primeiras 30 linhas do <code>README.md</code> em inglês; <code>README.pt-BR.md</code> linkado e resolvendo; <code>test_readme.py</code> cobrindo os dois; <code>docs/samples/</code> com ≥3 arquivos de tipos distintos e zero texto de corpus.</label></li>
+        <li><input type="checkbox" id="s4"><label for="s4"><b>S07</b> — frase da política do ouro em <code>labeling/README.md</code>; gate D11 executado em clone limpo com saída colada; visibilidade PUBLIC confirmada pela API; badge respondendo 200 sem autenticação.</label></li>
+      </ul>
+    </section>
+
+    <section class="tab-panel" id="p-decisoes" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Decisões confirmadas</h2>
+      <p class="measure" data-skel="fixo">Cada decisão firme com trade-off real pode ser
+      promovida a ADR no repo do projeto.</p>
+      <table class="grid" data-slot="tabela-decisoes">
+        <tr><th>#</th><th>Decisão</th><th>Motivo</th><th></th></tr>
+        <tr><td><b>D4</b><br><span class="badge neutral">do PRD</span></td><td><code>backups/bancada.sql</code> sai do HEAD e da história; o backup vive fora do git</td><td>PII de terceiro e gabaritos versionados contradizem o próprio <code>.gitignore</code>; barato antes de público, impossível depois</td><td><button class="btn ghost" data-adr="D4">promover a ADR</button></td></tr>
+        <tr><td><b>D6</b><br><span class="badge neutral">do PRD</span></td><td>Editoras → "Editora A/B/C" no HEAD</td><td>Repo público não nomeia titulares de material protegido processado localmente; os nomes não agregam sinal técnico</td><td><button class="btn ghost" data-adr="D6">promover a ADR</button></td></tr>
+        <tr><td><b>D9</b><br><span class="badge neutral">do PRD</span></td><td><code>labeling/manifest.json</code> continua versionado; regra escrita: ouro público nunca reusado com anotadores externos</td><td>Transparência de metodologia vale mais que sigilo retroativo; o risco de integridade se neutraliza por rotação</td><td><button class="btn ghost" data-adr="D9">promover a ADR</button></td></tr>
+        <tr><td><b>D11</b><br><span class="badge neutral">do PRD</span></td><td>Flip público só depois do gate em clone limpo</td><td>Histórico público não se apaga; o gate custa dez minutos</td><td><button class="btn ghost" data-adr="D11">promover a ADR</button></td></tr>
+        <tr><td><b>PC1</b><br><span class="badge warn">pendente — sua</span></td><td><b>Para onde vai a história limpa:</b> (a) <code>force-push</code> no repositório atual, ou (b) renomear o atual para arquivo privado, criar um novo com o mesmo nome e empurrar só a história filtrada</td><td>Em (a), o GitHub mantém os objetos antigos alcançáveis por SHA até a coleta de lixo — o dump continuaria acessível a quem tivesse o hash, e a purga exige chamado ao suporte. Em (b) o repositório novo nunca viu o blob. Mesmo nome ⇒ URL, badge e links do README continuam válidos. <b>Recomendação: (b).</b></td><td><button class="btn ghost" data-adr="PC1">promover a ADR</button></td></tr>
+        <tr><td><b>PC2</b><br><span class="badge warn">pendente — sua</span></td><td><b>Identidade dos commits:</b> 51 em <code>gigio.professor@gmail.com</code>, 25 em <code>geovani.henrique@ifsc.edu.br</code>. Unificar via <code>--mailmap</code> no mesmo filtro, ou manter as duas</td><td>O R13 permite e-mail de contato <i>intencional</i>; o institucional em 25 commits é intencional? É a pendência que a memória registra como não decidida — e o filtro é o único momento barato para unificar</td><td><button class="btn ghost" data-adr="PC2">promover a ADR</button></td></tr>
+        <tr><td><b>PC3</b><br><span class="badge warn">pendente — sua</span></td><td>Os critérios R13 e R14 do PRD passam a excluir o próprio PRD por pathspec (<code>':!docs/artefatos/prd-padrao-ouro.html'</code>); o PRD também recebe o SHA novo de <code>4598795</code> após o filtro</td><td>Um critério que cita a string proibida não pode passar num arquivo que contém o critério. Excluir só o PRD é mecânico e honesto; reescrever as strings dentro dele em forma que não casa consigo mesma seria ofuscação</td><td><button class="btn ghost" data-adr="PC3">promover a ADR</button></td></tr>
+        <tr><td><b>PC4</b><br><span class="badge info">deste plano</span></td><td><code>[pedidos] material_dir</code> fica vazio no <code>settings.toml</code> versionado; <code>destilacao.material_dir()</code> lê <code>PF_MATERIAL_DIR</code> antes do arquivo</td><td>O código só lia a configuração versionada. Sem a variável, o único jeito de apontar para a pasta local seria sujar um arquivo rastreado — e o primeiro commit distraído devolveria o caminho pessoal ao HEAD</td><td><button class="btn ghost" data-adr="PC4">promover a ADR</button></td></tr>
+        <tr><td><b>PC5</b><br><span class="badge info">deste plano</span></td><td><code>"Identidade Saraiva"</code> → <code>"Identidade"</code> na tabela de coleções e nos testes; ISBNs saem dos docs; os nomes de arquivo em MAIÚSCULAS nos testes ficam</td><td>A coleção se chama Identidade — Saraiva é a editora, e as outras duas coleções já não carregam a delas. Os nomes de arquivo são identificadores dos arquivos locais que o parser precisa reconhecer, e o critério (sensível a caixa) não os alcança. Nenhum pedido gravado usa o rótulo antigo (37 Biologia + 5 Filosofia)</td><td><button class="btn ghost" data-adr="PC5">promover a ADR</button></td></tr>
+        <tr><td><b>PC6</b><br><span class="badge info">deste plano</span></td><td>Branches remotas <code>claude/bold-blackburn-da41ab</code> e <code>central-de-briefs</code> apagadas no remoto; a local <code>central-de-briefs</code> fica pelo worktree de briefs</td><td>Ambas estão absorvidas em <code>main</code>. Uma branch remota com a história velha manteria o blob alcançável mesmo depois do filtro</td><td><button class="btn ghost" data-adr="PC6">promover a ADR</button></td></tr>
+        <tr><td><b>PC7</b><br><span class="badge info">deste plano</span></td><td>Conteúdo antes, filtro uma vez, SHAs depois pelo <code>commit-map</code></td><td>Cada citação corrigida exatamente uma vez — ver o callout da aba Sprints</td><td><button class="btn ghost" data-adr="PC7">promover a ADR</button></td></tr>
+      </table>
+
+      <div class="callout danger" data-skel="fixo"><span class="lbl">Risco RK2 — reescrita de histórico</span>
+        <p>Mitigado antes de começar: espelho em <code>F:\backups</code> com <code>fsck</code> limpo e bundle verificado. Modo de falha
+        restante: uma worktree com dados humanos sendo removida em vez de resetada — por isso o filtro roda num clone à parte e as
+        worktrees só recebem <code>reset --hard</code>, que não toca arquivo não rastreado. Se algo sair errado no meio, o comando de
+        volta é um <code>git clone</code> do mirror.</p>
+      </div>
+      <div class="callout warn" data-skel="fixo"><span class="lbl">Risco novo — o remoto durante a transição</span>
+        <p>Entre o push (ou a criação do repositório novo) e o <code>reset --hard</code> das worktrees, qualquer outra sessão que
+        faça <code>git pull</code> neste repositório verá histórias divergentes. Nenhuma das quatro sessões do projeto está com trabalho
+        aberto (recon de 2026-09-05), e a janela é de minutos — mas vale não abrir outra janela do Prompt-factory enquanto o S05-B roda.</p>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="p-exp" role="tabpanel" data-lang="pt" hidden>
+      <div class="lang-bar" data-skel="fixo">
+        <span class="lang-lbl">Idioma</span>
+        <button type="button" class="lang-btn" data-set-lang="pt" aria-pressed="true">Português</button>
+        <button type="button" class="lang-btn" data-set-lang="en" aria-pressed="false">English</button>
+      </div>
+      <div class="callout note" data-skel="fixo"><span class="lbl">Regra desta aba</span>
+        <p>Linguagem leiga, nos dois idiomas: zero sigla sem expansão, zero jargão sem
+        definição na primeira ocorrência, números com a escala explicada. <b>Nenhum fato
+        novo</b> — tudo aqui existe nas outras abas, e as duas versões dizem o mesmo.</p></div>
+      <h2 data-skel="fixo">O que é isto, em 30 segundos</h2>
+      <div data-slot="exp-resumo">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-resumo-pt"><p>É o roteiro para abrir o projeto ao público sem levar junto o que não pode ir. Três tarefas: apagar da memória do projeto um arquivo que nunca deveria ter sido guardado nela, traduzir a porta de entrada para inglês, e só então virar a chave de "privado" para "público" — depois de conferir tudo numa cópia limpa, como um avaliador faria.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-resumo-en"><p>This is the roadmap for opening the project to the public without taking along what must not go. Three tasks: erase from the project's memory a file that should never have been kept there, translate the front door into English, and only then flip the switch from "private" to "public" — after checking everything on a clean copy, the way an evaluator would.</p></div>
+      </div>
+      <h2 data-skel="fixo">Por que isto existe</h2>
+      <div data-slot="exp-porque">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-porque-pt"><p>Um sistema de controle de versão guarda <b>toda</b> versão de todo arquivo, para sempre. Em 12 de agosto foi guardada uma cópia do banco de dados da plataforma de anotação — com texto derivado de conversas de terceiros, inclusive o nome de uma pessoa, e com as respostas escondidas de um teste de calibração. Apagar o arquivo hoje não basta: ele continuaria lá, em cada versão anterior. A única saída é reescrever a história do projeto sem ele, e isso muda o "número de série" de cada versão posterior — inclusive de dez versões que documentos do próprio projeto citam pelo número. Além disso, o projeto guarda em 11 lugares o caminho de pastas do computador do autor e, em vários documentos, o nome de três editoras cujo material foi processado localmente. Nada disso é crime; tudo isso é ruído que um repositório público não deveria carregar.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-porque-en"><p>A version control system keeps <b>every</b> version of every file, forever. On 12 August a copy of the annotation platform's database was stored — with text derived from third-party conversations, including a person's name, and with the hidden answers of a calibration test. Deleting the file today is not enough: it would still be there, in every earlier version. The only way out is to rewrite the project's history without it, and that changes the "serial number" of every later version — including ten versions that the project's own documents cite by number. On top of that, the project stores in 11 places the folder paths of the author's own computer and, in several documents, the names of three publishers whose material was processed locally. None of this is a crime; all of it is noise a public repository should not carry.</p></div>
+      </div>
+      <h2 data-skel="fixo">O que muda daqui pra frente</h2>
+      <div data-slot="exp-muda">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-muda-pt"><p>Fica <b>mais fácil</b> mostrar o projeto: qualquer pessoa abre o endereço, lê em inglês e vê o selo de verificação — sem convite. Fica <b>mais caro</b> errar: depois de público, o que for publicado fica publicado, e é exatamente por isso que a ordem é rígida. O que <b>não se desfaz</b> é a reescrita da história, e ela é a única operação irreversível desta etapa — por isso há uma cópia completa de tudo guardada em outro disco antes de começar, e por isso a escolha de onde publicar a história limpa (o mesmo endereço ou um endereço recriado) é sua, com o trade-off explicado.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-muda-en"><p>It gets <b>easier</b> to show the project: anyone opens the address, reads it in English and sees the verification badge — no invitation needed. It gets <b>more expensive</b> to be wrong: once public, whatever is published stays published, and that is exactly why the order is rigid. What <b>cannot be undone</b> is the rewriting of history, and it is the only irreversible operation in this stage — which is why a complete copy of everything is stored on another disk before starting, and why the choice of where to publish the clean history (the same address or a recreated one) is yours, with the trade-off spelled out.</p></div>
+      </div>
+      <h2 data-skel="fixo">O que isto NÃO diz</h2>
+      <div data-slot="exp-nao_diz">
+        <div class="lang-pt measure" lang="pt-BR" data-slot="exp-nao_diz-pt"><p>Não promete que o arquivo desaparece do servidor do GitHub no instante em que a história é reescrita: se a escolha for manter o mesmo repositório, cópias antigas podem continuar acessíveis por número de série até a limpeza do servidor, e o plano diz isso em vez de esconder. Não faz o vídeo de demonstração — ele precisa de você gravando. Não decide sozinho se os 25 commits assinados com o e-mail institucional devem ser reassinados: é decisão de identidade, e é sua. E não vira a chave: a mudança para público é feita por você, na interface, depois de eu mostrar o resultado da conferência.</p></div>
+        <div class="lang-en measure" lang="en" data-slot="exp-nao_diz-en"><p>It does not promise the file vanishes from GitHub's servers the instant history is rewritten: if the choice is to keep the same repository, old copies may remain reachable by serial number until the server's cleanup, and the plan says so instead of hiding it. It does not make the demo video — that needs you recording. It does not decide on its own whether the 25 commits signed with the institutional e-mail should be re-signed: that is an identity decision, and it is yours. And it does not flip the switch: the change to public is made by you, in the interface, after I show you the result of the check.</p></div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="p-machine" role="tabpanel" hidden>
+      <h2 data-skel="fixo">Guia de execução para o agente</h2>
+      <p class="measure" data-skel="fixo">Schema fixo. O próximo agente do loop ingere
+      isto sem reler o CLAUDE.md inteiro.</p>
+      <div class="machine-block" id="mr" data-slot="machine-readable">PRINCIPIOS:
+  - Um sprint por vez. Termine, teste, reporte, aguarde aprovacao.
+  - Leia antes de escrever. Nunca assuma conteudo de arquivo.
+  - Espelho conferido antes de qualquer reescrita (feito: F:\backups\prompt-factory\pre-filter-repo-2026-09-05).
+  - Teste e parte do sprint; sem output colado o sprint nao terminou.
+  - Escopo fechado; fora de escopo vira observacao, nao correcao.
+  - Acao externa (push com forca, criar/renomear repo, flip de visibilidade) so com aprovacao explicita; as tres ultimas sao do dono, na interface.
+CICLO_DE_SPRINT:
+  1. ler doc do sprint + pre-requisitos
+  2. explicar ao usuario
+  3. .bak/espelho dos criticos
+  4. implementar
+  5. testes obrigatorios
+  6. rodar testes, colar output real
+  7. conferir criterios de aceitacao (binario)
+  8. reportar
+  9. apos aprovacao: arquivar doc, gerar relatorio, proximo
+COMANDOS_DE_TESTE:
+  & "$env:USERPROFILE\.local\bin\uv.exe" run ruff check .
+  & "$env:USERPROFILE\.local\bin\uv.exe" run pytest -q -m "not slow"
+  # S05-B, num CLONE FRESCO (nunca no checkout com worktrees):
+  git clone --no-local G:\Github\Prompt-factory <tmp>\pf-filtro
+  & "$env:USERPROFILE\.local\bin\uv.exe" tool run --system-certs git-filter-repo --invert-paths --path backups/bancada.sql [--mailmap <arquivo>, se PC2]
+  Get-Content .git\filter-repo\commit-map     # old -> new; corrigir as 10 citacoes com ele
+  git log --all --oneline -- backups/bancada.sql   # VAZIO
+  # gate D11 (S07), em outro clone limpo do REMOTO: os greps da aba Plano + uv sync --locked + ruff + pytest
+LINHA_DE_BASE_MEDIDA (2026-09-05):
+  - backups/bancada.sql: 1 commit (4598795, que tambem criou scripts/backup_bancada.py -> NAO fica vazio), 676 KB
+  - SHAs citados que serao reescritos: PROMPT-HANDOFF-F4-2.md x4 (ccb7893 0938e9f 4fe590c 4801ca9),
+    plano-sprint-camada-0.html x5 (d85fefa c30b7b4 59343a2 eebd4b0 c4446d6), prd-padrao-ouro.html x1 (4598795)
+  - NAO e commit do repo: c827c6df (CLAUDE.md, revisao do Hub) — nada a corrigir la; 599d083 (tests/fixtures_annotate_v1.py) e ancestral, fica
+  - caminhos pessoais no HEAD: CLAUDE.md:7,88 · README.md:91 · config/settings.toml:560 (material_dir) · prd-redesign-bancada.html:91
+    · docs/central-de-briefs/HANDOFF.md:171 · PLANO.md:15,50 · (prd-padrao-ouro.html:154,191,341 — e o proprio criterio: PC3)
+  - editoras no HEAD: .gitignore:36-37 · HANDOFF.md:179-181,188 · PLANO.md:59-60,63,85,391,423 · PROMPT-HANDOFF-F4-2.md:99
+    · src/prompt_factory/annotate/destilacao.py:199 · tests/test_central_destilacao.py:131-146 · (prd-padrao-ouro.html:192,342 — PC3)
+  - material_dir: lido SO de settings.toml (destilacao.material_dir); sem flag, sem env — PC4 cria PF_MATERIAL_DIR
+  - identidades: 51 gigio.professor@gmail.com + 25 geovani.henrique@ifsc.edu.br (PC2)
+  - remoto: refs/heads/{main, central-de-briefs, claude/bold-blackburn-da41ab}; gh NAO instalado
+  - documento de metodologia do R15: labeling/README.md
+  - git-filter-repo a40bce548d2c via `uv tool run --system-certs`
+ORDEM_OBRIGATORIA:
+  S05-A conteudo (R13,R14,backup,gitignore) -> suite -> merge main
+  S05-B filtro em clone fresco -> commit-map -> 10 SHAs -> push conforme PC1 -> reset --hard nas worktrees -> PC6
+  S06   README EN + README.pt-BR.md + test_readme (2 arquivos) + docs/samples (Bancada com corpus vazio)
+  S07   R15 em labeling/README.md -> gate D11 em clone limpo do remoto -> DONO flipa -> verificar por API sem auth -> commit do flip com o gate anexado
+PEGADINHAS_TRANSVERSAIS:
+  - filter-repo recusa repo que nao seja clone fresco; use --no-local no clone para nao compartilhar objetos com o checkout.
+  - reset --hard nas worktrees NAO toca arquivo nao rastreado: annotate.sqlite e destilacao/ da briefs ficam. Nunca `worktree remove` ali.
+  - filter-repo reescreve SHAs abreviados dentro de MENSAGENS de commit sozinho; nos ARQUIVOS nao — dai o commit-map.
+  - O PRD cita as strings proibidas nos criterios R13/R14: sem o pathspec de exclusao (PC3), o gate reprova o PRD para sempre.
+  - "Identidade Saraiva" e rotulo DERIVADO do nome do arquivo (destilacao.py:199); mudar exige mudar o esperado nos testes.
+  - test_readme.py casa `N testes` (pt, ponto de milhar); o README EN escreve `1,469 tests` — o check tem de cobrir os dois arquivos.
+  - Force-push no mesmo repo deixa objetos antigos alcancaveis por SHA no GitHub ate a GC (PC1 opcao a).
+  - Depois do push, o CI roda sobre SHAs novos: o badge muda de alvo sem aviso — e o esperado.
+  - Nao abrir outra janela do Prompt-factory durante o S05-B (janela de divergencia).
+  - PowerShell corrompe encoding em redirecionamento; uv pelo caminho completo.</div>
+      <div class="btn-row" data-skel="fixo">
+        <button class="btn" id="btn-prompt">Copiar como prompt de handoff</button>
+        <span class="toast" id="toast">copiado ✓</span>
+      </div>
+    </section>
+  </div>
+
+  <footer class="doc-foot" data-skel="fixo">
+    Artefato durável derivado do plano aprovado (D10) · single-file, zero rede (D5) ·
+    aba Machine-Readable byte-alinhada ao baton-pass (D8).
+  </footer>
+</div>
+
+<script data-skel="fixo">
+(function(){"use strict";
+  document.querySelectorAll(".tabs").forEach(function(tabs){
+    var btns=tabs.querySelectorAll(".tab-btn"),panels=tabs.querySelectorAll(".tab-panel");
+    btns.forEach(function(btn){btn.addEventListener("click",function(){
+      btns.forEach(function(b){b.setAttribute("aria-selected","false")});
+      panels.forEach(function(p){p.hidden=true});
+      btn.setAttribute("aria-selected","true");
+      var pn=document.getElementById(btn.getAttribute("aria-controls"));
+      if(pn)pn.hidden=false;});});});
+  document.querySelectorAll("[data-lang]").forEach(function(root){
+    root.querySelectorAll(".lang-btn").forEach(function(btn){btn.addEventListener("click",function(){
+      var lang=btn.getAttribute("data-set-lang");
+      root.setAttribute("data-lang",lang);
+      root.querySelectorAll(".lang-btn").forEach(function(b){
+        b.setAttribute("aria-pressed",String(b.getAttribute("data-set-lang")===lang));});});});});
+  document.querySelectorAll("ul.check input[type=checkbox]").forEach(function(cb){
+    cb.addEventListener("change",function(){cb.closest("li").classList.toggle("done",cb.checked)});});
+  function flash(id){var t=document.getElementById(id||"toast");if(!t)return;t.classList.add("show");setTimeout(function(){t.classList.remove("show")},1400);}
+  function copy(txt){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){flash();},function(){flash();});}else{var ta=document.createElement("textarea");ta.value=txt;document.body.appendChild(ta);ta.select();try{document.execCommand("copy")}catch(e){}document.body.removeChild(ta);flash();}}
+  // ---- Estado persistente: autosave localStorage + inlineState p/ save durável (ADR 0006) ----
+  var SKEY="artefato:"+location.pathname;
+  function stEls(){return document.querySelectorAll(".wrap input, .wrap select, .wrap textarea, .wrap .pasta");}
+  function stKey(el,i){return el.id?("#"+el.id):(el.tagName+"|"+(el.type||"")+"|"+i);}
+  function captureState(){var s={};stEls().forEach(function(el,i){var k=stKey(el,i);
+    if(el.classList&&el.classList.contains("pasta")) s[k]={p:Array.prototype.map.call(el.querySelectorAll("img"),function(im){return im.src;})};
+    else if(el.type==="checkbox"||el.type==="radio") s[k]={c:el.checked};
+    else s[k]={v:el.value};});return s;}
+  function restoreState(s){if(!s)return;stEls().forEach(function(el,i){var o=s[stKey(el,i)];if(!o)return;
+    if(el.classList&&el.classList.contains("pasta")){el.innerHTML="";(o.p||[]).forEach(function(src){var im=document.createElement("img");im.src=src;el.appendChild(im);});}
+    else if(el.type==="checkbox"||el.type==="radio"){if("c" in o){el.checked=o.c;var li=el.closest("li");if(li&&li.parentNode&&li.parentNode.classList&&li.parentNode.classList.contains("check"))li.classList.toggle("done",el.checked);}}
+    else{if("v" in o)el.value=o.v;}});}
+  function autosave(){try{localStorage.setItem(SKEY,JSON.stringify(captureState()));}catch(e){}}
+  function inlineState(){
+    document.querySelectorAll(".wrap input").forEach(function(el){if(el.type==="checkbox"||el.type==="radio"){if(el.checked)el.setAttribute("checked","checked");else el.removeAttribute("checked");}else el.setAttribute("value",el.value||"");});
+    document.querySelectorAll(".wrap select").forEach(function(el){Array.prototype.forEach.call(el.options,function(o){if(o.value===el.value)o.setAttribute("selected","selected");else o.removeAttribute("selected");});});
+    document.querySelectorAll(".wrap textarea").forEach(function(el){el.textContent=el.value||"";});}
+  var _fsa=null;
+  function saveHtml(){
+    inlineState();
+    var html="<!DOCTYPE html>\n"+document.documentElement.outerHTML;
+    var nm=(document.title||"artefato").replace(/[^\w\-.]+/g,"_")+".html";
+    function blobFallback(){
+      var blob=new Blob([html],{type:"text/html;charset=utf-8"});
+      var url=URL.createObjectURL(blob); var a=document.createElement("a");
+      a.href=url; a.download=nm; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(url);},100);
+      flash("toast-save");}
+    if(_fsa){
+      _fsa.createWritable().then(function(w){return w.write(html).then(function(){return w.close();});}).then(function(){flash("toast-save");}).catch(function(){blobFallback();});
+    } else if(window.showSaveFilePicker){
+      window.showSaveFilePicker({suggestedName:nm,types:[{description:"HTML",accept:{"text/html":[".html"]}}]}).then(function(h){_fsa=h;return h.createWritable();}).then(function(w){return w.write(html).then(function(){return w.close();});}).then(function(){flash("toast-save");}).catch(function(e){if(e.name!=="AbortError") blobFallback();});
+    } else {blobFallback();}}
+  stEls().forEach(function(el){el.addEventListener("input",autosave);el.addEventListener("change",autosave);});
+  try{var _raw=localStorage.getItem(SKEY);if(_raw)restoreState(JSON.parse(_raw));}catch(e){}
+  var bp=document.getElementById("btn-prompt");
+  if(bp)bp.addEventListener("click",function(){var el=document.getElementById("mr");copy("PROMPT DE HANDOFF (Guia de execução do plano):\n\n"+(el?el.textContent:""));});
+  var bs=document.getElementById("btn-save"); if(bs) bs.addEventListener("click",saveHtml);
+  document.addEventListener("keydown",function(e){if((e.ctrlKey||e.metaKey)&&e.key==="s"){e.preventDefault();saveHtml();}});
+})();
+</script>
+</body>
+</html>

@@ -557,7 +557,13 @@ lang_confianca_min = 0.50
 # É também o parafuso que permite apontar a campanha para material de autoria
 # própria um dia; é nesse caso, e só nele, que embutir o recorte seria
 # discutível (§6 do plano, opção (a)).
-material_dir = "G:/Github/Ensino Medio_txt"
+#
+# VAZIO DE PROPÓSITO no arquivo versionado. A pasta é da máquina de quem roda a
+# campanha, e um caminho pessoal num arquivo rastreado volta ao HEAD no primeiro
+# commit distraído (R13 da Camada 1). Aponte pela variável de ambiente
+# PF_MATERIAL_DIR, que vence esta chave e não suja arquivo nenhum; a chave só
+# existe como fallback para quem preferir um settings local não commitado.
+material_dir = ""
 
 # A JANELA que o agente lê de cada vez. 12.000 caracteres é grande o bastante
 # para conter um capítulo com o boxe e as atividades dele, e pequeno o bastante

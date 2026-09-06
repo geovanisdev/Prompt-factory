@@ -66,6 +66,7 @@ def material(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     arquivo = raiz / "DOSEUJEITO_PNLD26_Filosofia_VU_MP.txt"
     arquivo.write_text(_texto_material(), encoding="utf-8")
     secao = config.settings()["pedidos"]
+    monkeypatch.delenv("PF_MATERIAL_DIR", raising=False)
     monkeypatch.setitem(secao, "material_dir", str(raiz))
     monkeypatch.setitem(secao, "janela_chars", 1_000)
     monkeypatch.setitem(secao, "janela_overlap", 100)
@@ -128,22 +129,22 @@ NOMES = [
     # tudo minúsculo e hifenizado, sem "PNLD26" no lugar de sempre
     (
         "identidade-saraiva-projetos-integradores-matematica-pnld-ensino-medio-2026.txt",
-        "Identidade Saraiva",
+        "Identidade",
         "Projetos Integradores",
         "",
     ),
     # a mesma coleção com ESPAÇO em vez de underscore
-    ("IDENTIDADE SARAIVA_PNLD26_REDACAO_VU_MP.txt", "Identidade Saraiva", "Redação", ""),
+    ("IDENTIDADE SARAIVA_PNLD26_REDACAO_VU_MP.txt", "Identidade", "Redação", ""),
     ("CIENCIA VIVA_PNLD26_BIOLOGIA_VU_PR.txt", "Ciência Viva", "Biologia", ""),
     ("DOSEUJEITO_PNLD26_Filosofia_VU_MP.txt", "Do Seu Jeito", "Filosofia", ""),
     ("DOSEUJEITO_PNLD26_CIE_HUMANAS_VU_MP.txt", "Do Seu Jeito", "Ciências Humanas", ""),
     ("DOSEUJEITO_PNLD26_LP_VOL2_MP.txt", "Do Seu Jeito", "Língua Portuguesa", "2"),
     ("DOSEUJEITO_PNLD26_MATEM_VOL3_MP.txt", "Do Seu Jeito", "Matemática", "3"),
     # o dígito SOLTO entre underscores — a outra grafia real de volume
-    ("IDENTIDADE_SARAIVA_PNLD26_MATEM_1_MP.txt", "Identidade Saraiva", "Matemática", "1"),
+    ("IDENTIDADE_SARAIVA_PNLD26_MATEM_1_MP.txt", "Identidade", "Matemática", "1"),
     # `ED_FISICA` tem de vencer `FISICA` — é o caso que a ordem por tamanho salva
-    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_FISICA_VU_MP.txt", "Identidade Saraiva", "Educação Física", ""),
-    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_DIGITAL_VU_MP.txt", "Identidade Saraiva", "Educação Digital", ""),
+    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_FISICA_VU_MP.txt", "Identidade", "Educação Física", ""),
+    ("IDENTIDADE_SARAIVA_PNLD26_EM_ED_DIGITAL_VU_MP.txt", "Identidade", "Educação Digital", ""),
 ]
 
 
@@ -404,6 +405,7 @@ def test_nome_com_caminho_e_recusado(material: Path, dp: dmod.DestilacaoPaths) -
 def test_material_dir_nao_configurado_diz_o_que_fazer(
     monkeypatch: pytest.MonkeyPatch, dp: dmod.DestilacaoPaths
 ) -> None:
+    monkeypatch.delenv("PF_MATERIAL_DIR", raising=False)
     monkeypatch.setitem(config.settings()["pedidos"], "material_dir", "")
     with pytest.raises(ValueError, match="material_dir"):
         dmod.preparar(arquivo="x.txt", n=1, dp=dp)
@@ -839,6 +841,7 @@ def test_material_indisponivel_no_import_AVISA_em_vez_de_derrubar(
     """A janela gravada no lote continua sendo prova de que o recorte existiu. O
     que se perde é a checagem de drift — recusar aqui exigiria a pasta montada
     para importar trabalho que já foi feito."""
+    monkeypatch.delenv("PF_MATERIAL_DIR", raising=False)
     monkeypatch.setitem(config.settings()["pedidos"], "material_dir", str(dp.raiz / "sumiu"))
     rel = _importar(conn, dp, "ped_0001", {"pedidos": [_pedido(lote)]})
     assert rel["ok"]
@@ -1054,3 +1057,21 @@ def test_a_campanha_nao_toca_o_corpus(material: Path, dp: dmod.DestilacaoPaths) 
     # e as duas operações da CLI não recebem conexão de corpus nenhuma
     assert set(inspect.signature(dmod.preparar).parameters) == {"arquivo", "n", "dp"}
     assert "corpus" not in set(inspect.signature(dmod.importar).parameters)
+
+
+def test_pf_material_dir_vence_o_settings(monkeypatch, tmp_path):
+    """A variável de ambiente é o caminho recomendado, e ela VENCE o arquivo.
+
+    O ``settings.toml`` versionado deixa ``material_dir`` vazio de propósito
+    (R13: caminho pessoal em arquivo rastreado volta ao HEAD no primeiro commit
+    distraído). Se a chave do arquivo vencesse, a variável seria decoração.
+    """
+    from prompt_factory import config
+    from prompt_factory.annotate import destilacao as dmod
+
+    monkeypatch.setitem(config.settings()["pedidos"], "material_dir", str(tmp_path / "do-arquivo"))
+    monkeypatch.setenv("PF_MATERIAL_DIR", str(tmp_path / "da-variavel"))
+    assert dmod.material_dir() == tmp_path / "da-variavel"
+
+    monkeypatch.setenv("PF_MATERIAL_DIR", "   ")
+    assert dmod.material_dir() == tmp_path / "do-arquivo", "variável em branco cai no arquivo"

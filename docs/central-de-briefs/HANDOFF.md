@@ -168,24 +168,24 @@ chamada pela rota de submissão e pelo import da campanha.
 
 ## 4. O material bruto que o módulo vai destilar
 
-`G:\Github\Ensino Medio_txt` (fora do repositório): **35 arquivos .txt,
+A pasta local do material (fora do repositório; `[pedidos] material_dir` ou `PF_MATERIAL_DIR`): **35 arquivos .txt,
 52.805.785 bytes (~52,8 MB), 1.242.152 linhas**, extração linear de PDF de
 apostilas do **PNLD 2026** (Ensino Médio), todas na edição **Manual do
 Professor** — ou seja, com as respostas do professor intercaladas no texto.
-Três coleções, três selos do mesmo grupo editorial:
+Três coleções, três selos do mesmo grupo editorial (anonimizados aqui como Editora A, B e C — o repositório é público e os nomes não agregam sinal técnico):
 
-| coleção | editora (verbatim do arquivo) | arquivos |
+| coleção | editora | arquivos |
 | --- | --- | --- |
-| Ciência Viva | "Todos os direitos reservados por Editora Scipione S.A." | 3 |
-| Do Seu Jeito | "Todos os direitos reservados por Editora Ática S.A." | 16 |
-| Identidade / Síntesis | "Todos os direitos reservados por Saraiva Educação S.A." | 16 |
+| Ciência Viva | Editora B | 3 |
+| Do Seu Jeito | Editora A | 16 |
+| Identidade / Síntesis | Editora C | 16 |
 
 Dezoito disciplinas/frentes (Biologia, Física, Química, Matemática, LP,
 Redação, História, Geografia, Filosofia, Sociologia, Arte, Espanhol, Ed.
 Física, Ed. Digital, projetos integradores…), com códigos de habilidade da
 BNCC (`EM13CNT201`, `EM13CHS101`…) marcando cada capítulo. **Copyright
-integral e explícito**: página de créditos completa, CIP, ISBN (ex.:
-978-65-267-0282-6, Filosofia/Ática 2024), autores nomeados, e o carimbo "PNLD
+integral e explícito**: página de créditos completa, CIP, ISBN (Filosofia,
+Editora A, 2024), autores nomeados, e o carimbo "PNLD
 EM 2026–2029 — MATERIAL DE DIVULGAÇÃO". Os livros ainda **citam terceiros
 dentro deles** (tradução de Nietzsche da Companhia das Letras, Vernant/Difel,
 questões Fuvest/UFPR) — um recorte pode cair em texto que nem é da editora. As
