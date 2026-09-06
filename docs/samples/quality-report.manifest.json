@@ -1,0 +1,65 @@
+{
+  "created_at": "2026-09-06T11:48:16Z",
+  "file": "quality-report.md",
+  "sha256": "05cf4456fdec3640ce9893e90411ddae20f22b171c7623e4a412558ccc2fee7c",
+  "bytes": 2381,
+  "profile": "quality-report",
+  "container": "md",
+  "title": "Quality report",
+  "description": "How the work was checked: two review passes, reviewer calibration against hidden targets, and the metric that measures triage itself.",
+  "language": "en",
+  "row_count": 1,
+  "source_annotations": 1,
+  "statuses": [
+    "avaliada"
+  ],
+  "include_synthetic": false,
+  "include_pending_evaluation": false,
+  "synthetic_signal": "anotacoes.gabarito_avaliacao_json IS NOT NULL",
+  "synthetic_in_scope": 0,
+  "prompt_sumido": 0,
+  "task_types": [
+    "comparar_ab"
+  ],
+  "project": null,
+  "attributions": {},
+  "taxonomy_version": "1.0",
+  "app_version": "0.1.0",
+  "annotation_schema_version": 7,
+  "composition": {
+    "anotacoes": 1,
+    "sinteticas": 0,
+    "humanas": 1,
+    "sinteticas_por_alvo": {},
+    "sinteticas_por_familia": {},
+    "material_por_origem": {
+      "rubricas": {
+        "fixture": 12
+      },
+      "respostas_modelo": {
+        "fixture": 24
+      }
+    },
+    "sinal": "anotacoes.gabarito_avaliacao_json IS NOT NULL"
+  },
+  "calibration": {
+    "n": 0,
+    "scale": [
+      "inutilizavel",
+      "ajustavel",
+      "adequado",
+      "excepcional"
+    ]
+  },
+  "triage_leak": {
+    "approved_by_triage": 1,
+    "then_rated": 1,
+    "arrived_unusable": 0,
+    "ended_unsalvageable": 0,
+    "leak_rate": 0.0,
+    "annotation_ids": {
+      "arrived_unusable": [],
+      "ended_unsalvageable": []
+    }
+  }
+}
